@@ -9,6 +9,9 @@ import os
 import sys
 
 from ravn_app.ui.converter_tab import ConverterTab
+from ravn_app.ui.subtitle_tab import SubtitleTab
+from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
+from ravn_app.core.database import DatabaseManager, ConfigManager
 
 
 class YouTubeDownloaderApp(ctk.CTk):
@@ -22,50 +25,63 @@ class YouTubeDownloaderApp(ctk.CTk):
         ctk.set_default_color_theme("blue")
 
         self.title("RAVN - Media Manager")
-        self.geometry("1000x700")
-        self.minsize(900, 600)
+        self.geometry("1200x800")
+        self.minsize(1000, 700)
+
+        # Database ve Config yönetimi (Faz 4)
+        self.db_manager = DatabaseManager("ravn_history.db")
+        self.config_manager = ConfigManager("ravn_config.json")
 
         # Tema yönetimi
-        self.current_theme = 'nordic'
+        self.current_theme = self.config_manager.get('theme', 'nordic')
         self._setup_ui()
+
+    def __del__(self):
+        """Uygulama kapanırken veritabanını kapat"""
+        if hasattr(self, 'db_manager'):
+            self.db_manager.close()
 
     def _setup_ui(self):
         """UI bileşenlerini kur"""
         # Üst başlık
         header_frame = ctk.CTkFrame(self, fg_color="#1a1a1a")
         header_frame.pack(fill="x", padx=0, pady=0)
-        
+
         title = ctk.CTkLabel(
             header_frame,
             text="🎬 RAVN - Media Manager",
             font=ctk.CTkFont(size=22, weight="bold")
         )
         title.pack(pady=15)
-        
+
         # Sekmeli arayüz
         self.tabview = ctk.CTkTabview(self, anchor="nw")
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Sekme: İndir
+
+        # Sekme: İndir (Faz 1)
         download_tab = self.tabview.add("📥 İndir")
         self._setup_download_tab(download_tab)
-        
-        # Sekme: Dönüştür
+
+        # Sekme: Dönüştür (Faz 2)
         converter_tab = self.tabview.add("🔄 Dönüştür")
         self._setup_converter_tab(converter_tab)
-        
-        # Sekme: Analiz
-        analyzer_tab = self.tabview.add("🔍 Analiz")
-        self._setup_analyzer_tab(analyzer_tab)
-        
-        # Sekme: Ayarlar
+
+        # Sekme: Altyazı (Faz 3)
+        subtitle_tab = self.tabview.add("📝 Altyazı")
+        self._setup_subtitle_tab(subtitle_tab)
+
+        # Sekme: Geçmiş (Faz 4)
+        history_tab = self.tabview.add("📚 Geçmiş")
+        self._setup_history_tab(history_tab)
+
+        # Sekme: Ayarlar (Faz 4 & 5)
         settings_tab = self.tabview.add("⚙️ Ayarlar")
-        self._setup_settings_tab(settings_tab)
-        
+        self._setup_settings_tab_full(settings_tab)
+
         # Alt durum çubuğu
         footer_frame = ctk.CTkFrame(self, fg_color="#1a1a1a")
         footer_frame.pack(fill="x", padx=0, pady=0)
-        
+
         status = ctk.CTkLabel(
             footer_frame,
             text="Hazır • v1.0.0",
@@ -73,7 +89,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             text_color="#888888"
         )
         status.pack(pady=5)
-    
+
     def _setup_download_tab(self, tab):
         """İndirme sekmesini kur"""
         label = ctk.CTkLabel(
@@ -82,7 +98,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             font=("Arial", 18, "bold")
         )
         label.pack(pady=20)
-        
+
         info = ctk.CTkLabel(
             tab,
             text="Bu sekme Faz 0 bileşenleri ile doldurulacak\n(Mevcut downloader özelliği)",
@@ -90,97 +106,33 @@ class YouTubeDownloaderApp(ctk.CTk):
             text_color="#999999"
         )
         info.pack(pady=20)
-        
+
         # TODO: Downloader UI'ı buraya ekle
-    
+
     def _setup_converter_tab(self, tab):
-        """Dönüştürme sekmesini kur"""
+        """Dönüştürme sekmesini kur (Faz 2)"""
         converter = ConverterTab(tab, fg_color="transparent")
         converter.pack(fill="both", expand=True)
-    
-    def _setup_analyzer_tab(self, tab):
-        """Analiz sekmesini kur"""
-        label = ctk.CTkLabel(
-            tab,
-            text="🔍 Medya Analiz Aracı",
-            font=("Arial", 18, "bold")
-        )
-        label.pack(pady=20)
-        
-        info = ctk.CTkLabel(
-            tab,
-            text="Bu sekme Faz 2 bileşenleri ile doldurulacak\n(Medya dosya analizi, codec detayları)",
-            justify="center",
-            text_color="#999999"
-        )
-        info.pack(pady=20)
-        
-        # TODO: Analyzer UI'ı buraya ekle
-    
-    def _setup_settings_tab(self, tab):
-        """Ayarlar sekmesini kur"""
-        label = ctk.CTkLabel(
-            tab,
-            text="⚙️ Uygulama Ayarları",
-            font=("Arial", 18, "bold")
-        )
-        label.pack(pady=20)
-        
-        settings_frame = ctk.CTkFrame(tab)
-        settings_frame.pack(fill="x", padx=20, pady=10)
-        
-        # Tema seçimi
-        ctk.CTkLabel(settings_frame, text="Görünüm Modu:", font=("Arial", 11)).pack(anchor="w", pady=5)
-        appearance_var = ctk.StringVar(value="Dark")
-        appearance_menu = ctk.CTkOptionMenu(
-            settings_frame,
-            values=["Dark", "Light", "System"],
-            variable=appearance_var,
-            command=self._change_appearance
-        )
-        appearance_menu.pack(fill="x", pady=5)
-        
-        # Tema rengi
-        ctk.CTkLabel(settings_frame, text="Tema Rengi:", font=("Arial", 11)).pack(anchor="w", pady=5)
-        color_var = ctk.StringVar(value="blue")
-        color_menu = ctk.CTkOptionMenu(
-            settings_frame,
-            values=["blue", "green", "dark-blue"],
-            variable=color_var,
-            command=self._change_theme
-        )
-        color_menu.pack(fill="x", pady=5)
-        
-        # Hakkında
-        about_frame = ctk.CTkFrame(tab)
-        about_frame.pack(fill="x", padx=20, pady=20)
-        
-        ctk.CTkLabel(about_frame, text="Hakkında", font=("Arial", 12, "bold")).pack(anchor="w")
-        
-        about_text = ctk.CTkLabel(
-            about_frame,
-            text="""RAVN - Rapid Audio-Video Networking
-Sürüm: 1.0.0 (Faz 1: Video Converter)
 
-Özellikler:
-• YouTube Video İndirme
-• Video Format Dönüştürme (MP4, MKV, WebM, vb.)
-• Codec Seçimi (H.264, H.265, VP9, AV1)
-• Toplu İşlem Desteği
-• Medya Dosya Analizi (Faz 2)
+    def _setup_subtitle_tab(self, tab):
+        """Altyazı sekmesini kur (Faz 3)"""
+        subtitle_manager = SubtitleTab(tab, fg_color="transparent")
+        subtitle_manager.pack(fill="both", expand=True)
 
-Geliştirici: waldseelen
-GitHub: https://github.com/waldseelen/ravn""",
-            font=("Arial", 9),
-            text_color="#CCCCCC",
-            justify="left"
-        )
-        about_text.pack(anchor="w", pady=10)
-    
+    def _setup_history_tab(self, tab):
+        """Geçmiş sekmesini kur (Faz 4)"""
+        history_viewer = HistoryTab(tab, self.db_manager, fg_color="transparent")
+        history_viewer.pack(fill="both", expand=True)
+
+    def _setup_settings_tab_full(self, tab):
+        """Ayarlar sekmesini kur (Faz 4 & 5 - Gelişmiş)"""
+        settings_manager = SettingsTab(tab, self.config_manager, fg_color="transparent")
+        settings_manager.pack(fill="both", expand=True)
+
     def _change_appearance(self, choice):
         """Görünüm modunu değiştir"""
         ctk.set_appearance_mode(choice)
-    
+
     def _change_theme(self, choice):
         """Tema rengini değiştir"""
         ctk.set_default_color_theme(choice)

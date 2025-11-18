@@ -22,7 +22,7 @@ class VideoCodec(Enum):
     VP8 = ("libvpx", "webm", "slow")
     VP9 = ("libvpx-vp9", "webm", "slow")
     AV1 = ("libaom-av1", "mkv", "very_slow")
-    
+
     def __init__(self, lib: str, container: str, default_preset: str):
         self.lib = lib
         self.container = container
@@ -36,7 +36,7 @@ class AudioCodec(Enum):
     OPUS = ("libopus", "webm")
     VORBIS = ("libvorbis", "webm")
     FLAC = ("flac", "mkv")
-    
+
     def __init__(self, lib: str, container: str):
         self.lib = lib
         self.container = container
@@ -82,7 +82,7 @@ class ConversionSettings:
 
 class CodecManager:
     """Codec'ler ve FFmpeg parametrelerini yönet"""
-    
+
     # Desteklenen video codec'leri
     VIDEO_CODECS = {
         'h264': VideoCodec.H264,
@@ -92,7 +92,7 @@ class CodecManager:
         'vp9': VideoCodec.VP9,
         'av1': VideoCodec.AV1,
     }
-    
+
     # Desteklenen ses codec'leri
     AUDIO_CODECS = {
         'aac': AudioCodec.AAC,
@@ -101,7 +101,7 @@ class CodecManager:
         'vorbis': AudioCodec.VORBIS,
         'flac': AudioCodec.FLAC,
     }
-    
+
     # Format -> Varsayılan Codec
     FORMAT_DEFAULTS = {
         'mp4': {'video': VideoCodec.H264, 'audio': AudioCodec.AAC},
@@ -111,17 +111,17 @@ class CodecManager:
         'mov': {'video': VideoCodec.H264, 'audio': AudioCodec.AAC},
         'flv': {'video': VideoCodec.H264, 'audio': AudioCodec.MP3},
     }
-    
+
     @staticmethod
     def get_video_codec(codec_name: str) -> Optional[VideoCodec]:
         """Video codec'i al"""
         return CodecManager.VIDEO_CODECS.get(codec_name.lower())
-    
+
     @staticmethod
     def get_audio_codec(codec_name: str) -> Optional[AudioCodec]:
         """Ses codec'i al"""
         return CodecManager.AUDIO_CODECS.get(codec_name.lower())
-    
+
     @staticmethod
     def get_default_codecs(format_ext: str) -> Dict:
         """Format için varsayılan codec'leri al"""
@@ -129,14 +129,14 @@ class CodecManager:
             'video': VideoCodec.H264,
             'audio': AudioCodec.AAC
         })
-    
+
     @staticmethod
-    def get_video_codec_command(codec: VideoCodec, quality: VideoQuality, 
+    def get_video_codec_command(codec: VideoCodec, quality: VideoQuality,
                                preset: Optional[str] = None) -> List[str]:
         """Video codec FFmpeg parametrelerini döndür"""
         preset = preset or codec.default_preset
         cmd = ['-c:v', codec.lib]
-        
+
         if codec in [VideoCodec.H264, VideoCodec.H265]:
             cmd.extend(['-preset', preset, '-crf', str(quality.value)])
         elif codec == VideoCodec.VP8:
@@ -145,14 +145,14 @@ class CodecManager:
             cmd.extend(['-deadline', preset, '-crf', str(quality.value)])
         elif codec == VideoCodec.AV1:
             cmd.extend(['-cpu-used', str(8 if preset == 'very_slow' else 4)])
-        
+
         return cmd
-    
+
     @staticmethod
     def get_audio_codec_command(codec: AudioCodec, bitrate: AudioBitrate) -> List[str]:
         """Ses codec FFmpeg parametrelerini döndür"""
         cmd = ['-c:a', codec.lib]
-        
+
         if codec == AudioCodec.AAC:
             cmd.extend(['-q:a', '2'])  # Kalite
         elif codec == AudioCodec.MP3:
@@ -163,17 +163,17 @@ class CodecManager:
             cmd.extend(['-q:a', '6'])  # Kalite (0-10)
         elif codec == AudioCodec.FLAC:
             cmd.extend(['-compression_level', '8'])
-        
+
         return cmd
 
 
 class VideoConverter:
     """Video format dönüştürücü"""
-    
+
     def __init__(self, ffmpeg_path: str = "ffmpeg"):
         """
         VideoConverter'ı başlat
-        
+
         Args:
             ffmpeg_path (str): FFmpeg yürütülebilir dosyasının yolu
         """
@@ -182,47 +182,47 @@ class VideoConverter:
         self.is_running = False
         self.progress = 0
         self.status_callback = None
-    
+
     def set_status_callback(self, callback):
         """İlerleme güncellemeleri için callback ayarla"""
         self.status_callback = callback
-    
+
     def _log(self, message: str, level: str = "info"):
         """Günlük mesajı yazdır"""
         if self.status_callback:
             self.status_callback(f"[{level.upper()}] {message}")
         else:
             print(f"[{level.upper()}] {message}")
-    
+
     def convert(self, settings: ConversionSettings) -> bool:
         """
         Videoyu dönüştür
-        
+
         Args:
             settings (ConversionSettings): Dönüştürme ayarları
-            
+
         Returns:
             bool: Başarılı ise True
         """
         try:
             self.is_running = True
-            
+
             # Giriş dosyasını kontrol et
             if not os.path.exists(settings.input_file):
                 self._log(f"Giriş dosyası bulunamadı: {settings.input_file}", "error")
                 return False
-            
+
             # Çıkış dizinini oluştur
             output_dir = os.path.dirname(settings.output_file)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
-            
+
             self._log(f"Dönüştürme başlanıyor: {settings.input_file}")
             self._log(f"Format: {settings.video_codec.name} / {settings.audio_codec.name}")
-            
+
             # FFmpeg komutunu oluştur
             command = self._build_command(settings)
-            
+
             # İşlemi çalıştır
             self.current_process = subprocess.Popen(
                 command,
@@ -230,10 +230,10 @@ class VideoConverter:
                 stderr=subprocess.PIPE,
                 universal_newlines=True
             )
-            
+
             # Çıkıyı izle
             _, stderr = self.current_process.communicate()
-            
+
             if self.current_process.returncode == 0:
                 self._log(f"Dönüştürme tamamlandı: {settings.output_file}", "success")
                 self.is_running = False
@@ -242,16 +242,16 @@ class VideoConverter:
                 self._log(f"Dönüştürme hatası: {stderr}", "error")
                 self.is_running = False
                 return False
-                
+
         except Exception as e:
             self._log(f"Dönüştürme hatası: {str(e)}", "error")
             self.is_running = False
             return False
-    
+
     def _build_command(self, settings: ConversionSettings) -> List[str]:
         """FFmpeg komutunu oluştur"""
         cmd = [self.ffmpeg_path, '-i', settings.input_file]
-        
+
         # Video codec
         if not settings.audio_only:
             codec_cmd = CodecManager.get_video_codec_command(
@@ -260,18 +260,18 @@ class VideoConverter:
                 settings.preset
             )
             cmd.extend(codec_cmd)
-            
+
             # FPS değiştirme
             if settings.fps:
                 cmd.extend(['-r', str(settings.fps)])
-            
+
             # Çözünürlük değiştirme
             if settings.scale:
                 width, height = settings.scale
                 cmd.extend(['-vf', f'scale={width}:{height}'])
         else:
             cmd.append('-vn')  # Video yok
-        
+
         # Ses codec
         if not settings.video_only:
             codec_cmd = CodecManager.get_audio_codec_command(
@@ -281,16 +281,16 @@ class VideoConverter:
             cmd.extend(codec_cmd)
         else:
             cmd.append('-an')  # Ses yok
-        
+
         # Hardware acceleration
         if settings.hardware_accel and settings.hardware_accel != 'none':
             cmd.extend(['-hwaccel', settings.hardware_accel])
-        
+
         # Çıkış dosyası
         cmd.extend(['-y', settings.output_file])
-        
+
         return cmd
-    
+
     def stop(self):
         """Dönüştürmeyi durdur"""
         if self.current_process:
@@ -301,11 +301,11 @@ class VideoConverter:
 
 class BatchConverter:
     """Toplu dönüştürme yöneticisi"""
-    
+
     def __init__(self, converter: VideoConverter, max_workers: int = 1):
         """
         BatchConverter'ı başlat
-        
+
         Args:
             converter (VideoConverter): Kullanılacak converter
             max_workers (int): Eşzamanlı işçi sayısı (1 = sırasız)
@@ -315,11 +315,11 @@ class BatchConverter:
         self.queue = queue.Queue()
         self.results = []
         self.is_processing = False
-    
+
     def add_files(self, files: List[str], settings_template: ConversionSettings):
         """
         Dönüştürme kuyruğuna dosya ekle
-        
+
         Args:
             files (List[str]): İşlenecek dosyaların listesi
             settings_template (ConversionSettings): Ayarlar şablonu
@@ -329,7 +329,7 @@ class BatchConverter:
             input_path = Path(file)
             output_ext = settings_template.video_codec.container
             output_file = str(input_path.with_suffix(f'.{output_ext}'))
-            
+
             # Ayarları klonla
             settings = ConversionSettings(
                 input_file=file,
@@ -342,16 +342,16 @@ class BatchConverter:
                 fps=settings_template.fps,
                 scale=settings_template.scale
             )
-            
+
             self.queue.put(settings)
-    
+
     def process(self, progress_callback=None) -> Dict:
         """
         Kuyruktaki tüm dosyaları işle
-        
+
         Args:
             progress_callback: İlerleme callback'i
-            
+
         Returns:
             Dict: İşlem sonuçları
         """
@@ -359,32 +359,187 @@ class BatchConverter:
         self.results = []
         total = self.queue.qsize()
         processed = 0
-        
+
         while not self.queue.empty() and self.is_processing:
             settings = self.queue.get()
-            
+
             if progress_callback:
                 progress_callback(f"İşleniyor: {processed + 1}/{total}")
-            
+
             success = self.converter.convert(settings)
             self.results.append({
                 'input': settings.input_file,
                 'output': settings.output_file,
                 'success': success
             })
-            
+
             processed += 1
-        
+
         self.is_processing = False
-        
+
         return {
             'total': total,
             'successful': sum(1 for r in self.results if r['success']),
             'failed': sum(1 for r in self.results if not r['success']),
             'results': self.results
         }
-    
+
     def cancel(self):
         """İşlemi iptal et"""
         self.is_processing = False
         self.converter.stop()
+
+
+# ===== FAZ 2: Video Analiz ve Gelişmiş Özellikler =====
+
+class VideoInfo:
+    """Video dosya bilgileri"""
+
+    def __init__(self):
+        self.filename: str = ""
+        self.duration: float = 0
+        self.width: int = 0
+        self.height: int = 0
+        self.fps: float = 0
+        self.bitrate: int = 0
+        self.video_codec: str = ""
+        self.audio_codec: str = ""
+        self.file_size: int = 0
+        self.container: str = ""
+        self.streams: List[Dict] = []
+
+    def get_display_info(self) -> str:
+        """Görüntülenebilir bilgiler döndür"""
+        return f"""
+📊 Video Bilgileri:
+  Dosya: {self.filename}
+  Süre: {self._format_duration(self.duration)}
+  Çözünürlük: {self.width}x{self.height}
+  FPS: {self.fps:.2f}
+  Video Codec: {self.video_codec}
+  Ses Codec: {self.audio_codec}
+  Bitrate: {self.bitrate / 1000:.0f} kbps
+  Boyut: {self._format_size(self.file_size)}
+  Konteyner: {self.container}
+"""
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        """Süreyi HH:MM:SS formatına çevir"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    @staticmethod
+    def _format_size(bytes_size: int) -> str:
+        """Boyutu insan okunur formata çevir"""
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if bytes_size < 1024:
+                return f"{bytes_size:.2f} {unit}"
+            bytes_size /= 1024
+        return f"{bytes_size:.2f} TB"
+
+
+class VideoAnalyzer:
+    """Video dosyalarını analiz etme motoru"""
+
+    def __init__(self, ffprobe_path: str = "ffprobe"):
+        """VideoAnalyzer'ı başlat"""
+        self.ffprobe_path = ffprobe_path
+
+    def analyze(self, file_path: str) -> Optional[VideoInfo]:
+        """Video dosyasını analiz et"""
+        if not os.path.exists(file_path):
+            return None
+
+        try:
+            cmd = [
+                self.ffprobe_path,
+                '-v', 'error',
+                '-select_streams', 'v:0,a:0',
+                '-show_entries',
+                'format=duration,bit_rate,size,format_name:stream=width,height,r_frame_rate,codec_name,codec_type',
+                '-of', 'json',
+                file_path
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return None
+
+            data = json.loads(result.stdout)
+            format_info = data.get('format', {})
+            streams = data.get('streams', [])
+
+            video_stream = next((s for s in streams if s.get('codec_type') == 'video'), {})
+            audio_stream = next((s for s in streams if s.get('codec_type') == 'audio'), {})
+
+            fps_str = video_stream.get('r_frame_rate', '30/1')
+            if '/' in fps_str:
+                num, den = map(float, fps_str.split('/'))
+                fps = num / den if den else 30
+            else:
+                fps = float(fps_str) if fps_str else 30
+
+            info = VideoInfo()
+            info.filename = os.path.basename(file_path)
+            info.duration = float(format_info.get('duration', 0))
+            info.width = video_stream.get('width', 0)
+            info.height = video_stream.get('height', 0)
+            info.fps = fps
+            info.bitrate = int(format_info.get('bit_rate', 0))
+            info.video_codec = video_stream.get('codec_name', 'unknown')
+            info.audio_codec = audio_stream.get('codec_name', 'none')
+            info.file_size = int(format_info.get('size', 0))
+            info.container = os.path.splitext(file_path)[1][1:]
+            info.streams = streams
+
+            return info
+        except Exception as e:
+            print(f"Analiz hatası: {e}")
+            return None
+
+
+class VideoEditor:
+    """Gelişmiş video düzenleme işlemleri"""
+
+    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+        """VideoEditor'ı başlat"""
+        self.ffmpeg_path = ffmpeg_path
+
+    def trim(self, input_file: str, output_file: str, start_time: float, duration: float) -> bool:
+        """Video kırpması (trim)"""
+        cmd = [self.ffmpeg_path, '-i', input_file, '-ss', str(start_time), '-t', str(duration), '-c', 'copy', '-y', output_file]
+        try:
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except:
+            return False
+
+    def scale(self, input_file: str, output_file: str, width: int, height: int) -> bool:
+        """Çözünürlük değiştirme"""
+        cmd = [self.ffmpeg_path, '-i', input_file, '-vf', f'scale={width}:{height}', '-y', output_file]
+        try:
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except:
+            return False
+
+    def extract_audio(self, input_file: str, output_file: str, audio_codec: AudioCodec) -> bool:
+        """Ses çıkartma"""
+        cmd = [self.ffmpeg_path, '-i', input_file, '-vn', '-c:a', audio_codec.lib, '-y', output_file]
+        try:
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except:
+            return False
+
+    def create_gif(self, input_file: str, output_file: str, start_time: float = 0, duration: float = 5, fps: int = 10) -> bool:
+        """Videodan GIF oluşturma"""
+        cmd = [self.ffmpeg_path, '-i', input_file, '-ss', str(start_time), '-t', str(duration), '-vf', f'fps={fps},scale=320:-1:flags=lanczos', '-y', output_file]
+        try:
+            result = subprocess.run(cmd, capture_output=True)
+            return result.returncode == 0
+        except:
+            return False

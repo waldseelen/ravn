@@ -18,12 +18,13 @@ from ravn_app.core.converter import (
 class ConverterTab(ctk.CTkFrame):
     """Video converter sekmesi"""
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, db_manager=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.converter = VideoConverter()
         self.batch_converter = None
         self.conversion_thread = None
         self.is_converting = False
+        self.db_manager = db_manager  # Veritabanı yöneticisi
 
         self.setup_ui()
 
@@ -362,7 +363,18 @@ class ConverterTab(ctk.CTkFrame):
     def _conversion_worker(self, settings: ConversionSettings):
         """Dönüştürme işçisi (thread'de çalışır)"""
         self.converter.set_status_callback(self.log_add)
+
+        # Progress callback'i ekle
+        def update_progress(progress: float, status: str):
+            """İlerleme güncellemesi"""
+            self.progress_var.set(progress)
+            if status:
+                self.status_label.configure(text=status, text_color="#FFA500")
+
+        self.converter.set_progress_callback(update_progress)
+        start_time = __import__('time').time()
         success = self.converter.convert(settings)
+        duration = __import__('time').time() - start_time
 
         self.is_converting = False
         self.convert_btn.configure(state="normal")
@@ -371,6 +383,24 @@ class ConverterTab(ctk.CTkFrame):
         if success:
             self.status_label.configure(text="✓ Dönüştürme tamamlandı", text_color="#00AA00")
             self.progress_var.set(100)
+
+            # Veritabanına kaydet
+            if hasattr(self, 'db_manager') and self.db_manager:
+                from ravn_app.core.database import ConversionRecord
+                record = ConversionRecord(
+                    input_file=settings.input_file,
+                    output_file=settings.output_file,
+                    input_codec=settings.video_codec.name,
+                    output_codec=settings.video_codec.name,
+                    conversion_date=__import__('datetime').datetime.now().isoformat(),
+                    duration=duration,
+                    status="completed"
+                )
+                try:
+                    self.db_manager.add_conversion(record)
+                except:
+                    pass  # Veritabanı hatası görmezden gel
+
             messagebox.showinfo("Başarılı", f"Video başarıyla dönüştürüldü:\n{settings.output_file}")
         else:
             self.status_label.configure(text="✗ Dönüştürme başarısız", text_color="#FF0000")

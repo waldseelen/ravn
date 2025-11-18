@@ -12,6 +12,7 @@ from ravn_app.ui.converter_tab import ConverterTab
 from ravn_app.ui.subtitle_tab import SubtitleTab
 from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
 from ravn_app.core.database import DatabaseManager, ConfigManager
+from ravn_app.core.platform_support import PlatformManager
 
 
 class YouTubeDownloaderApp(ctk.CTk):
@@ -31,6 +32,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         # Database ve Config yönetimi (Faz 4)
         self.db_manager = DatabaseManager("ravn_history.db")
         self.config_manager = ConfigManager("ravn_config.json")
+        self.platform_manager = PlatformManager()  # Platform desteği
 
         # Tema yönetimi
         self.current_theme = self.config_manager.get('theme', 'nordic')
@@ -91,27 +93,91 @@ class YouTubeDownloaderApp(ctk.CTk):
         status.pack(pady=5)
 
     def _setup_download_tab(self, tab):
-        """İndirme sekmesini kur"""
-        label = ctk.CTkLabel(
-            tab,
-            text="📥 YouTube İndirici",
+        """İndirme sekmesini kur - Platform desteğiyle"""
+        # Başlık
+        header_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        header_frame.pack(fill="x", padx=15, pady=10)
+
+        title = ctk.CTkLabel(
+            header_frame,
+            text="📥 Video İndir",
             font=("Arial", 18, "bold")
         )
-        label.pack(pady=20)
+        title.pack(anchor="w")
 
-        info = ctk.CTkLabel(
-            tab,
-            text="Bu sekme Faz 0 bileşenleri ile doldurulacak\n(Mevcut downloader özelliği)",
-            justify="center",
-            text_color="#999999"
+        # Platform seçimi
+        platform_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        platform_frame.pack(fill="x", padx=15, pady=10)
+
+        platform_label = ctk.CTkLabel(
+            platform_frame,
+            text="Platform:",
+            font=("Arial", 12)
         )
-        info.pack(pady=20)
+        platform_label.pack(side="left", padx=5)
 
-        # TODO: Downloader UI'ı buraya ekle
+        platforms = self.platform_manager.get_supported_platforms()
+        platform_menu = ctk.CTkOptionMenu(
+            platform_frame,
+            values=platforms,
+            command=lambda x: self._on_platform_selected(x)
+        )
+        platform_menu.pack(side="left", padx=5)
+
+        # URL giriş alanı
+        url_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        url_frame.pack(fill="x", padx=15, pady=10)
+
+        url_label = ctk.CTkLabel(
+            url_frame,
+            text="URL:",
+            font=("Arial", 12)
+        )
+        url_label.pack(side="left", padx=5)
+
+        self.url_entry = ctk.CTkEntry(
+            url_frame,
+            placeholder_text="Video URL'sini gir...",
+            width=400
+        )
+        self.url_entry.pack(side="left", padx=5, fill="x", expand=True)
+
+        # Bilgi etiketi
+        self.info_label = ctk.CTkLabel(
+            tab,
+            text="Desteklenen platformlar: " + ", ".join(platforms),
+            text_color="#999999",
+            font=("Arial", 10)
+        )
+        self.info_label.pack(pady=10)
+
+        # İndir butonu
+        download_btn = ctk.CTkButton(
+            tab,
+            text="📥 İndir",
+            command=self._download_video,
+            font=("Arial", 14, "bold"),
+            height=40
+        )
+        download_btn.pack(padx=15, pady=10, fill="x")
+
+    def _on_platform_selected(self, platform: str):
+        """Platform seçildiğinde çağrılır"""
+        print(f"Platform seçildi: {platform}")
+
+    def _download_video(self):
+        """Videoyu indir"""
+        url = self.url_entry.get()
+        if not url:
+            print("URL giriniz")
+            return
+
+        print(f"İndirme başlanıyor: {url}")
+        # TODO: Indirme işlemini çalıştır
 
     def _setup_converter_tab(self, tab):
         """Dönüştürme sekmesini kur (Faz 2)"""
-        converter = ConverterTab(tab, fg_color="transparent")
+        converter = ConverterTab(tab, db_manager=self.db_manager, fg_color="transparent")
         converter.pack(fill="both", expand=True)
 
     def _setup_subtitle_tab(self, tab):

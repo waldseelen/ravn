@@ -1,15 +1,15 @@
-# Projeye Katkı Sağlama (Contributing)
+# Projeye Katk─▒ Sa─şlama (Contributing)
 
-## Hoş Geldiniz! 👋
+## Ho┼ş Geldiniz! ­şæï
 
-RAVN projesine katkı sağlamakla ilgilenmediğiniz için teşekkürler! Bu dokümantasyon, size nasıl etkili bir şekilde proje geliştirmeye katılabileceğinizi gösterecektir.
+RAVN projesine katk─▒ sa─şlamakla ilgilenmedi─şiniz i├ğin te┼şekk├╝rler! Bu dok├╝mantasyon, size nas─▒l etkili bir ┼şekilde proje geli┼ştirmeye kat─▒labilece─şinizi g├Âsterecektir.
 
 ---
 
-## Başlamadan Önce
+## Ba┼şlamadan ├ûnce
 
-1. **Projeyi Fork'layın:** GitHub'da "Fork" butonu ile kendi hesabınıza kopya oluşturun
-2. **Repoyu klonlayın:**
+1. **Projeyi Fork'lay─▒n:** GitHub'da "Fork" butonu ile kendi hesab─▒n─▒za kopya olu┼şturun
+2. **Repoyu klonlay─▒n:**
    ```bash
    git clone https://github.com/YOUR-USERNAME/ravn.git
    cd ravn
@@ -21,17 +21,17 @@ RAVN projesine katkı sağlamakla ilgilenmediğiniz için teşekkürler! Bu dok�
 
 ---
 
-## Geliştirme Ortamı Kurulumu
+## Geli┼ştirme Ortam─▒ Kurulumu
 
 ### Gereksinimler
-- Python 3.8 veya daha yüksek
+- Python 3.8 veya daha y├╝ksek
 - FFmpeg (sistem PATH'inde veya proje dizininde)
 - Git
 
-### Kurulum Adımları
+### Kurulum Ad─▒mlar─▒
 
 ```bash
-# Virtual environment oluştur
+# Virtual environment olu┼ştur
 python -m venv venv
 
 # Virtual environment'i aktive et
@@ -40,109 +40,109 @@ python -m venv venv
 # macOS/Linux:
 source venv/bin/activate
 
-# Bağımlılıkları kur
+# Ba─ş─▒ml─▒l─▒klar─▒ kur
 pip install -r requirements.txt
 
-# Geliştirme araçlarını kur
+# Geli┼ştirme ara├ğlar─▒n─▒ kur
 pip install pytest pytest-cov black flake8 pylint
 ```
 
-### Testleri Çalıştır
+### Testleri ├çal─▒┼şt─▒r
 
 ```bash
-# Tüm testleri çalıştır
+# T├╝m testleri ├ğal─▒┼şt─▒r
 pytest tests/ -v
 
-# Coverage raporu ile çalıştır
+# Coverage raporu ile ├ğal─▒┼şt─▒r
 pytest tests/ --cov=ravn_app --cov-report=html
 
-# Belirli test dosyasını çalıştır
+# Belirli test dosyas─▒n─▒ ├ğal─▒┼şt─▒r
 pytest tests/test_core.py -v
 
-# Belirli test fonksiyonunu çalıştır
+# Belirli test fonksiyonunu ├ğal─▒┼şt─▒r
 pytest tests/test_core.py::TestYouTubeDownloader::test_format_options -v
 ```
 
 ---
 
-## Katkı Türleri
+## Katk─▒ T├╝rleri
 
 ### 1. Bug Raporu
 
-Bir bug buldunuz mu? GitHub Issues'de bir rapor açın:
+Bir bug buldunuz mu? GitHub Issues'de bir rapor a├ğ─▒n:
 
-**Bug raporu şablonu:**
+**Bug raporu ┼şablonu:**
 ```
-**Açıklama:** Bug'ın kısa açıklaması
+**A├ğ─▒klama:** Bug'─▒n k─▒sa a├ğ─▒klamas─▒
 
-**Adımları Tekrarla:**
+**Ad─▒mlar─▒ Tekrarla:**
 1. ...
 2. ...
 3. ...
 
-**Beklenen Davranış:** Ne olması gerekiyordu?
+**Beklenen Davran─▒┼ş:** Ne olmas─▒ gerekiyordu?
 
-**Gerçek Davranış:** Ne oldu?
+**Ger├ğek Davran─▒┼ş:** Ne oldu?
 
 **Ortam:**
-- OS: [ör: Windows 10]
-- Python: [ör: 3.11.0]
-- RAVN: [ör: v1.0.0]
+- OS: [├Âr: Windows 10]
+- Python: [├Âr: 3.11.0]
+- RAVN: [├Âr: v1.0.0]
 ```
 
-### 2. Özellik Talebi (Feature Request)
+### 2. ├ûzellik Talebi (Feature Request)
 
-Yeni bir özellik önerisini Issues'de açın:
+Yeni bir ├Âzellik ├Ânerisini Issues'de a├ğ─▒n:
 
-**Özellik talebinin şablonu:**
+**├ûzellik talebinin ┼şablonu:**
 ```
-**Açıklama:** Yeni özelliğin ne olduğunu açıklayın
+**A├ğ─▒klama:** Yeni ├Âzelli─şin ne oldu─şunu a├ğ─▒klay─▒n
 
-**Amaç:** Bu özellik ne sorunu çözer?
+**Ama├ğ:** Bu ├Âzellik ne sorunu ├ğ├Âzer?
 
-**Önerilen Çözüm:** Nasıl çalışması gerekir?
+**├ûnerilen ├ç├Âz├╝m:** Nas─▒l ├ğal─▒┼şmas─▒ gerekir?
 
-**Alternatif Çözümler:** Başka seçenekler var mı?
+**Alternatif ├ç├Âz├╝mler:** Ba┼şka se├ğenekler var m─▒?
 ```
 
-### 3. Kod Katkısı
+### 3. Kod Katk─▒s─▒
 
-Kod yazarak projeye katkı sağlamak istiyorsanız:
+Kod yazarak projeye katk─▒ sa─şlamak istiyorsan─▒z:
 
-#### Adım 1: Issue'yi Belirleyin
+#### Ad─▒m 1: Issue'yi Belirleyin
 
-- Açık bir issue'yi seçin ve yorum yazarak üzerinde çalışacağınızı belirtin
-- Kendi issue'nizi açabilirsiniz (büyük değişiklikler için önerilir)
+- A├ğ─▒k bir issue'yi se├ğin ve yorum yazarak ├╝zerinde ├ğal─▒┼şaca─ş─▒n─▒z─▒ belirtin
+- Kendi issue'nizi a├ğabilirsiniz (b├╝y├╝k de─şi┼şiklikler i├ğin ├Ânerilir)
 
-#### Adım 2: Branch Oluşturun
+#### Ad─▒m 2: Branch Olu┼şturun
 
 ```bash
-# En son develop'ı çek
+# En son develop'─▒ ├ğek
 git fetch upstream
 git checkout develop
 
-# Yeni feature branch oluştur
+# Yeni feature branch olu┼ştur
 git checkout -b feature/your-feature-name
 
 # veya bug branch'i
 git checkout -b bugfix/your-bug-fix
 ```
 
-**Branch Adlandırma:**
+**Branch Adland─▒rma:**
 - Feature: `feature/video-converter`
 - Bug: `bugfix/download-error`
-- Dokümantasyon: `docs/setup-guide`
+- Dok├╝mantasyon: `docs/setup-guide`
 - Refactor: `refactor/module-structure`
 
-#### Adım 3: Kod Yazın
+#### Ad─▒m 3: Kod Yaz─▒n
 
 **Kod Stil Rehberi:**
-- PEP 8 standardını takip edin
-- Maksimum satır uzunluğu: 100 karakter
-- Anlaşılır değişken isimleri kullanın
+- PEP 8 standard─▒n─▒ takip edin
+- Maksimum sat─▒r uzunlu─şu: 100 karakter
+- Anla┼ş─▒l─▒r de─şi┼şken isimleri kullan─▒n
 - Fonksiyonlara docstring ekleyin
 
-**Docstring Örneği:**
+**Docstring ├ûrne─şi:**
 ```python
 def download_video(url: str, output_path: str) -> bool:
     """
@@ -150,19 +150,19 @@ def download_video(url: str, output_path: str) -> bool:
     
     Args:
         url (str): Video URL'si
-        output_path (str): İndirilen dosya yolu
+        output_path (str): ─░ndirilen dosya yolu
     
     Returns:
-        bool: İşlem başarılı ise True
+        bool: ─░┼şlem ba┼şar─▒l─▒ ise True
     
     Raises:
-        ValueError: URL geçersiz ise
+        ValueError: URL ge├ğersiz ise
     """
 ```
 
-#### Adım 4: Testler Yazın
+#### Ad─▒m 4: Testler Yaz─▒n
 
-Her feature veya bug fix için test yazın:
+Her feature veya bug fix i├ğin test yaz─▒n:
 
 ```python
 def test_new_feature():
@@ -177,23 +177,23 @@ def test_new_feature():
     assert result == expected_value
 ```
 
-#### Adım 5: Kodu Formatla
+#### Ad─▒m 5: Kodu Formatla
 
 ```bash
 # Black ile formatla
 black ravn_app tests
 
-# isort ile import'ları düzenle
+# isort ile import'lar─▒ d├╝zenle
 isort ravn_app tests
 
 # Linting kontrol
 flake8 ravn_app tests
 ```
 
-#### Adım 6: Commit Yap
+#### Ad─▒m 6: Commit Yap
 
 ```bash
-# Değişiklikleri stage et
+# De─şi┼şiklikleri stage et
 git add .
 
 # Commit yap (Conventional Commits kullanarak)
@@ -205,7 +205,7 @@ git commit -m "feat: Add new feature description
 Fixes #123"
 ```
 
-**Commit Mesajı Formatı:**
+**Commit Mesaj─▒ Format─▒:**
 ```
 <type>(<scope>): <subject>
 
@@ -214,96 +214,96 @@ Fixes #123"
 <footer>
 ```
 
-**Tür Örnekleri:**
-- `feat`: Yeni özellik
-- `fix`: Bug düzeltme
-- `docs`: Dokümantasyon
+**T├╝r ├ûrnekleri:**
+- `feat`: Yeni ├Âzellik
+- `fix`: Bug d├╝zeltme
+- `docs`: Dok├╝mantasyon
 - `style`: Kod stili
-- `refactor`: Yeniden yapılandırma
+- `refactor`: Yeniden yap─▒land─▒rma
 - `test`: Test ekleme
 - `chore`: Build/dependencies
 
-#### Adım 7: Push Et
+#### Ad─▒m 7: Push Et
 
 ```bash
 git push origin feature/your-feature-name
 ```
 
-#### Adım 8: Pull Request (PR) Aç
+#### Ad─▒m 8: Pull Request (PR) A├ğ
 
-1. GitHub'da "New Pull Request" tıklayın
-2. **Base:** `develop` (özellikler)
+1. GitHub'da "New Pull Request" t─▒klay─▒n
+2. **Base:** `develop` (├Âzellikler)
 3. **Head:** Sizin branch'iniz
-4. PR şablonunu doldurun:
+4. PR ┼şablonunu doldurun:
 
 ```markdown
-## Açıklama
-Yaptığınız değişiklikleri açıklayın.
+## A├ğ─▒klama
+Yapt─▒─ş─▒n─▒z de─şi┼şiklikleri a├ğ─▒klay─▒n.
 
-## İlgili Issue
+## ─░lgili Issue
 Fixes #123
 
-## Değişiklikler
-- [ ] Özellik A eklendi
-- [ ] Bug B düzeltildi
-- [ ] Dokümantasyon güncellendi
+## De─şi┼şiklikler
+- [ ] ├ûzellik A eklendi
+- [ ] Bug B d├╝zeltildi
+- [ ] Dok├╝mantasyon g├╝ncellendi
 
 ## Test Edildi
-- [ ] Birim testleri geçti
-- [ ] Manuel test yapıldı
+- [ ] Birim testleri ge├ğti
+- [ ] Manuel test yap─▒ld─▒
 
 ## Checklist
 - [ ] Kodu self-review ettim
 - [ ] Uygun yorumlar ve docstring ekledim
-- [ ] Dokümantasyonu güncelledim
+- [ ] Dok├╝mantasyonu g├╝ncelledim
 - [ ] Yeni testler ekledim
-- [ ] Tüm testler geçti
+- [ ] T├╝m testler ge├ğti
 ```
 
 ---
 
-## Kod İncelemesi (Code Review) Süreci
+## Kod ─░ncelemesi (Code Review) S├╝reci
 
-### Reviewer'lar İçin
+### Reviewer'lar ─░├ğin
 
 1. **Kod Kalitesi:** Okunabilir, verimli mi?
-2. **Testler:** Tüm testler geçiyor mu? Coverage yeterli mi?
-3. **Dokümantasyon:** Kod dokümante edilmiş mi?
-4. **Performans:** Performance problem var mı?
-5. **Güvenlik:** Güvenlik açığı var mı?
+2. **Testler:** T├╝m testler ge├ğiyor mu? Coverage yeterli mi?
+3. **Dok├╝mantasyon:** Kod dok├╝mante edilmi┼ş mi?
+4. **Performans:** Performance problem var m─▒?
+5. **G├╝venlik:** G├╝venlik a├ğ─▒─ş─▒ var m─▒?
 
-### Contributor'lar İçin
+### Contributor'lar ─░├ğin
 
-Eleştiri alırsanız:
-- Kişisel alınmayın - kod kalitesi için yapılır
-- Açıklamalar isterse, sorular sorun
-- Feedback'a dayanarak hızlı bir şekilde düzeltme yapın
+Ele┼ştiri al─▒rsan─▒z:
+- Ki┼şisel al─▒nmay─▒n - kod kalitesi i├ğin yap─▒l─▒r
+- A├ğ─▒klamalar isterse, sorular sorun
+- Feedback'a dayanarak h─▒zl─▒ bir ┼şekilde d├╝zeltme yap─▒n
 
 ---
 
 ## CI/CD Pipeline
 
-Tüm PR'lar otomatik olarak test edilen:
+T├╝m PR'lar otomatik olarak test edilen:
 
 1. **Tests:** `pytest tests/ --cov=ravn_app`
 2. **Linting:** `flake8`, `black`, `isort`
-3. **Build:** PyInstaller (main branch'i için)
+3. **Build:** PyInstaller (main branch'i i├ğin)
 
-Pipeline geçmezse, sorunları düzeltip push edin - otomatik olarak yeniden çalışacak.
+Pipeline ge├ğmezse, sorunlar─▒ d├╝zeltip push edin - otomatik olarak yeniden ├ğal─▒┼şacak.
 
 ---
 
-## Dokümantasyon Katkıları
+## Dok├╝mantasyon Katk─▒lar─▒
 
-Dokümantasyon güncellemeleri için:
+Dok├╝mantasyon g├╝ncellemeleri i├ğin:
 
-1. Dosyayı edit edin
-2. Test edin (link kontrolü, formatı)
-3. PR açın (`docs/` prefix'i ile)
+1. Dosyay─▒ edit edin
+2. Test edin (link kontrol├╝, format─▒)
+3. PR a├ğ─▒n (`docs/` prefix'i ile)
 
 **Markdown Stil:**
-- Başlıklar: `#` (H1), `##` (H2), vb.
-- Kod bloğu: ` ```python ... ``` `
+- Ba┼şl─▒klar: `#` (H1), `##` (H2), vb.
+- Kod blo─şu: ` ```python ... ``` `
 - Link: `[Text](url)`
 - Liste: `-` veya `*`
 
@@ -311,14 +311,14 @@ Dokümantasyon güncellemeleri için:
 
 ## Sorular & Destek
 
-- **Bug raporu:** GitHub Issues açın
-- **Özellik talebine:** GitHub Issues'de tartışın
-- **Teknik soru:** Issue başlığında `[QUESTION]` kullanın
+- **Bug raporu:** GitHub Issues a├ğ─▒n
+- **├ûzellik talebine:** GitHub Issues'de tart─▒┼ş─▒n
+- **Teknik soru:** Issue ba┼şl─▒─ş─▒nda `[QUESTION]` kullan─▒n
 
 ---
 
-## Teşekkürler 🙏
+## Te┼şekk├╝rler ­şÖÅ
 
-Projeye katkı sağladığınız için teşekkürler! Sizin işbirliğiniz RAVN'ı daha iyi hale getiriyor.
+Projeye katk─▒ sa─şlad─▒─ş─▒n─▒z i├ğin te┼şekk├╝rler! Sizin i┼şbirli─şiniz RAVN'─▒ daha iyi hale getiriyor.
 
-**Happy coding!** 🚀
+**Happy coding!** ­şÜÇ

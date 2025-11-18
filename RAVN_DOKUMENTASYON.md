@@ -1,119 +1,119 @@
 # RAVN - Media Downloader
 
-## 📋 İçindekiler
-- [Proje Hakkında](#proje-hakkında)
-- [Özellikler](#özellikler)
-- [Mimari ve Tasarım](#mimari-ve-tasarım)
+## ­şôï ─░├ğindekiler
+- [Proje Hakk─▒nda](#proje-hakk─▒nda)
+- [├ûzellikler](#├Âzellikler)
+- [Mimari ve Tasar─▒m](#mimari-ve-tasar─▒m)
 - [Kurulum ve Gereksinimler](#kurulum-ve-gereksinimler)
-- [Kullanım Kılavuzu](#kullanım-kılavuzu)
-- [Desktop Uygulaması Oluşturma](#desktop-uygulaması-oluşturma)
-- [Gelecek Geliştirmeler](#gelecek-geliştirmeler)
+- [Kullan─▒m K─▒lavuzu](#kullan─▒m-k─▒lavuzu)
+- [Desktop Uygulamas─▒ Olu┼şturma](#desktop-uygulamas─▒-olu┼şturma)
+- [Gelecek Geli┼ştirmeler](#gelecek-geli┼ştirmeler)
 - [Teknik Detaylar](#teknik-detaylar)
 
 ---
 
-## 🎯 Proje Hakkında
+## ­şÄ» Proje Hakk─▒nda
 
-**RAVN - Media Downloader**, YouTube videolarını ve playlistlerini yüksek kalitede indirmek için geliştirilmiş modern bir masaüstü uygulamasıdır. Kullanıcı dostu arayüzü, güçlü indirme yetenekleri ve estetik tema sistemiyle, medya içeriklerini kolayca bilgisayarınıza kaydetmenizi sağlar.
+**RAVN - Media Downloader**, YouTube videolar─▒n─▒ ve playlistlerini y├╝ksek kalitede indirmek i├ğin geli┼ştirilmi┼ş modern bir masa├╝st├╝ uygulamas─▒d─▒r. Kullan─▒c─▒ dostu aray├╝z├╝, g├╝├ğl├╝ indirme yetenekleri ve estetik tema sistemiyle, medya i├ğeriklerini kolayca bilgisayar─▒n─▒za kaydetmenizi sa─şlar.
 
-### Ana Amaç
-- YouTube videolarını farklı formatlarda (MP4, MP3) indirmek
+### Ana Ama├ğ
+- YouTube videolar─▒n─▒ farkl─▒ formatlarda (MP4, MP3) indirmek
 - Playlist'lerdeki birden fazla videoyu toplu olarak indirmek
-- Kullanıcıya tam kontrol sağlayan, modern ve şık bir arayüz sunmak
-- İndirme süreçlerini izleyebilir ve yönetebilir hale getirmek
+- Kullan─▒c─▒ya tam kontrol sa─şlayan, modern ve ┼ş─▒k bir aray├╝z sunmak
+- ─░ndirme s├╝re├ğlerini izleyebilir ve y├Ânetebilir hale getirmek
 
 ---
 
-## ✨ Özellikler
+## Ô£¿ ├ûzellikler
 
-### 🎬 Medya İndirme Yetenekleri
-1. **Video İndirme (MP4)**
-   - Çoklu kalite seçenekleri: En İyi, 1080p, 720p, 480p
-   - Video ve ses akışlarının otomatik birleştirilmesi
-   - YouTube'un 403 hatalarına karşı güvenli format seçimi
+### ­şÄ¼ Medya ─░ndirme Yetenekleri
+1. **Video ─░ndirme (MP4)**
+   - ├çoklu kalite se├ğenekleri: En ─░yi, 1080p, 720p, 480p
+   - Video ve ses ak─▒┼şlar─▒n─▒n otomatik birle┼ştirilmesi
+   - YouTube'un 403 hatalar─▒na kar┼ş─▒ g├╝venli format se├ğimi
 
-2. **Ses İndirme (MP3)**
-   - Yüksek kaliteli ses çıkarma (192 kbps)
-   - FFmpeg ile profesyonel ses dönüşümü
-   - Otomatik format dönüştürme
+2. **Ses ─░ndirme (MP3)**
+   - Y├╝ksek kaliteli ses ├ğ─▒karma (192 kbps)
+   - FFmpeg ile profesyonel ses d├Ân├╝┼ş├╝m├╝
+   - Otomatik format d├Ân├╝┼şt├╝rme
 
-3. **Playlist Desteği**
-   - Tüm playlist'i veya seçili videoları indirme
-   - Video seçim penceresi ile kontrollü indirme
-   - Dosya adlarını otomatik numaralandırma seçeneği
-   - Playlist için otomatik klasör oluşturma
+3. **Playlist Deste─şi**
+   - T├╝m playlist'i veya se├ğili videolar─▒ indirme
+   - Video se├ğim penceresi ile kontroll├╝ indirme
+   - Dosya adlar─▒n─▒ otomatik numaraland─▒rma se├ğene─şi
+   - Playlist i├ğin otomatik klas├Âr olu┼şturma
 
-### 🎨 Kullanıcı Arayüzü
+### ­şÄ¿ Kullan─▒c─▒ Aray├╝z├╝
 1. **Tema Sistemi**
-   - 3 farklı arka plan teması: Nordic, Forest, Aurora
-   - Dark mode desteği
-   - Dinamik arka plan yeniden boyutlandırma
+   - 3 farkl─▒ arka plan temas─▒: Nordic, Forest, Aurora
+   - Dark mode deste─şi
+   - Dinamik arka plan yeniden boyutland─▒rma
 
-2. **İndirme Yönetimi**
-   - Gerçek zamanlı ilerleme çubukları
-   - İndirme hızı ve tahmini süre gösterimi
-   - Detaylı log kayıtları (açılır/kapanır)
-   - Her indirme için ayrı kontrol paneli
+2. **─░ndirme Y├Ânetimi**
+   - Ger├ğek zamanl─▒ ilerleme ├ğubuklar─▒
+   - ─░ndirme h─▒z─▒ ve tahmini s├╝re g├Âsterimi
+   - Detayl─▒ log kay─▒tlar─▒ (a├ğ─▒l─▒r/kapan─▒r)
+   - Her indirme i├ğin ayr─▒ kontrol paneli
 
-3. **Kontrol Özellikleri**
+3. **Kontrol ├ûzellikleri**
    - Tekli veya toplu iptal etme
    - Tamamlanan indirmeleri temizleme
-   - Dosya ve klasör hızlı açma butonları
-   - İndirme kuyruğu sistemi
+   - Dosya ve klas├Âr h─▒zl─▒ a├ğma butonlar─▒
+   - ─░ndirme kuyru─şu sistemi
 
-### 🔧 Teknik Özellikler
-1. **Sıralı İndirme Mimarisi**
-   - Queue (kuyruk) tabanlı indirme sistemi
-   - Eşzamanlı birden fazla indirmeyi sırayla işleme
-   - Sistem kaynaklarını verimli kullanma
+### ­şöğ Teknik ├ûzellikler
+1. **S─▒ral─▒ ─░ndirme Mimarisi**
+   - Queue (kuyruk) tabanl─▒ indirme sistemi
+   - E┼şzamanl─▒ birden fazla indirmeyi s─▒rayla i┼şleme
+   - Sistem kaynaklar─▒n─▒ verimli kullanma
 
-2. **Thread-Safe İşlemler**
+2. **Thread-Safe ─░┼şlemler**
    - Threading ile arka plan indirmeleri
-   - UI thread'ini bloklamayan tasarım
-   - Güvenli iptal mekanizması
+   - UI thread'ini bloklamayan tasar─▒m
+   - G├╝venli iptal mekanizmas─▒
 
-3. **Hata Yönetimi**
-   - FFmpeg eksikliği kontrolü
-   - İndirme hatalarını yakalama ve raporlama
-   - Kullanıcı dostu hata mesajları
-
----
-
-## 🏗️ Mimari ve Tasarım
-
-### Katmanlı Mimari
-
-```
-┌─────────────────────────────────────┐
-│     Kullanıcı Arayüzü (UI)         │
-│  (CustomTkinter + PIL)              │
-├─────────────────────────────────────┤
-│    İş Mantığı Katmanı               │
-│  - İndirme Yönetimi                 │
-│  - Kuyruk Sistemi                   │
-│  - Thread Yönetimi                  │
-├─────────────────────────────────────┤
-│    Medya İşleme Katmanı             │
-│  - yt-dlp (YouTube indirme)         │
-│  - FFmpeg (format dönüştürme)       │
-├─────────────────────────────────────┤
-│      Sistem Katmanı                 │
-│  - Dosya Sistemi İşlemleri          │
-│  - Platform Algılama                │
-└─────────────────────────────────────┘
-```
+3. **Hata Y├Ânetimi**
+   - FFmpeg eksikli─şi kontrol├╝
+   - ─░ndirme hatalar─▒n─▒ yakalama ve raporlama
+   - Kullan─▒c─▒ dostu hata mesajlar─▒
 
 ---
 
-## 💻 Kurulum ve Gereksinimler
+## ­şÅù´©Å Mimari ve Tasar─▒m
+
+### Katmanl─▒ Mimari
+
+```
+ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ
+Ôöé     Kullan─▒c─▒ Aray├╝z├╝ (UI)         Ôöé
+Ôöé  (CustomTkinter + PIL)              Ôöé
+Ôö£ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöñ
+Ôöé    ─░┼ş Mant─▒─ş─▒ Katman─▒               Ôöé
+Ôöé  - ─░ndirme Y├Ânetimi                 Ôöé
+Ôöé  - Kuyruk Sistemi                   Ôöé
+Ôöé  - Thread Y├Ânetimi                  Ôöé
+Ôö£ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöñ
+Ôöé    Medya ─░┼şleme Katman─▒             Ôöé
+Ôöé  - yt-dlp (YouTube indirme)         Ôöé
+Ôöé  - FFmpeg (format d├Ân├╝┼şt├╝rme)       Ôöé
+Ôö£ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöñ
+Ôöé      Sistem Katman─▒                 Ôöé
+Ôöé  - Dosya Sistemi ─░┼şlemleri          Ôöé
+Ôöé  - Platform Alg─▒lama                Ôöé
+ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöİ
+```
+
+---
+
+## ­şÆ╗ Kurulum ve Gereksinimler
 
 ### Sistem Gereksinimleri
-- **İşletim Sistemi:** Windows 10/11, macOS 10.14+, Linux (Ubuntu 20.04+)
-- **Python:** 3.8 veya üzeri
+- **─░┼şletim Sistemi:** Windows 10/11, macOS 10.14+, Linux (Ubuntu 20.04+)
+- **Python:** 3.8 veya ├╝zeri
 - **RAM:** Minimum 4 GB
-- **Disk Alanı:** 200 MB (uygulama) + indirme alanı
+- **Disk Alan─▒:** 200 MB (uygulama) + indirme alan─▒
 
-### Python Kütüphaneleri
+### Python K├╝t├╝phaneleri
 
 ```bash
 pip install customtkinter
@@ -121,46 +121,46 @@ pip install Pillow
 pip install yt-dlp
 ```
 
-**Kütüphane Detayları:**
+**K├╝t├╝phane Detaylar─▒:**
 
-| Kütüphane | Versiyon | Amaç |
+| K├╝t├╝phane | Versiyon | Ama├ğ |
 |-----------|----------|------|
-| customtkinter | ≥5.0.0 | Modern UI bileşenleri |
-| Pillow | ≥9.0.0 | Görsel işleme ve tema resimleri |
+| customtkinter | ÔëÑ5.0.0 | Modern UI bile┼şenleri |
+| Pillow | ÔëÑ9.0.0 | G├Ârsel i┼şleme ve tema resimleri |
 | yt-dlp | Latest | YouTube video/ses indirme |
 
 ---
 
-## 📖 Kullanım Kılavuzu
+## ­şôû Kullan─▒m K─▒lavuzu
 
-### Temel Kullanım
+### Temel Kullan─▒m
 
-#### 1. Tekli Video İndirme
-1. YouTube video URL'sini üst kısımdaki giriş alanına yapıştırın
-2. **Format** seçin: MP4 (Video) veya MP3 (Ses)
-3. **Kalite** seçin: En İyi, 1080p, 720p, 480p
-4. **Kayıt Yeri** butonuna tıklayarak hedef klasörü seçin (varsayılan: Masaüstü)
-5. **"Bilgileri Getir"** butonuna tıklayın
-6. İndirme otomatik başlayacaktır
+#### 1. Tekli Video ─░ndirme
+1. YouTube video URL'sini ├╝st k─▒s─▒mdaki giri┼ş alan─▒na yap─▒┼şt─▒r─▒n
+2. **Format** se├ğin: MP4 (Video) veya MP3 (Ses)
+3. **Kalite** se├ğin: En ─░yi, 1080p, 720p, 480p
+4. **Kay─▒t Yeri** butonuna t─▒klayarak hedef klas├Âr├╝ se├ğin (varsay─▒lan: Masa├╝st├╝)
+5. **"Bilgileri Getir"** butonuna t─▒klay─▒n
+6. ─░ndirme otomatik ba┼şlayacakt─▒r
 
 ---
 
-## 📁 Kod Organizasyonu
+## ­şôü Kod Organizasyonu
 
 ```
 ravn/
-├── ravn.py                 # Ana uygulama
-├── requirements.txt        # Python bağımlılıkları
-├── README.md              # Kullanıcı dokümantasyonu
-├── RAVN_DOKUMENTASYON.md  # Teknik dokümantasyon
-├── assets/                # Görseller ve kaynaklar
-│   ├── themes/
-│   │   ├── nordic.webp
-│   │   ├── forest.webp
-│   │   └── aurora.webp
-│   └── icons/
-│       └── ravn_icon.ico
-├── build/                 # Build çıktıları (geçici)
-├── dist/                  # EXE çıktıları
-└── release/               # Dağıtım paketi
+Ôö£ÔöÇÔöÇ ravn.py                 # Ana uygulama
+Ôö£ÔöÇÔöÇ requirements.txt        # Python ba─ş─▒ml─▒l─▒klar─▒
+Ôö£ÔöÇÔöÇ README.md              # Kullan─▒c─▒ dok├╝mantasyonu
+Ôö£ÔöÇÔöÇ RAVN_DOKUMENTASYON.md  # Teknik dok├╝mantasyon
+Ôö£ÔöÇÔöÇ assets/                # G├Ârseller ve kaynaklar
+Ôöé   Ôö£ÔöÇÔöÇ themes/
+Ôöé   Ôöé   Ôö£ÔöÇÔöÇ nordic.webp
+Ôöé   Ôöé   Ôö£ÔöÇÔöÇ forest.webp
+Ôöé   Ôöé   ÔööÔöÇÔöÇ aurora.webp
+Ôöé   ÔööÔöÇÔöÇ icons/
+Ôöé       ÔööÔöÇÔöÇ ravn_icon.ico
+Ôö£ÔöÇÔöÇ build/                 # Build ├ğ─▒kt─▒lar─▒ (ge├ğici)
+Ôö£ÔöÇÔöÇ dist/                  # EXE ├ğ─▒kt─▒lar─▒
+ÔööÔöÇÔöÇ release/               # Da─ş─▒t─▒m paketi
 ```

@@ -1,0 +1,131 @@
+"""
+RAVN Birim Testleri
+pytest ile çalışır: pytest tests/
+"""
+
+import pytest
+import sys
+import os
+
+# Proje dizinini path'e ekle
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from ravn_app.core.downloader import YouTubeDownloader
+from ravn_app.utils.file_utils import sanitize_filename, format_bytes
+from ravn_app.utils.system_utils import find_executable, get_platform
+
+
+class TestYouTubeDownloader:
+    """YouTubeDownloader sınıfı testleri"""
+    
+    def setup_method(self):
+        """Her test öncesi çalışır"""
+        self.downloader = YouTubeDownloader()
+    
+    def test_downloader_creation(self):
+        """Downloader nesnesi oluşturulabilir mi"""
+        assert self.downloader is not None
+        assert self.downloader.download_queue is not None
+    
+    def test_format_options(self):
+        """Format seçenekleri mevcut mi"""
+        formats = self.downloader.get_video_format_options()
+        assert "MP4 (Video)" in formats
+        assert "MP3 (Ses)" in formats
+        assert len(formats) == 2
+    
+    def test_quality_options(self):
+        """Kalite seçenekleri mevcut mi"""
+        qualities = self.downloader.get_quality_options()
+        assert "En İyi" in qualities
+        assert "1080p" in qualities
+        assert "720p" in qualities
+        assert "480p" in qualities
+        assert len(qualities) == 4
+    
+    def test_sanitize_filename(self):
+        """Dosya adı temizleme çalışıyor mu"""
+        filename = 'My "Video" (2025) | Full HD.mp4'
+        cleaned = YouTubeDownloader.sanitize_filename(filename)
+        assert '"' not in cleaned
+        assert '|' not in cleaned
+        assert '(' in cleaned  # Parantez temizlenmiyor
+
+
+class TestFileUtils:
+    """Dosya işlemleri testleri"""
+    
+    def test_sanitize_filename_removes_invalid_chars(self):
+        """Geçersiz karakterler temizleniyor mu"""
+        test_cases = [
+            ('file*name.txt', 'filename.txt'),
+            ('file?test.mp4', 'filetest.mp4'),
+            ('file:name.doc', 'filename.doc'),
+            ('file"name".docx', 'filename.docx'),
+        ]
+        
+        for input_name, expected in test_cases:
+            result = sanitize_filename(input_name)
+            assert result == expected
+    
+    def test_format_bytes_conversion(self):
+        """Byte dönüştürmesi doğru mu"""
+        assert "(1.00 Bytes)" in format_bytes(1)
+        assert "KB" in format_bytes(1024)
+        assert "MB" in format_bytes(1024 * 1024)
+        assert "GB" in format_bytes(1024 * 1024 * 1024)
+    
+    def test_format_bytes_invalid_input(self):
+        """Geçersiz giriş ele alınıyor mu"""
+        assert format_bytes("invalid") == ""
+        assert format_bytes(None) == ""
+
+
+class TestSystemUtils:
+    """Sistem işlemleri testleri"""
+    
+    def test_platform_detection(self):
+        """Platform algılama çalışıyor mu"""
+        platform = get_platform()
+        assert platform in ["windows", "darwin", "linux"]
+    
+    def test_find_executable(self):
+        """Executable bulma çalışıyor mu"""
+        # python her zaman bulunabilir
+        result = find_executable("python")
+        assert result is not None or find_executable("python3") is not None
+
+
+class TestIntegration:
+    """Entegrasyon testleri"""
+    
+    def test_downloader_workflow(self):
+        """Temel indirme akışı doğru mu"""
+        downloader = YouTubeDownloader()
+        
+        # Format seçeneklerini al
+        formats = downloader.get_video_format_options()
+        assert "MP4 (Video)" in formats
+        
+        # Kalite seçeneklerini al
+        qualities = downloader.get_quality_options()
+        assert len(qualities) > 0
+        
+        # İndirme kuyruğu boş olmalı
+        assert downloader.download_queue.empty()
+
+
+@pytest.mark.skip(reason="YouTube API ihtiyacı")
+class TestLiveDownload:
+    """Canlı indirme testleri (internet gerekli)"""
+    
+    def test_extract_video_info(self):
+        """Video bilgilerini çekebiliyor mu"""
+        downloader = YouTubeDownloader()
+        # Bu test gerçek bir video URL'si gerektirir
+        # Örnek: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        pass
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -12,72 +12,75 @@ Write-Host ""
 
 function Check-Environment {
     Write-Host "🔍 Ortam kontrolü yapılıyor..." -ForegroundColor Yellow
-    
+
     # Python kontrolü
     if (Get-Command python -ErrorAction SilentlyContinue) {
         $pythonVersion = python --version
         Write-Host "✓ Python: $pythonVersion" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "✗ Python bulunamadı!" -ForegroundColor Red
         return $false
     }
-    
+
     # FFmpeg kontrolü
     if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
-        $ffmpegVersion = ffmpeg -version 2>$null | Select-Object -First 1
         Write-Host "✓ FFmpeg: Kurulu" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "⚠ FFmpeg bulunamadı. Uygulama başlatıldığında indirilecek." -ForegroundColor Yellow
     }
-    
+
     # Bağımlılıklar kontrolü
     if (Test-Path "requirements.txt") {
         Write-Host "✓ requirements.txt: Bulundu" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "✗ requirements.txt bulunamadı!" -ForegroundColor Red
         return $false
     }
-    
+
     return $true
 }
 
-function Install-Dependencies {
+function Install-ProjectDependencies {
     Write-Host "`n📦 Bağımlılıklar kuruluyor..." -ForegroundColor Yellow
-    
+
     if (-not (Test-Path "venv")) {
         Write-Host "Sanal ortam oluşturuluyor..." -ForegroundColor Cyan
         python -m venv venv
     }
-    
+
     & ".\venv\Scripts\Activate.ps1"
     pip install -r requirements.txt
-    
+
     Write-Host "✓ Bağımlılıklar kuruldu" -ForegroundColor Green
 }
 
-function Run-Tests {
+function Invoke-Tests {
     Write-Host "`n🧪 Testler çalıştırılıyor..." -ForegroundColor Yellow
-    
+
     if (Get-Command pytest -ErrorAction SilentlyContinue) {
         pytest tests/ -v
         Write-Host "✓ Testler tamamlandı" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "⚠ pytest bulunamadı. Testler atlanıyor." -ForegroundColor Yellow
     }
 }
 
-function Start-App {
+function Start-RavnApp {
     Write-Host "`n🚀 Uygulama başlatılıyor..." -ForegroundColor Yellow
     python -m ravn_app.ui.main_window
 }
 
-function Clean-Project {
+function Clear-ProjectFiles {
     Write-Host "`n🧹 Proje temizleniyor..." -ForegroundColor Yellow
-    
+
     Get-ChildItem -Path . -Include __pycache__ -Recurse -Directory | Remove-Item -Recurse -Force
     Get-ChildItem -Path . -Include *.pyc -Recurse | Remove-Item -Force
     Get-ChildItem -Path . -Include .pytest_cache -Recurse -Directory | Remove-Item -Recurse -Force
-    
+
     Write-Host "✓ Proje temizlendi" -ForegroundColor Green
 }
 
@@ -88,23 +91,23 @@ switch ($Action.ToLower()) {
     }
     "install" {
         Check-Environment
-        Install-Dependencies
+        Install-ProjectDependencies
     }
     "test" {
-        Run-Tests
+        Invoke-Tests
     }
     "run" {
-        Start-App
+        Start-RavnApp
     }
     "clean" {
-        Clean-Project
+        Clear-ProjectFiles
     }
     "all" {
         Check-Environment
-        Install-Dependencies
-        Clean-Project
-        Run-Tests
-        Start-App
+        Install-ProjectDependencies
+        Clear-ProjectFiles
+        Invoke-Tests
+        Start-RavnApp
     }
     default {
         Write-Host "Kullanım: .\build.ps1 [check|install|test|run|clean|all]" -ForegroundColor Yellow

@@ -248,13 +248,13 @@ python -m ravn_app.ui.main_window
 
 ## 📞 İletişim
 
-**Repository:** https://github.com/waldseelen/ravn  
-**Durum:** ✅ Aktif Geliştirme  
-**Son Güncelleme:** 18 Kasım 2025  
+**Repository:** https://github.com/waldseelen/ravn
+**Durum:** ✅ Aktif Geliştirme
+**Son Güncelleme:** 18 Kasım 2025
 **Versiyon:** 1.0.0 (Faz 1 Tamamlandı)
 
 ---
 
-**Hazırlanmış:** GitHub Copilot  
-**Tarih:** 18 Kasım 2025  
+**Hazırlanmış:** GitHub Copilot
+**Tarih:** 18 Kasım 2025
 **Durum:** Raporlanabilir

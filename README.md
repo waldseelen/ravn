@@ -667,19 +667,19 @@ Bu proje MIT Lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICE
 
 ## ❓ SSS
 
-**S: FFmpeg bulunamıyor hatasını alıyorum.**  
+**S: FFmpeg bulunamıyor hatasını alıyorum.**
 C: FFmpeg'i [ffmpeg.org](https://ffmpeg.org/download.html) adresinden indirip sistem PATH'ine ekleyin.
 
-**S: İndirme çok yavaş.**  
+**S: İndirme çok yavaş.**
 C: İnternet hızınız, video kalitesi ve sistem performansı bu konuda etkili olabilir.
 
-**S: Hangi video formatları destekleniyor?**  
+**S: Hangi video formatları destekleniyor?**
 C: YouTube'daki tüm formatlar (MP4, WebM, vb.) ve MP3 audio desteği var.
 
-**S: Kaç video aynı anda indirebilirim?**  
+**S: Kaç video aynı anda indirebilirim?**
 C: Varsayılan olarak sıralı indirme yapılır (sistem kaynaklarını optimize etmek için).
 
-**S: Indirilen videoları kaldırabilir miyim?**  
+**S: Indirilen videoları kaldırabilir miyim?**
 C: Evet, indirme tamamlandıktan sonra "Dosyayı Aç" butonuyla açılan klasörden silebilirsiniz.
 
 ---
@@ -695,6 +695,6 @@ C: Evet, indirme tamamlandıktan sonra "Dosyayı Aç" butonuyla açılan klasör
 
 ---
 
-**Son Güncelleme:** 18 Kasım 2025  
-**Versiyon:** 1.0.0  
+**Son Güncelleme:** 18 Kasım 2025
+**Versiyon:** 1.0.0
 **Durum:** Aktif Geliştirme

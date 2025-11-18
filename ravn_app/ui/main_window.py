@@ -13,24 +13,6 @@ from ravn_app.ui.subtitle_tab import SubtitleTab
 from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
 from ravn_app.core.database import DatabaseManager, ConfigManager
 
-import logging
-import warnings
-
-# Suppress noisy RuntimeWarning about module found in sys.modules when running as -m
-warnings.filterwarnings(
-    "ignore",
-    message=r".*found in sys.modules after import of package 'ravn_app.ui'.*",
-    category=RuntimeWarning,
-)
-
-logger = logging.getLogger("ravn.ui.main")
-if not logger.handlers:
-    # Configure a simple console handler (won't override user-level logging)
-    ch = logging.StreamHandler()
-    ch.setFormatter(logging.Formatter("[RAVN/UI] %(asctime)s %(levelname)s: %(message)s"))
-    logger.addHandler(ch)
-    logger.setLevel(logging.INFO)
-
 
 class YouTubeDownloaderApp(ctk.CTk):
     """Ana uygulama penceresi - Sekmeli arayüz"""
@@ -158,12 +140,8 @@ class YouTubeDownloaderApp(ctk.CTk):
 
 def main():
     """Uygulamayı başlat"""
-    try:
-        logger.info("Starting RAVN UI")
-        app = YouTubeDownloaderApp()
-        app.mainloop()
-    except Exception as e:
-        logger.exception("Unhandled exception while running the GUI: %s", e)
+    app = YouTubeDownloaderApp()
+    app.mainloop()
 
 
 if __name__ == "__main__":

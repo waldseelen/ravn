@@ -408,7 +408,15 @@ class TestConverterIntegration:
 
     def test_batch_converter_with_multiple_files(self):
         """Batch converter çoklu dosya testi"""
+        from unittest.mock import Mock, patch
+        from ravn_app.core.runners import RunnerResult
+        
         converter = VideoConverter()
+        # Mock the runner to avoid actual file processing
+        converter._runner.run = Mock(return_value=RunnerResult(
+            success=True, return_code=0
+        ))
+        
         batch = BatchConverter(converter, max_workers=1)
 
         files = [
@@ -428,7 +436,11 @@ class TestConverterIntegration:
 
         assert batch.queue.qsize() == 3
 
-        # Boş işlem
-        results = batch.process()
+        # Mock os.path.exists and os.path.getsize for file validation
+        with patch('os.path.exists', return_value=True), \
+             patch('os.path.getsize', return_value=1000):
+            results = batch.process()
+        
         assert results['total'] == 3
         assert len(results['results']) == 3
+        assert results['successful'] == 3

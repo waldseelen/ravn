@@ -8,12 +8,14 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 from enum import Enum
 from dataclasses import dataclass
 from threading import Thread
 import queue
 import logging
+
+from ravn_app.core.runners import FFmpegRunner, RunnerResult, RunnerStatus
 
 
 # Logging konfigürasyonu
@@ -194,29 +196,34 @@ class CodecManager:
 
 
 class VideoConverter:
-    """Video format dönüştürücü"""
+    """Video format dönüştürücü - FFmpegRunner üzerinden çalışır"""
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
         """
         VideoConverter'ı başlat
 
         Args:
             ffmpeg_path (str): FFmpeg yürütülebilir dosyasının yolu
+            ffprobe_path (str): FFprobe yürütülebilir dosyasının yolu
         """
         self.ffmpeg_path = ffmpeg_path
-        self.current_process = None
+        self.ffprobe_path = ffprobe_path
+        self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
         self.is_running = False
         self.progress = 0
-        self.status_callback = None
-        self.progress_callback = None
-        self.total_frames = None
-        self.processed_frames = 0
+        self.status_callback: Optional[Callable[[str], None]] = None
+        self.progress_callback: Optional[Callable[[float, str], None]] = None
 
-    def set_status_callback(self, callback):
+    @property
+    def current_process(self):
+        """Backwards compatibility: access runner's current process"""
+        return self._runner.current_process
+
+    def set_status_callback(self, callback: Optional[Callable[[str], None]]):
         """İlerleme güncellemeleri için callback ayarla"""
         self.status_callback = callback
 
-    def set_progress_callback(self, callback):
+    def set_progress_callback(self, callback: Optional[Callable[[float, str], None]]):
         """İlerleme yüzdesini güncellemek için callback ayarla
 
         Callback fonksiyonu şu parametrelerle çağırılır:
@@ -250,7 +257,7 @@ class VideoConverter:
 
     def convert(self, settings: ConversionSettings) -> bool:
         """
-        Videoyu dönüştür
+        Videoyu dönüştür - FFmpegRunner kullanır
 
         Args:
             settings (ConversionSettings): Dönüştürme ayarları
@@ -295,65 +302,46 @@ class VideoConverter:
                 self._update_progress(0, "Hata: Geçersiz codec")
                 raise CodecException(error_msg)
 
-            # Çıkış dizinini oluştur
-            output_dir = os.path.dirname(settings.output_file)
-            if output_dir:
-                try:
-                    os.makedirs(output_dir, exist_ok=True)
-                except Exception as e:
-                    error_msg = f"Çıkış dizini oluşturulamadı: {str(e)}"
-                    self._log(error_msg, "error")
-                    self._update_progress(0, "Hata: Dizin oluşturulamadı")
-                    raise ConversionException(error_msg) from e
-
             self._log(f"Dönüştürme başlanıyor: {settings.input_file}")
             self._log(f"Format: {settings.video_codec.name} / {settings.audio_codec.name}")
             self._log(f"Giriş dosyası boyutu: {self._format_size(file_size)}")
             self._update_progress(5, "Hazırlanıyor...")
 
-            # FFmpeg komutunu oluştur
-            command = self._build_command(settings)
-            self._log(f"FFmpeg komutu: {' '.join(command)}", "debug")
+            # Video ve ses argümanlarını hazırla
+            video_args, audio_args = self._build_codec_args(settings)
+            extra_args = self._build_extra_args(settings)
 
-            # İşlemi çalıştır
-            try:
-                self.current_process = subprocess.Popen(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    universal_newlines=True
-                )
+            self._update_progress(10, "Dönüştürme işlemi başladı...")
 
-                self._update_progress(10, "Dönüştürme işlemi başladı...")
+            # FFmpegRunner kullanarak çalıştır (gerçek zamanlı ilerleme ile)
+            result = self._runner.run(
+                input_file=settings.input_file,
+                output_file=settings.output_file,
+                video_args=video_args,
+                audio_args=audio_args,
+                extra_args=extra_args,
+                progress_callback=self.progress_callback,
+                use_realtime_progress=True  # Gerçek zamanlı ilerleme aktif
+            )
 
-                # Çıkıyı izle ve progress'ü güncelle
-                _, stderr = self.current_process.communicate()
-
-                if self.current_process.returncode == 0:
-                    output_size = os.path.getsize(settings.output_file)
-                    self._log(f"Dönüştürme tamamlandı: {settings.output_file}", "success")
-                    self._log(f"Çıkış dosyası boyutu: {self._format_size(output_size)}", "success")
-                    compression_ratio = (1 - output_size / file_size) * 100 if file_size > 0 else 0
-                    self._log(f"Sıkıştırma oranı: {compression_ratio:.1f}%", "success")
-                    self._update_progress(100, "Tamamlandı!")
-                    self.is_running = False
-                    return True
-                else:
-                    error_msg = f"FFmpeg hatası (Kod {self.current_process.returncode}): {stderr}"
-                    self._log(error_msg, "error")
-                    self._update_progress(0, "Hata oluştu")
-                    raise FFmpegException(error_msg)
-
-            except subprocess.TimeoutExpired:
-                error_msg = "FFmpeg işlemi zaman aşımına uğradı"
+            if result.success:
+                output_size = result.metadata.get('output_size', 0)
+                self._log(f"Dönüştürme tamamlandı: {settings.output_file}", "success")
+                self._log(f"Çıkış dosyası boyutu: {self._format_size(output_size)}", "success")
+                compression_ratio = (1 - output_size / file_size) * 100 if file_size > 0 else 0
+                self._log(f"Sıkıştırma oranı: {compression_ratio:.1f}%", "success")
+                self._update_progress(100, "Tamamlandı!")
+                self.is_running = False
+                return True
+            else:
+                error_msg = f"FFmpeg hatası: {result.error_message}"
                 self._log(error_msg, "error")
-                self._update_progress(0, "Zaman aşımı")
+                self._update_progress(0, "Hata oluştu")
                 raise FFmpegException(error_msg)
 
-        except ConversionException as e:
-            self._log(f"Dönüştürme hatası: {str(e)}", "error")
+        except ConversionException:
             self.is_running = False
-            return False
+            raise
         except Exception as e:
             error_msg = f"Beklenmeyen hata: {type(e).__name__}: {str(e)}"
             self._log(error_msg, "error")
@@ -361,54 +349,70 @@ class VideoConverter:
             self.is_running = False
             return False
 
-    def _build_command(self, settings: ConversionSettings) -> List[str]:
-        """FFmpeg komutunu oluştur"""
-        cmd = [self.ffmpeg_path, '-i', settings.input_file]
+    def _build_codec_args(self, settings: ConversionSettings) -> Tuple[List[str], List[str]]:
+        """Video ve ses codec argümanlarını oluştur"""
+        video_args = []
+        audio_args = []
 
         # Video codec
         if not settings.audio_only:
-            codec_cmd = CodecManager.get_video_codec_command(
+            video_args = CodecManager.get_video_codec_command(
                 settings.video_codec,
                 settings.video_quality,
                 settings.preset
             )
-            cmd.extend(codec_cmd)
-
-            # FPS değiştirme
-            if settings.fps:
-                cmd.extend(['-r', str(settings.fps)])
-
-            # Çözünürlük değiştirme
-            if settings.scale:
-                width, height = settings.scale
-                cmd.extend(['-vf', f'scale={width}:{height}'])
         else:
-            cmd.append('-vn')  # Video yok
+            video_args = ['-vn']
 
         # Ses codec
         if not settings.video_only:
-            codec_cmd = CodecManager.get_audio_codec_command(
+            audio_args = CodecManager.get_audio_codec_command(
                 settings.audio_codec,
                 settings.audio_bitrate
             )
-            cmd.extend(codec_cmd)
         else:
-            cmd.append('-an')  # Ses yok
+            audio_args = ['-an']
+
+        return video_args, audio_args
+
+    def _build_extra_args(self, settings: ConversionSettings) -> List[str]:
+        """Ek FFmpeg argümanlarını oluştur"""
+        extra_args = []
+
+        # FPS değiştirme
+        if settings.fps and not settings.audio_only:
+            extra_args.extend(['-r', str(settings.fps)])
+
+        # Çözünürlük değiştirme
+        if settings.scale and not settings.audio_only:
+            width, height = settings.scale
+            extra_args.extend(['-vf', f'scale={width}:{height}'])
 
         # Hardware acceleration
         if settings.hardware_accel and settings.hardware_accel != 'none':
-            cmd.extend(['-hwaccel', settings.hardware_accel])
+            extra_args.extend(['-hwaccel', settings.hardware_accel])
 
-        # Çıkış dosyası
+        return extra_args
+
+    def _build_command(self, settings: ConversionSettings) -> List[str]:
+        """FFmpeg komutunu oluştur (legacy/backwards compatibility)"""
+        cmd = [self.ffmpeg_path, '-i', settings.input_file]
+
+        video_args, audio_args = self._build_codec_args(settings)
+        extra_args = self._build_extra_args(settings)
+
+        cmd.extend(video_args)
+        cmd.extend(audio_args)
+        cmd.extend(extra_args)
         cmd.extend(['-y', settings.output_file])
 
         return cmd
 
     def stop(self):
         """Dönüştürmeyi durdur"""
-        if self.current_process:
-            self.current_process.terminate()
-            self.is_running = False
+        cancelled = self._runner.cancel()
+        self.is_running = False
+        if cancelled:
             self._log("Dönüştürme durduruldu", "warning")
 
 
@@ -555,11 +559,12 @@ class VideoInfo:
 
 
 class VideoAnalyzer:
-    """Video dosyalarını analiz etme motoru"""
+    """Video dosyalarını analiz etme motoru - FFmpegRunner kullanır"""
 
-    def __init__(self, ffprobe_path: str = "ffprobe"):
+    def __init__(self, ffprobe_path: str = "ffprobe", ffmpeg_path: str = "ffmpeg"):
         """VideoAnalyzer'ı başlat"""
         self.ffprobe_path = ffprobe_path
+        self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
 
     def analyze(self, file_path: str) -> Optional[VideoInfo]:
         """Video dosyasını analiz et"""
@@ -567,21 +572,11 @@ class VideoAnalyzer:
             return None
 
         try:
-            cmd = [
-                self.ffprobe_path,
-                '-v', 'error',
-                '-select_streams', 'v:0,a:0',
-                '-show_entries',
-                'format=duration,bit_rate,size,format_name:stream=width,height,r_frame_rate,codec_name,codec_type',
-                '-of', 'json',
-                file_path
-            ]
-
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
+            # FFmpegRunner probe metodu kullan
+            data = self._runner.probe(file_path)
+            if data is None:
                 return None
 
-            data = json.loads(result.stdout)
             format_info = data.get('format', {})
             streams = data.get('streams', [])
 
@@ -610,16 +605,17 @@ class VideoAnalyzer:
 
             return info
         except Exception as e:
-            print(f"Analiz hatası: {e}")
+            logger.error(f"Analiz hatası: {e}")
             return None
 
 
 class VideoEditor:
-    """Gelişmiş video düzenleme işlemleri"""
+    """Gelişmiş video düzenleme işlemleri - FFmpegRunner kullanır"""
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
         """VideoEditor'ı başlat"""
         self.ffmpeg_path = ffmpeg_path
+        self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
         logger.info(f"VideoEditor başlatıldı: {ffmpeg_path}")
 
     def _validate_files(self, input_file: str, operation: str = "processing") -> bool:
@@ -648,29 +644,27 @@ class VideoEditor:
         Returns:
             bool: Başarılı ise True
         """
-        try:
-            if not self._validate_files(input_file, "trim"):
-                return False
-
-            if start_time < 0 or duration <= 0:
-                logger.error(f"Geçersiz zaman parametreleri: start={start_time}, duration={duration}")
-                return False
-
-            logger.info(f"Kırpma işlemi başlatılıyor: {start_time}s, süre: {duration}s")
-            cmd = [self.ffmpeg_path, '-i', input_file, '-ss', str(start_time), '-t', str(duration), '-c', 'copy', '-y', output_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-
-            if result.returncode == 0:
-                logger.info(f"Kırpma başarılı: {output_file}")
-                return True
-            else:
-                logger.error(f"Kırpma hatası: {result.stderr}")
-                return False
-        except subprocess.TimeoutExpired:
-            logger.error("Kırpma işlemi zaman aşımına uğradı")
+        if not self._validate_files(input_file, "trim"):
             return False
-        except Exception as e:
-            logger.error(f"Kırpma hatası: {type(e).__name__}: {str(e)}")
+
+        if start_time < 0 or duration <= 0:
+            logger.error(f"Geçersiz zaman parametreleri: start={start_time}, duration={duration}")
+            return False
+
+        logger.info(f"Kırpma işlemi başlatılıyor: {start_time}s, süre: {duration}s")
+
+        result = self._runner.run(
+            input_file=input_file,
+            output_file=output_file,
+            extra_args=['-ss', str(start_time), '-t', str(duration), '-c', 'copy'],
+            timeout=3600
+        )
+
+        if result.success:
+            logger.info(f"Kırpma başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Kırpma hatası: {result.error_message}")
             return False
 
     def scale(self, input_file: str, output_file: str, width: int, height: int) -> bool:
@@ -686,29 +680,27 @@ class VideoEditor:
         Returns:
             bool: Başarılı ise True
         """
-        try:
-            if not self._validate_files(input_file, "scale"):
-                return False
-
-            if width <= 0 or height <= 0:
-                logger.error(f"Geçersiz çözünürlük: {width}x{height}")
-                return False
-
-            logger.info(f"Ölçeklendirme başlatılıyor: {width}x{height}")
-            cmd = [self.ffmpeg_path, '-i', input_file, '-vf', f'scale={width}:{height}', '-y', output_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-
-            if result.returncode == 0:
-                logger.info(f"Ölçeklendirme başarılı: {output_file}")
-                return True
-            else:
-                logger.error(f"Ölçeklendirme hatası: {result.stderr}")
-                return False
-        except subprocess.TimeoutExpired:
-            logger.error("Ölçeklendirme işlemi zaman aşımına uğradı")
+        if not self._validate_files(input_file, "scale"):
             return False
-        except Exception as e:
-            logger.error(f"Ölçeklendirme hatası: {type(e).__name__}: {str(e)}")
+
+        if width <= 0 or height <= 0:
+            logger.error(f"Geçersiz çözünürlük: {width}x{height}")
+            return False
+
+        logger.info(f"Ölçeklendirme başlatılıyor: {width}x{height}")
+
+        result = self._runner.run(
+            input_file=input_file,
+            output_file=output_file,
+            extra_args=['-vf', f'scale={width}:{height}'],
+            timeout=3600
+        )
+
+        if result.success:
+            logger.info(f"Ölçeklendirme başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Ölçeklendirme hatası: {result.error_message}")
             return False
 
     def extract_audio(self, input_file: str, output_file: str, audio_codec: AudioCodec) -> bool:
@@ -723,29 +715,28 @@ class VideoEditor:
         Returns:
             bool: Başarılı ise True
         """
-        try:
-            if not self._validate_files(input_file, "extract_audio"):
-                return False
-
-            if not isinstance(audio_codec, AudioCodec):
-                logger.error(f"Geçersiz ses codec: {audio_codec}")
-                return False
-
-            logger.info(f"Ses çıkartılıyor: {audio_codec.name}")
-            cmd = [self.ffmpeg_path, '-i', input_file, '-vn', '-c:a', audio_codec.lib, '-y', output_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
-
-            if result.returncode == 0:
-                logger.info(f"Ses çıkartma başarılı: {output_file}")
-                return True
-            else:
-                logger.error(f"Ses çıkartma hatası: {result.stderr}")
-                return False
-        except subprocess.TimeoutExpired:
-            logger.error("Ses çıkartma işlemi zaman aşımına uğradı")
+        if not self._validate_files(input_file, "extract_audio"):
             return False
-        except Exception as e:
-            logger.error(f"Ses çıkartma hatası: {type(e).__name__}: {str(e)}")
+
+        if not isinstance(audio_codec, AudioCodec):
+            logger.error(f"Geçersiz ses codec: {audio_codec}")
+            return False
+
+        logger.info(f"Ses çıkartılıyor: {audio_codec.name}")
+
+        result = self._runner.run(
+            input_file=input_file,
+            output_file=output_file,
+            video_args=['-vn'],
+            audio_args=['-c:a', audio_codec.lib],
+            timeout=1800
+        )
+
+        if result.success:
+            logger.info(f"Ses çıkartma başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Ses çıkartma hatası: {result.error_message}")
             return False
 
     def create_gif(self, input_file: str, output_file: str, start_time: float = 0, duration: float = 5, fps: int = 10) -> bool:
@@ -762,27 +753,29 @@ class VideoEditor:
         Returns:
             bool: Başarılı ise True
         """
-        try:
-            if not self._validate_files(input_file, "create_gif"):
-                return False
-
-            if start_time < 0 or duration <= 0 or fps <= 0:
-                logger.error(f"Geçersiz GIF parametreleri: start={start_time}, duration={duration}, fps={fps}")
-                return False
-
-            logger.info(f"GIF oluşturulüyor: {duration}s, {fps} fps")
-            cmd = [self.ffmpeg_path, '-i', input_file, '-ss', str(start_time), '-t', str(duration), '-vf', f'fps={fps},scale=320:-1:flags=lanczos', '-y', output_file]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
-
-            if result.returncode == 0:
-                logger.info(f"GIF oluşturma başarılı: {output_file}")
-                return True
-            else:
-                logger.error(f"GIF oluşturma hatası: {result.stderr}")
-                return False
-        except subprocess.TimeoutExpired:
-            logger.error("GIF oluşturma işlemi zaman aşımına uğradı")
+        if not self._validate_files(input_file, "create_gif"):
             return False
-        except Exception as e:
-            logger.error(f"GIF oluşturma hatası: {type(e).__name__}: {str(e)}")
+
+        if start_time < 0 or duration <= 0 or fps <= 0:
+            logger.error(f"Geçersiz GIF parametreleri: start={start_time}, duration={duration}, fps={fps}")
+            return False
+
+        logger.info(f"GIF oluşturulüyor: {duration}s, {fps} fps")
+
+        result = self._runner.run(
+            input_file=input_file,
+            output_file=output_file,
+            extra_args=[
+                '-ss', str(start_time),
+                '-t', str(duration),
+                '-vf', f'fps={fps},scale=320:-1:flags=lanczos'
+            ],
+            timeout=1800
+        )
+
+        if result.success:
+            logger.info(f"GIF oluşturma başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"GIF oluşturma hatası: {result.error_message}")
             return False

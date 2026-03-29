@@ -3,11 +3,13 @@ Pillow>=9.0.0
 yt-dlp
 pytest>=7.0
 requests>=2.31.0
+click>=8.0.0
+
 
 # Desktop App & Auto-Update
 pyinstaller>=5.0
 
 # FAZ 5: Gelişmiş UI Özellikleri (Opsiyonel)
-# tkinterdnd2>=0.3.0  # Drag & Drop (Windows)
-# pystray>=0.19.0     # Sistem tray
+tkinterdnd2>=0.3.0  # Drag & Drop (Windows)
+pystray>=0.19.0     # Sistem tray
 # win10toast>=0.9     # Windows bildirimleri

@@ -5,8 +5,6 @@ Gelişmiş kullanıcı arayüzü özellikleri
 
 import customtkinter as ctk
 from tkinter import filedialog
-import os
-from pathlib import Path
 from typing import Optional, Callable, List
 import threading
 import time
@@ -63,9 +61,19 @@ class DragDropFrame(ctk.CTkFrame):
 class SystemTrayIntegration:
     """Sistem tray entegrasyonu"""
 
-    def __init__(self, app_name: str = "RAVN"):
+    def __init__(
+        self,
+        app_name: str = "RAVN",
+        on_open: Optional[Callable[[], None]] = None,
+        on_pause_queue: Optional[Callable[[], None]] = None,
+        on_quit: Optional[Callable[[], None]] = None,
+    ):
         self.app_name = app_name
         self.icon = None
+        self.available = False
+        self.on_open = on_open
+        self.on_pause_queue = on_pause_queue
+        self.on_quit = on_quit
 
         try:
             from pystray import Icon, Menu, MenuItem
@@ -75,6 +83,7 @@ class SystemTrayIntegration:
             self.Menu = Menu
             self.MenuItem = MenuItem
             self._create_icon()
+            self.available = True
         except ImportError:
             print("Sistem tray desteği için pystray kütüphanesi gerekli")
 
@@ -86,10 +95,11 @@ class SystemTrayIntegration:
         draw = ImageDraw.Draw(image)
         draw.rectangle([16, 16, 48, 48], fill='white')
 
-        menu = self.Menu(
-            self.MenuItem('Aç', self._on_open),
-            self.MenuItem('Çıkış', self._on_quit)
-        )
+        menu_items = [self.MenuItem('Aç', self._on_open)]
+        if self.on_pause_queue:
+            menu_items.append(self.MenuItem('Kuyruğu Duraklat', self._on_pause_queue))
+        menu_items.append(self.MenuItem('Çıkış', self._on_quit))
+        menu = self.Menu(*menu_items)
 
         self.icon = self.Icon(self.app_name, image, menu=menu)
 
@@ -105,10 +115,18 @@ class SystemTrayIntegration:
 
     def _on_open(self, icon, item):
         """Uygulama açıldığında"""
-        pass  # Ana pencereyi göster
+        if self.on_open:
+            self.on_open()
+
+    def _on_pause_queue(self, icon, item):
+        """Kuyruğu duraklat/başlat callback'i."""
+        if self.on_pause_queue:
+            self.on_pause_queue()
 
     def _on_quit(self, icon, item):
         """Çıkış"""
+        if self.on_quit:
+            self.on_quit()
         icon.stop()
 
 

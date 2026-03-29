@@ -6,12 +6,15 @@ Altyazı indirme, dönüştürme ve yönetim sistemi
 import os
 import re
 import json
-import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Callable
 from enum import Enum
 from dataclasses import dataclass
 import logging
+
+from ravn_app.core.runners import FFmpegRunner, YtDlpRunner, RunnerResult
+
+logger = logging.getLogger(__name__)
 
 
 class SubtitleFormat(Enum):
@@ -36,14 +39,15 @@ class SubtitleInfo:
 class SubtitleDownloader:
     """YouTube ve diğer platformlardan altyazı indirir"""
 
-    def __init__(self):
-        self.yt_dlp_path = "yt-dlp"
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        self.yt_dlp_path = yt_dlp_path
+        self._runner = YtDlpRunner(yt_dlp_path)
 
     def download_subtitles(
         self,
         video_url: str,
         output_dir: str,
-        languages: List[str] = None,
+        languages: Optional[List[str]] = None,
         auto_sub: bool = True
     ) -> List[SubtitleInfo]:
         """
@@ -63,67 +67,69 @@ class SubtitleDownloader:
 
         languages = languages or ['tr', 'en']
 
-        options = {
-            'writesubtitles': True,
-            'writeautomaticsub': auto_sub,
-            'subtitleslangs': languages,
-            'skip_download': True,
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
-            'quiet': True
-        }
+        # yt-dlp args for subtitle-only download
+        args = [
+            '--write-subs',
+            '--sub-langs', ','.join(languages),
+            '--skip-download',
+            '-o', os.path.join(output_dir, '%(title)s.%(ext)s'),
+            '--quiet',
+        ]
+        
+        if auto_sub:
+            args.append('--write-auto-subs')
 
-        try:
-            import yt_dlp
-            with yt_dlp.YoutubeDL(options) as ydl:
-                info = ydl.extract_info(video_url, download=True)
-
-                downloaded_subs = []
-                if 'requested_subtitles' in info:
-                    for lang, sub_info in info['requested_subtitles'].items():
-                        if sub_info and 'filepath' in sub_info:
-                            downloaded_subs.append(SubtitleInfo(
-                                language=lang,
-                                format=SubtitleFormat.VTT,
-                                file_path=sub_info['filepath'],
-                                is_auto_generated=False
-                            ))
-
-                return downloaded_subs
-
-        except Exception as e:
-            logging.error(f"Altyazı indirme hatası: {e}")
+        # Run using YtDlpRunner
+        result = self._runner.download(video_url, output_dir, extra_args=args)
+        
+        if not result.success:
+            logger.error(f"Altyazı indirme hatası: {result.error_message}")
             return []
+
+        # Find downloaded subtitle files
+        downloaded_subs = []
+        for lang in languages:
+            # Look for subtitle files with various extensions
+            for ext in ['vtt', 'srt', 'ass', 'ssa']:
+                pattern = os.path.join(output_dir, f"*.{lang}.{ext}")
+                import glob
+                for sub_file in glob.glob(pattern):
+                    try:
+                        fmt = SubtitleFormat(ext)
+                    except ValueError:
+                        fmt = SubtitleFormat.VTT
+                    
+                    downloaded_subs.append(SubtitleInfo(
+                        language=lang,
+                        format=fmt,
+                        file_path=sub_file,
+                        is_auto_generated='auto' in sub_file.lower()
+                    ))
+        
+        return downloaded_subs
 
     def list_available_subtitles(self, video_url: str) -> Dict[str, List[str]]:
         """Video için mevcut altyazıları listele"""
-        try:
-            import yt_dlp
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-
-                result = {
-                    'manual': [],
-                    'automatic': []
-                }
-
-                if 'subtitles' in info:
-                    result['manual'] = list(info['subtitles'].keys())
-
-                if 'automatic_captions' in info:
-                    result['automatic'] = list(info['automatic_captions'].keys())
-
-                return result
-
-        except Exception as e:
-            logging.error(f"Altyazı listeleme hatası: {e}")
+        result = self._runner.extract_info(video_url)
+        
+        if not result.success:
+            logger.error(f"Altyazı listeleme hatası: {result.error_message}")
             return {'manual': [], 'automatic': []}
+
+        info = result.metadata.get('info', {})
+        
+        return {
+            'manual': list(info.get('subtitles', {}).keys()),
+            'automatic': list(info.get('automatic_captions', {}).keys())
+        }
 
 
 class SubtitleConverter:
-    """Altyazı format dönüştürücü"""
+    """Altyazı format dönüştürücü - FFmpegRunner kullanır"""
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
         self.ffmpeg_path = ffmpeg_path
+        self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
 
     def convert(
         self,
@@ -143,24 +149,26 @@ class SubtitleConverter:
             Başarılı ise True
         """
         if not os.path.exists(input_file):
+            logger.error(f"Dosya bulunamadı: {input_file}")
             return False
 
         if output_file is None:
             input_path = Path(input_file)
             output_file = str(input_path.with_suffix(f'.{output_format.value}'))
 
-        cmd = [
-            self.ffmpeg_path,
-            '-i', input_file,
-            '-y',
-            output_file
-        ]
+        result = self._runner.run_raw(
+            args=[
+                '-i', input_file,
+                '-y',
+                output_file
+            ]
+        )
 
-        try:
-            result = subprocess.run(cmd, capture_output=True)
-            return result.returncode == 0
-        except Exception as e:
-            logging.error(f"Altyazı dönüştürme hatası: {e}")
+        if result.success:
+            logger.info(f"Altyazı dönüştürme başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Altyazı dönüştürme hatası: {result.error_message}")
             return False
 
     def srt_to_vtt(self, srt_file: str, vtt_file: str) -> bool:
@@ -176,7 +184,7 @@ class SubtitleConverter:
 
             return True
         except Exception as e:
-            logging.error(f"SRT->VTT dönüştürme hatası: {e}")
+            logger.error(f"SRT->VTT dönüştürme hatası: {e}")
             return False
 
     def vtt_to_srt(self, vtt_file: str, srt_file: str) -> bool:
@@ -194,7 +202,7 @@ class SubtitleConverter:
 
             return True
         except Exception as e:
-            logging.error(f"VTT->SRT dönüştürme hatası: {e}")
+            logger.error(f"VTT->SRT dönüştürme hatası: {e}")
             return False
 
 
@@ -260,7 +268,7 @@ class SubtitleEditor:
             return True
 
         except Exception as e:
-            logging.error(f"Zaman kaydırma hatası: {e}")
+            logger.error(f"Zaman kaydırma hatası: {e}")
             return False
 
     def merge_subtitles(
@@ -284,7 +292,7 @@ class SubtitleEditor:
             return True
 
         except Exception as e:
-            logging.error(f"Altyazı birleştirme hatası: {e}")
+            logger.error(f"Altyazı birleştirme hatası: {e}")
             return False
 
     def remove_formatting(self, input_file: str, output_file: str) -> bool:
@@ -305,15 +313,16 @@ class SubtitleEditor:
             return True
 
         except Exception as e:
-            logging.error(f"Formatlama kaldırma hatası: {e}")
+            logger.error(f"Formatlama kaldırma hatası: {e}")
             return False
 
 
 class SubtitleEmbedder:
-    """Videoylara altyazı gömme (hard-sub)"""
+    """Videoylara altyazı gömme - FFmpegRunner kullanır"""
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
         self.ffmpeg_path = ffmpeg_path
+        self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
 
     def embed_soft(
         self,
@@ -334,22 +343,31 @@ class SubtitleEmbedder:
         Returns:
             Başarılı ise True
         """
-        cmd = [
-            self.ffmpeg_path,
-            '-i', video_file,
-            '-i', subtitle_file,
-            '-c', 'copy',
-            '-c:s', 'mov_text',
-            '-metadata:s:s:0', f'language={language}',
-            '-y',
-            output_file
-        ]
+        if not os.path.exists(video_file):
+            logger.error(f"Video dosyası bulunamadı: {video_file}")
+            return False
+        
+        if not os.path.exists(subtitle_file):
+            logger.error(f"Altyazı dosyası bulunamadı: {subtitle_file}")
+            return False
 
-        try:
-            result = subprocess.run(cmd, capture_output=True)
-            return result.returncode == 0
-        except Exception as e:
-            logging.error(f"Soft subtitle ekleme hatası: {e}")
+        result = self._runner.run_raw(
+            args=[
+                '-i', video_file,
+                '-i', subtitle_file,
+                '-c', 'copy',
+                '-c:s', 'mov_text',
+                '-metadata:s:s:0', f'language={language}',
+                '-y',
+                output_file
+            ]
+        )
+
+        if result.success:
+            logger.info(f"Soft subtitle ekleme başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Soft subtitle ekleme hatası: {result.error_message}")
             return False
 
     def embed_hard(
@@ -373,23 +391,32 @@ class SubtitleEmbedder:
         Returns:
             Başarılı ise True
         """
+        if not os.path.exists(video_file):
+            logger.error(f"Video dosyası bulunamadı: {video_file}")
+            return False
+        
+        if not os.path.exists(subtitle_file):
+            logger.error(f"Altyazı dosyası bulunamadı: {subtitle_file}")
+            return False
+
         # Windows path'lerini düzelt
         subtitle_path = subtitle_file.replace('\\', '/').replace(':', '\\:')
 
-        cmd = [
-            self.ffmpeg_path,
-            '-i', video_file,
-            '-vf', f"subtitles='{subtitle_path}':force_style='FontSize={font_size},PrimaryColour={font_color}'",
-            '-c:a', 'copy',
-            '-y',
-            output_file
-        ]
+        result = self._runner.run_raw(
+            args=[
+                '-i', video_file,
+                '-vf', f"subtitles='{subtitle_path}':force_style='FontSize={font_size},PrimaryColour={font_color}'",
+                '-c:a', 'copy',
+                '-y',
+                output_file
+            ]
+        )
 
-        try:
-            result = subprocess.run(cmd, capture_output=True)
-            return result.returncode == 0
-        except Exception as e:
-            logging.error(f"Hard subtitle ekleme hatası: {e}")
+        if result.success:
+            logger.info(f"Hard subtitle ekleme başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Hard subtitle ekleme hatası: {result.error_message}")
             return False
 
     def extract_subtitles(
@@ -399,19 +426,24 @@ class SubtitleEmbedder:
         stream_index: int = 0
     ) -> bool:
         """Videodan altyazıyı çıkart"""
-        cmd = [
-            self.ffmpeg_path,
-            '-i', video_file,
-            '-map', f'0:s:{stream_index}',
-            '-y',
-            output_file
-        ]
+        if not os.path.exists(video_file):
+            logger.error(f"Video dosyası bulunamadı: {video_file}")
+            return False
 
-        try:
-            result = subprocess.run(cmd, capture_output=True)
-            return result.returncode == 0
-        except Exception as e:
-            logging.error(f"Altyazı çıkartma hatası: {e}")
+        result = self._runner.run_raw(
+            args=[
+                '-i', video_file,
+                '-map', f'0:s:{stream_index}',
+                '-y',
+                output_file
+            ]
+        )
+
+        if result.success:
+            logger.info(f"Altyazı çıkartma başarılı: {output_file}")
+            return True
+        else:
+            logger.error(f"Altyazı çıkartma hatası: {result.error_message}")
             return False
 
 

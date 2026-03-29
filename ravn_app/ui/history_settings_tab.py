@@ -8,6 +8,7 @@ from tkinter import messagebox, filedialog
 from pathlib import Path
 from ..core.database import DatabaseManager, ConfigManager
 from .advanced_features import SearchFilter
+from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -24,61 +25,67 @@ class HistoryTab(ctk.CTkFrame):
         """UI'ı oluştur"""
         # Başlık
         header_frame = ctk.CTkFrame(self)
-        header_frame.pack(fill="x", padx=10, pady=10)
+        header_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         ctk.CTkLabel(
             header_frame,
-            text="📚 İndirme Geçmişi",
-            font=("Arial", 18, "bold")
-        ).pack(side="left", padx=10)
+            text="İndirme Geçmişi",
+            font=Fonts.H1
+        ).pack(side="left", padx=Spacing.SM)
 
         # İstatistikler butonu
         ctk.CTkButton(
             header_frame,
-            text="📊 İstatistikler",
-            command=self.show_statistics
-        ).pack(side="right", padx=5)
+            text="İstatistikler",
+            command=self.show_statistics,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_SM
+        ).pack(side="right", padx=Spacing.XS)
 
         # Temizle butonu
         ctk.CTkButton(
             header_frame,
-            text="🗑️ Temizle",
-            command=self.clear_history
-        ).pack(side="right", padx=5)
+            text="Temizle",
+            command=self.clear_history,
+            fg_color=Colors.DANGER,
+            hover_color=Colors.DANGER_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_SM
+        ).pack(side="right", padx=Spacing.XS)
 
         # Arama ve filtre
         search_frame = ctk.CTkFrame(self)
-        search_frame.pack(fill="x", padx=10, pady=5)
+        search_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.XS)
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
             placeholder_text="🔍 Ara...",
             width=300
         )
-        self.search_entry.pack(side="left", padx=5)
+        self.search_entry.pack(side="left", padx=Spacing.XS)
         self.search_entry.bind("<KeyRelease>", lambda e: self.filter_history())
 
-        ctk.CTkLabel(search_frame, text="Format:").pack(side="left", padx=5)
+        ctk.CTkLabel(search_frame, text="Format:", font=Fonts.LABEL).pack(side="left", padx=Spacing.XS)
         self.format_filter = ctk.CTkComboBox(
             search_frame,
             values=["Tümü", "MP4", "MP3", "MKV", "AVI"],
             command=lambda v: self.filter_history(),
             width=100
         )
-        self.format_filter.pack(side="left", padx=5)
+        self.format_filter.pack(side="left", padx=Spacing.XS)
 
-        ctk.CTkLabel(search_frame, text="Durum:").pack(side="left", padx=5)
+        ctk.CTkLabel(search_frame, text="Durum:", font=Fonts.LABEL).pack(side="left", padx=Spacing.XS)
         self.status_filter = ctk.CTkComboBox(
             search_frame,
             values=["Tümü", "completed", "failed", "cancelled"],
             command=lambda v: self.filter_history(),
             width=120
         )
-        self.status_filter.pack(side="left", padx=5)
+        self.status_filter.pack(side="left", padx=Spacing.XS)
 
         # Scrollable liste
         self.scrollable_frame = ctk.CTkScrollableFrame(self)
-        self.scrollable_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.scrollable_frame.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
 
     def load_history(self):
         """Geçmişi yükle"""
@@ -91,9 +98,10 @@ class HistoryTab(ctk.CTkFrame):
         if not downloads:
             ctk.CTkLabel(
                 self.scrollable_frame,
-                text="Henüz indirme kaydı yok",
-                font=("Arial", 14)
-            ).pack(pady=50)
+                text="Henüz indirme geçmişi yok.",
+                font=Fonts.LABEL,
+                text_color=Colors.TEXT_MUTED
+            ).pack(pady=Spacing.XL)
             return
 
         for download in downloads:
@@ -106,41 +114,41 @@ class HistoryTab(ctk.CTkFrame):
 
         # Sol taraf - Bilgiler
         info_frame = ctk.CTkFrame(item_frame)
-        info_frame.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        info_frame.pack(side="left", fill="x", expand=True, padx=Spacing.XS, pady=Spacing.XS)
 
         # Başlık
         title_label = ctk.CTkLabel(
             info_frame,
             text=download.title or "Başlık yok",
-            font=("Arial", 12, "bold"),
+            font=Fonts.LABEL_BOLD,
             anchor="w"
         )
-        title_label.pack(fill="x", padx=5, pady=2)
+        title_label.pack(fill="x", padx=Spacing.XS, pady=2)
 
         # Detaylar
         details = f"📁 {download.format} | 🎯 {download.quality} | 📊 {self.format_size(download.file_size)}"
         details_label = ctk.CTkLabel(
             info_frame,
             text=details,
-            font=("Arial", 10),
+            font=Fonts.SMALL,
             anchor="w",
-            text_color="gray"
+            text_color=Colors.TEXT_MUTED
         )
-        details_label.pack(fill="x", padx=5, pady=2)
+        details_label.pack(fill="x", padx=Spacing.XS, pady=2)
 
         # Tarih
         date_label = ctk.CTkLabel(
             info_frame,
             text=f"🕐 {download.download_date}",
-            font=("Arial", 9),
+            font=Fonts.SMALL,
             anchor="w",
-            text_color="gray"
+            text_color=Colors.TEXT_MUTED
         )
-        date_label.pack(fill="x", padx=5, pady=2)
+        date_label.pack(fill="x", padx=Spacing.XS, pady=2)
 
         # Sağ taraf - Butonlar
         button_frame = ctk.CTkFrame(item_frame)
-        button_frame.pack(side="right", padx=5)
+        button_frame.pack(side="right", padx=Spacing.XS)
 
         # Durum badge
         status_colors = {
@@ -257,13 +265,13 @@ class SettingsTab(ctk.CTkFrame):
         # Başlık
         ctk.CTkLabel(
             self,
-            text="⚙️ Ayarlar",
-            font=("Arial", 18, "bold")
-        ).pack(pady=20)
+            text="Ayarlar",
+            font=Fonts.H1
+        ).pack(pady=Spacing.LG)
 
         # Tabview
         self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
+        self.tabview.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.SM)
 
         # Genel sekmesi
         general_tab = self.tabview.add("Genel")
@@ -283,132 +291,149 @@ class SettingsTab(ctk.CTkFrame):
 
         # Alt butonlar
         button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=20, pady=10)
+        button_frame.pack(fill="x", padx=Spacing.LG, pady=Spacing.SM)
 
         ctk.CTkButton(
             button_frame,
-            text="💾 Kaydet",
+            text="Kaydet",
             command=self.save_settings,
-            height=40
-        ).pack(side="left", padx=5)
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
+            font=Fonts.LABEL_BOLD,
+            height=Sizes.BTN_HEIGHT_MD
+        ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
             button_frame,
-            text="🔄 Sıfırla",
+            text="Sıfırla",
             command=self.reset_settings,
-            height=40
-        ).pack(side="left", padx=5)
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD
+        ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
             button_frame,
-            text="📤 Dışa Aktar",
+            text="Dışa Aktar",
             command=self.export_settings,
-            height=40
-        ).pack(side="left", padx=5)
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD
+        ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
             button_frame,
-            text="📥 İçe Aktar",
+            text="İçe Aktar",
             command=self.import_settings,
-            height=40
-        ).pack(side="left", padx=5)
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD
+        ).pack(side="left", padx=Spacing.XS)
 
     def create_general_settings(self, parent):
         """Genel ayarlar"""
         # Tema
         theme_frame = ctk.CTkFrame(parent)
-        theme_frame.pack(fill="x", padx=10, pady=10)
+        theme_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(theme_frame, text="🎨 Tema:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(theme_frame, text="Tema:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.theme_combo = ctk.CTkComboBox(
             theme_frame,
             values=["Nordic", "Forest", "Aurora", "Dark", "Light"]
         )
-        self.theme_combo.pack(fill="x", padx=5, pady=5)
+        self.theme_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Dil
         lang_frame = ctk.CTkFrame(parent)
-        lang_frame.pack(fill="x", padx=10, pady=10)
+        lang_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(lang_frame, text="🌍 Dil:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(lang_frame, text="Dil:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.language_combo = ctk.CTkComboBox(
             lang_frame,
             values=["Türkçe", "English"]
         )
-        self.language_combo.pack(fill="x", padx=5, pady=5)
+        self.language_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Bildirimler
         notification_frame = ctk.CTkFrame(parent)
-        notification_frame.pack(fill="x", padx=10, pady=10)
+        notification_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         self.notifications_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
             notification_frame,
-            text="🔔 Bildirimleri etkinleştir",
-            variable=self.notifications_var
-        ).pack(anchor="w", padx=5, pady=5)
+            text="Bildirimleri etkinleştir",
+            variable=self.notifications_var,
+            font=Fonts.LABEL
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
         self.auto_update_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
             notification_frame,
-            text="🔄 Otomatik güncelleme kontrolü",
-            variable=self.auto_update_var
-        ).pack(anchor="w", padx=5, pady=5)
+            text="Otomatik güncelleme kontrolü",
+            variable=self.auto_update_var,
+            font=Fonts.LABEL
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
     def create_download_settings(self, parent):
         """İndirme ayarları"""
         # Varsayılan dizin
         dir_frame = ctk.CTkFrame(parent)
-        dir_frame.pack(fill="x", padx=10, pady=10)
+        dir_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(dir_frame, text="📁 Varsayılan İndirme Dizini:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(dir_frame, text="Varsayılan İndirme Dizini:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
         dir_select_frame = ctk.CTkFrame(dir_frame)
-        dir_select_frame.pack(fill="x", padx=5, pady=5)
+        dir_select_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         self.download_dir_entry = ctk.CTkEntry(dir_select_frame)
-        self.download_dir_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.download_dir_entry.pack(side="left", fill="x", expand=True, padx=Spacing.XS)
 
         ctk.CTkButton(
             dir_select_frame,
             text="Gözat",
             width=80,
-            command=self.select_download_dir
-        ).pack(side="right", padx=5)
+            command=self.select_download_dir,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL
+        ).pack(side="right", padx=Spacing.XS)
 
         # Varsayılan format ve kalite
         format_frame = ctk.CTkFrame(parent)
-        format_frame.pack(fill="x", padx=10, pady=10)
+        format_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(format_frame, text="📼 Varsayılan Format:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(format_frame, text="Varsayılan Format:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.default_format_combo = ctk.CTkComboBox(
             format_frame,
             values=["MP4", "MP3", "MKV"]
         )
-        self.default_format_combo.pack(fill="x", padx=5, pady=5)
+        self.default_format_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
-        ctk.CTkLabel(format_frame, text="🎯 Varsayılan Kalite:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(format_frame, text="Varsayılan Kalite:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.default_quality_combo = ctk.CTkComboBox(
             format_frame,
             values=["En İyi", "1080p", "720p", "480p"]
         )
-        self.default_quality_combo.pack(fill="x", padx=5, pady=5)
+        self.default_quality_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Eşzamanlı indirme
         concurrent_frame = ctk.CTkFrame(parent)
-        concurrent_frame.pack(fill="x", padx=10, pady=10)
+        concurrent_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(concurrent_frame, text="⚡ Eşzamanlı İndirme Sayısı:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(concurrent_frame, text="Eşzamanlı İndirme Sayısı:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.concurrent_slider = ctk.CTkSlider(
             concurrent_frame,
             from_=1,
             to=5,
             number_of_steps=4
         )
-        self.concurrent_slider.pack(fill="x", padx=5, pady=5)
+        self.concurrent_slider.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
-        self.concurrent_label = ctk.CTkLabel(concurrent_frame, text="1")
-        self.concurrent_label.pack(padx=5, pady=5)
+        self.concurrent_label = ctk.CTkLabel(concurrent_frame, text="1", font=Fonts.LABEL)
+        self.concurrent_label.pack(padx=Spacing.XS, pady=Spacing.XS)
         self.concurrent_slider.configure(
             command=lambda v: self.concurrent_label.configure(text=str(int(v)))
         )
@@ -417,50 +442,52 @@ class SettingsTab(ctk.CTkFrame):
         """Dönüştürme ayarları"""
         # FFmpeg yolu
         ffmpeg_frame = ctk.CTkFrame(parent)
-        ffmpeg_frame.pack(fill="x", padx=10, pady=10)
+        ffmpeg_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(ffmpeg_frame, text="🎬 FFmpeg Yolu:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(ffmpeg_frame, text="FFmpeg Yolu:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.ffmpeg_entry = ctk.CTkEntry(ffmpeg_frame)
-        self.ffmpeg_entry.pack(fill="x", padx=5, pady=5)
+        self.ffmpeg_entry.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Otomatik temizlik
         cleanup_frame = ctk.CTkFrame(parent)
-        cleanup_frame.pack(fill="x", padx=10, pady=10)
+        cleanup_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         self.auto_cleanup_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
             cleanup_frame,
-            text="🗑️ Dönüştürmeden sonra kaynak dosyayı sil",
-            variable=self.auto_cleanup_var
-        ).pack(anchor="w", padx=5, pady=5)
+            text="Dönüştürmeden sonra kaynak dosyayı sil",
+            variable=self.auto_cleanup_var,
+            font=Fonts.LABEL
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
     def create_advanced_settings(self, parent):
         """Gelişmiş ayarlar"""
         # Geçmiş limiti
         history_frame = ctk.CTkFrame(parent)
-        history_frame.pack(fill="x", padx=10, pady=10)
+        history_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(history_frame, text="📚 Geçmiş Kayıt Limiti:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(history_frame, text="Geçmiş Kayıt Limiti:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.history_limit_entry = ctk.CTkEntry(history_frame)
-        self.history_limit_entry.pack(fill="x", padx=5, pady=5)
+        self.history_limit_entry.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Altyazı ayarları
         subtitle_frame = ctk.CTkFrame(parent)
-        subtitle_frame.pack(fill="x", padx=10, pady=10)
+        subtitle_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         self.auto_subtitle_var = ctk.BooleanVar()
         ctk.CTkCheckBox(
             subtitle_frame,
-            text="📝 Otomatik altyazı indir",
-            variable=self.auto_subtitle_var
-        ).pack(anchor="w", padx=5, pady=5)
+            text="Otomatik altyazı indir",
+            variable=self.auto_subtitle_var,
+            font=Fonts.LABEL
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
-        ctk.CTkLabel(subtitle_frame, text="Tercih Edilen Altyazı Dili:").pack(anchor="w", padx=5, pady=5)
+        ctk.CTkLabel(subtitle_frame, text="Tercih Edilen Altyazı Dili:", font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.subtitle_lang_combo = ctk.CTkComboBox(
             subtitle_frame,
             values=["tr", "en", "de", "fr", "es"]
         )
-        self.subtitle_lang_combo.pack(fill="x", padx=5, pady=5)
+        self.subtitle_lang_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
     def load_settings(self):
         """Ayarları yükle"""

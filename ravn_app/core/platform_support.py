@@ -1,19 +1,30 @@
 """
-Platform desteği genişlemesi - Vimeo, Dailymotion ve diğer platformlar
+Platform desteği genişlemesi.
+
+Yeni platformlar:
+- TikTok
+- Instagram (post + reel)
+- Twitch (VOD + clip)
+- Twitter/X
+- Genel yt-dlp URL fallback
 """
 
-import os
 import logging
-from typing import Dict, List, Optional, Any
-from enum import Enum
+import os
+import re
 from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from ravn_app.core.runners import YtDlpRunner
 
 
 logger = logging.getLogger(__name__)
 
 
 class Platform(Enum):
-    """Desteklenen video platformları"""
+    """Desteklenen video platformları."""
+
     YOUTUBE = "youtube"
     VIMEO = "vimeo"
     DAILYMOTION = "dailymotion"
@@ -21,241 +32,308 @@ class Platform(Enum):
     BILIBILI = "bilibili"
     FACEBOOK = "facebook"
     INSTAGRAM = "instagram"
+    TIKTOK = "tiktok"
+    TWITTER = "twitter"
+    GENERIC = "generic"
 
 
 class PlatformDownloader(ABC):
-    """Platform indirici arayüzü"""
+    """Platform indirici arayüzü."""
 
     @property
     @abstractmethod
     def platform(self) -> Platform:
-        """Platform türü"""
-        pass
+        """Platform türü."""
 
     @abstractmethod
     def can_download(self, url: str) -> bool:
-        """URL'nin bu platform tarafından desteklenip desteklenmediğini kontrol et"""
-        pass
+        """URL'nin bu platform tarafından desteklenip desteklenmediğini kontrol et."""
 
     @abstractmethod
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
-        """Video bilgilerini al"""
-        pass
+        """Video bilgilerini al."""
 
     @abstractmethod
     def download(self, url: str, output_path: str, options: Dict[str, Any]) -> bool:
-        """Videoyu indir"""
-        pass
+        """Videoyu indir."""
 
 
-class VimeoDownloader(PlatformDownloader):
-    """Vimeo indirici"""
+class YtDlpPlatformDownloader(PlatformDownloader):
+    """YtDlpRunner tabanlı genel platform indirici."""
+
+    def __init__(
+        self,
+        platform: Platform,
+        platform_label: str,
+        domains: List[str],
+        yt_dlp_path: str = "yt-dlp",
+        url_patterns: Optional[List[str]] = None,
+    ):
+        self._platform = platform
+        self._platform_label = platform_label
+        self._domains = [domain.lower() for domain in domains]
+        self._url_patterns = [
+            re.compile(pattern, re.IGNORECASE) for pattern in (url_patterns or [])
+        ]
+        self._runner = YtDlpRunner(yt_dlp_path)
+
+    @property
+    def platform(self) -> Platform:
+        return self._platform
+
+    def can_download(self, url: str) -> bool:
+        normalized = (url or "").strip().lower()
+        if not normalized.startswith(("http://", "https://")):
+            return False
+
+        if any(domain in normalized for domain in self._domains):
+            return True
+
+        return any(pattern.search(normalized) for pattern in self._url_patterns)
+
+    def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
+        info = self._runner.extract_info(url)
+        if info is None:
+            return None
+
+        return {
+            "title": info.get("title", ""),
+            "duration": info.get("duration", 0),
+            "uploader": info.get("uploader", ""),
+            "thumbnail": info.get("thumbnail", ""),
+            "view_count": info.get("view_count", 0),
+            "like_count": info.get("like_count", 0),
+            "formats": len(info.get("formats", [])),
+            "ext": info.get("ext", ""),
+            "platform": self.platform.value,
+            "extractor": info.get("extractor", ""),
+            "platform_label": self._platform_label,
+        }
+
+    def download(self, url: str, output_path: str, options: Dict[str, Any]) -> bool:
+        os.makedirs(output_path, exist_ok=True)
+        options = options or {}
+
+        extra_args: List[str] = []
+        if options.get("save_info"):
+            extra_args.append("--write-info-json")
+        if options.get("subtitles"):
+            extra_args.append("--write-subs")
+        if options.get("subtitle_langs"):
+            extra_args.extend(["--sub-langs", str(options["subtitle_langs"])])
+        if options.get("thumbnail"):
+            extra_args.append("--write-thumbnail")
+        extra_args.append("--skip-unavailable-fragments")
+
+        result = self._runner.download(
+            url=url,
+            output_dir=output_path,
+            filename_template=options.get("filename_template", "%(title)s.%(ext)s"),
+            format_spec=options.get("format", "best"),
+            extra_args=extra_args,
+            retries=int(options.get("retries", YtDlpRunner.DEFAULT_RETRIES)),
+            timeout=int(options.get("timeout", YtDlpRunner.DEFAULT_TIMEOUT)),
+        )
+
+        if result.success:
+            logger.info("%s indirmesi başarılı: %s", self._platform_label, output_path)
+            return True
+
+        logger.error("%s indirme hatası: %s", self._platform_label, result.error_message)
+        return False
+
+
+class YouTubeDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.YOUTUBE,
+            platform_label="YouTube",
+            domains=["youtube.com", "youtu.be"],
+            yt_dlp_path=yt_dlp_path,
+        )
+
+
+class VimeoDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.VIMEO,
+            platform_label="Vimeo",
+            domains=["vimeo.com"],
+            yt_dlp_path=yt_dlp_path,
+        )
+
+
+class DailymotionDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.DAILYMOTION,
+            platform_label="Dailymotion",
+            domains=["dailymotion.com", "dai.ly"],
+            yt_dlp_path=yt_dlp_path,
+        )
+
+
+class TikTokDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.TIKTOK,
+            platform_label="TikTok",
+            domains=["tiktok.com", "vm.tiktok.com"],
+            yt_dlp_path=yt_dlp_path,
+        )
+
+
+class InstagramDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.INSTAGRAM,
+            platform_label="Instagram",
+            domains=["instagram.com"],
+            yt_dlp_path=yt_dlp_path,
+            url_patterns=[r"instagram\.com/(reel|p)/"],
+        )
+
+    def can_download(self, url: str) -> bool:
+        normalized = (url or "").strip().lower()
+        if not normalized.startswith(("http://", "https://")):
+            return False
+        return bool(re.search(r"instagram\.com/(reel|p)/", normalized))
+
+
+class TwitchDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.TWITCH,
+            platform_label="Twitch",
+            domains=["twitch.tv", "clips.twitch.tv"],
+            yt_dlp_path=yt_dlp_path,
+            url_patterns=[
+                r"twitch\.tv/videos/\d+",
+                r"clips\.twitch\.tv/[A-Za-z0-9_-]+",
+            ],
+        )
+
+    def can_download(self, url: str) -> bool:
+        normalized = (url or "").strip().lower()
+        if not normalized.startswith(("http://", "https://")):
+            return False
+        return bool(
+            re.search(r"twitch\.tv/videos/\d+", normalized)
+            or re.search(r"clips\.twitch\.tv/[A-Za-z0-9_-]+", normalized)
+        )
+
+
+class TwitterXDownloader(YtDlpPlatformDownloader):
+    def __init__(self, yt_dlp_path: str = "yt-dlp"):
+        super().__init__(
+            platform=Platform.TWITTER,
+            platform_label="Twitter/X",
+            domains=["twitter.com", "x.com"],
+            yt_dlp_path=yt_dlp_path,
+        )
+
+
+class GenericYtDlpDownloader(YtDlpPlatformDownloader):
+    """Bilinen platform eşleşmezse tüm yt-dlp URL'leri için fallback."""
 
     def __init__(self, yt_dlp_path: str = "yt-dlp"):
-        self.yt_dlp_path = yt_dlp_path
-
-    @property
-    def platform(self) -> Platform:
-        return Platform.VIMEO
-
-    def can_download(self, url: str) -> bool:
-        """Vimeo URL'sini kontrol et"""
-        return "vimeo.com" in url.lower()
-
-    def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
-        """Vimeo video bilgilerini al"""
-        try:
-            import subprocess
-            cmd = [
-                self.yt_dlp_path,
-                '-j',  # JSON çıktı
-                '--no-warnings',
-                url
-            ]
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-            if result.returncode == 0:
-                import json
-                info = json.loads(result.stdout)
-                return {
-                    'title': info.get('title', ''),
-                    'duration': info.get('duration', 0),
-                    'uploader': info.get('uploader', ''),
-                    'thumbnail': info.get('thumbnail', ''),
-                    'formats': len(info.get('formats', [])),
-                    'ext': info.get('ext', 'mp4'),
-                    'platform': 'vimeo'
-                }
-        except Exception as e:
-            logger.error(f"Vimeo bilgi hatası: {str(e)}")
-
-        return None
-
-    def download(self, url: str, output_path: str, options: Dict[str, Any]) -> bool:
-        """Vimeo videosunu indir"""
-        try:
-            import subprocess
-
-            os.makedirs(output_path, exist_ok=True)
-
-            cmd = [
-                self.yt_dlp_path,
-                '-f', options.get('format', 'best'),
-                '-o', os.path.join(output_path, '%(title)s.%(ext)s'),
-                '--write-info-json' if options.get('save_info') else '',
-                '--write-subs' if options.get('subtitles') else '',
-                '--skip-unavailable-fragments',
-            ]
-
-            # Boş argümanları kaldır
-            cmd = [arg for arg in cmd if arg]
-            cmd.append(url)
-
-            logger.info(f"Vimeo indirmesi başlanıyor: {url}")
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-
-            if result.returncode == 0:
-                logger.info(f"Vimeo indirmesi başarılı: {output_path}")
-                return True
-            else:
-                logger.error(f"Vimeo indirme hatası: {result.stderr}")
-                return False
-
-        except subprocess.TimeoutExpired:
-            logger.error("Vimeo indirmesi zaman aşımına uğradı")
-            return False
-        except Exception as e:
-            logger.error(f"Vimeo indirme hatası: {str(e)}")
-            return False
-
-
-class DailymotionDownloader(PlatformDownloader):
-    """Dailymotion indirici"""
-
-    def __init__(self, yt_dlp_path: str = "yt-dlp"):
-        self.yt_dlp_path = yt_dlp_path
-
-    @property
-    def platform(self) -> Platform:
-        return Platform.DAILYMOTION
+        super().__init__(
+            platform=Platform.GENERIC,
+            platform_label="Generic URL",
+            domains=[],
+            yt_dlp_path=yt_dlp_path,
+            url_patterns=[r"^https?://"],
+        )
 
     def can_download(self, url: str) -> bool:
-        """Dailymotion URL'sini kontrol et"""
-        return "dailymotion.com" in url.lower() or "dai.ly" in url.lower()
-
-    def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
-        """Dailymotion video bilgilerini al"""
-        try:
-            import subprocess
-            cmd = [
-                self.yt_dlp_path,
-                '-j',
-                '--no-warnings',
-                url
-            ]
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-            if result.returncode == 0:
-                import json
-                info = json.loads(result.stdout)
-                return {
-                    'title': info.get('title', ''),
-                    'duration': info.get('duration', 0),
-                    'uploader': info.get('uploader', ''),
-                    'thumbnail': info.get('thumbnail', ''),
-                    'view_count': info.get('view_count', 0),
-                    'like_count': info.get('like_count', 0),
-                    'ext': info.get('ext', 'mp4'),
-                    'platform': 'dailymotion'
-                }
-        except Exception as e:
-            logger.error(f"Dailymotion bilgi hatası: {str(e)}")
-
-        return None
-
-    def download(self, url: str, output_path: str, options: Dict[str, Any]) -> bool:
-        """Dailymotion videosunu indir"""
-        try:
-            import subprocess
-
-            os.makedirs(output_path, exist_ok=True)
-
-            cmd = [
-                self.yt_dlp_path,
-                '-f', options.get('format', 'best'),
-                '-o', os.path.join(output_path, '%(title)s.%(ext)s'),
-                '--write-info-json' if options.get('save_info') else '',
-                '--write-subs' if options.get('subtitles') else '',
-                '--skip-unavailable-fragments',
-            ]
-
-            cmd = [arg for arg in cmd if arg]
-            cmd.append(url)
-
-            logger.info(f"Dailymotion indirmesi başlanıyor: {url}")
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-
-            if result.returncode == 0:
-                logger.info(f"Dailymotion indirmesi başarılı: {output_path}")
-                return True
-            else:
-                logger.error(f"Dailymotion indirme hatası: {result.stderr}")
-                return False
-
-        except subprocess.TimeoutExpired:
-            logger.error("Dailymotion indirmesi zaman aşımına uğradı")
-            return False
-        except Exception as e:
-            logger.error(f"Dailymotion indirme hatası: {str(e)}")
-            return False
+        normalized = (url or "").strip().lower()
+        return bool(re.match(r"^https?://", normalized))
 
 
 class PlatformManager:
-    """Platform yöneticisi - tüm platform indirici yönetimi"""
+    """Platform yöneticisi - tüm platform indirici yönetimi."""
+
+    _BADGE_MAP: Dict[Platform, Dict[str, str]] = {
+        Platform.YOUTUBE: {"icon": "YT", "label": "YouTube", "color": "#ef4444"},
+        Platform.VIMEO: {"icon": "VI", "label": "Vimeo", "color": "#14b8a6"},
+        Platform.DAILYMOTION: {"icon": "DM", "label": "Dailymotion", "color": "#6366f1"},
+        Platform.TIKTOK: {"icon": "TT", "label": "TikTok", "color": "#f97316"},
+        Platform.INSTAGRAM: {"icon": "IG", "label": "Instagram", "color": "#ec4899"},
+        Platform.TWITCH: {"icon": "TW", "label": "Twitch", "color": "#a855f7"},
+        Platform.TWITTER: {"icon": "X", "label": "Twitter/X", "color": "#60a5fa"},
+        Platform.GENERIC: {"icon": "URL", "label": "Generic", "color": "#64748b"},
+    }
 
     def __init__(self):
         self.downloaders: Dict[Platform, PlatformDownloader] = {}
+        self._registration_order: List[Platform] = []
         self._register_default_downloaders()
 
     def _register_default_downloaders(self):
-        """Varsayılan platform indiricilerini kaydet"""
+        """Varsayılan platform indiricilerini kaydet."""
+        self.register_downloader(YouTubeDownloader())
         self.register_downloader(VimeoDownloader())
         self.register_downloader(DailymotionDownloader())
+        self.register_downloader(TikTokDownloader())
+        self.register_downloader(InstagramDownloader())
+        self.register_downloader(TwitchDownloader())
+        self.register_downloader(TwitterXDownloader())
+        self.register_downloader(GenericYtDlpDownloader())
         logger.info("Varsayılan platform indiricileri kaydedildi")
 
     def register_downloader(self, downloader: PlatformDownloader):
-        """Yeni platform indirici kaydet"""
+        """Yeni platform indirici kaydet."""
         self.downloaders[downloader.platform] = downloader
-        logger.info(f"Platform indirici kaydedildi: {downloader.platform.value}")
+        if downloader.platform not in self._registration_order:
+            self._registration_order.append(downloader.platform)
+        logger.info("Platform indirici kaydedildi: %s", downloader.platform.value)
 
     def find_downloader(self, url: str) -> Optional[PlatformDownloader]:
-        """URL için uygun indiriciyi bul"""
-        for downloader in self.downloaders.values():
-            if downloader.can_download(url):
+        """URL için uygun indiriciyi bul."""
+        for platform in self._registration_order:
+            downloader = self.downloaders.get(platform)
+            if downloader and downloader.can_download(url):
                 return downloader
         return None
 
+    def detect_platform(self, url: str) -> Optional[Platform]:
+        """URL için platformu tespit et."""
+        downloader = self.find_downloader(url)
+        if downloader is None:
+            return None
+        return downloader.platform
+
     def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
-        """Video bilgilerini al (otomatik platform tespiti)"""
+        """Video bilgilerini al (otomatik platform tespiti)."""
         downloader = self.find_downloader(url)
         if downloader:
             return downloader.get_video_info(url)
         return None
 
-    def download(self, url: str, output_path: str, options: Dict[str, Any] = None) -> bool:
-        """Videoyu indir (otomatik platform tespiti)"""
+    def download(
+        self,
+        url: str,
+        output_path: str,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Videoyu indir (otomatik platform tespiti)."""
         downloader = self.find_downloader(url)
         if not downloader:
-            logger.error(f"Desteklenmeyen platform: {url}")
+            logger.error("Desteklenmeyen platform: %s", url)
             return False
 
-        options = options or {}
-        return downloader.download(url, output_path, options)
+        return downloader.download(url, output_path, options or {})
 
     def get_supported_platforms(self) -> List[str]:
-        """Desteklenen platformları listele"""
-        return [p.value for p in self.downloaders.keys()]
+        """Desteklenen platformları listele."""
+        return [platform.value for platform in self._registration_order]
+
+    def get_platform_badge(self, url: str) -> Dict[str, str]:
+        """URL için badge/icon bilgisi döndür."""
+        platform = self.detect_platform(url)
+        if platform is None:
+            return {"icon": "?", "label": "Bilinmiyor", "color": "#64748b", "platform": "unknown"}
+
+        badge = dict(self._BADGE_MAP.get(platform, self._BADGE_MAP[Platform.GENERIC]))
+        badge["platform"] = platform.value
+        return badge

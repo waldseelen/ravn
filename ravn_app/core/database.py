@@ -3,14 +3,34 @@ RAVN - Database and Configuration Management (Faz 4)
 SQLite veritabanı ve konfigürasyon yönetimi
 """
 
-import sqlite3
 import json
+import logging
 import os
+import shutil
+import sqlite3
 from pathlib import Path
-from typing import List, Dict, Optional, Any
-from datetime import datetime
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from dataclasses import dataclass
 from enum import Enum
+
+from ravn_app.core.config_paths import (
+    get_config_file_path,
+    get_database_file_path,
+    ensure_directories_exist,
+    migrate_all_legacy_files,
+    get_default_config,
+    validate_config,
+)
+
+logger = logging.getLogger(__name__)
+
+
+LATEST_SCHEMA_VERSION = 2
+
+
+class DatabaseMigrationError(Exception):
+    """Raised when database migration fails."""
 
 
 class DownloadStatus(Enum):
@@ -54,25 +74,37 @@ class ConversionRecord:
 class DatabaseManager:
     """SQLite veritabanı yöneticisi"""
 
-    def __init__(self, db_path: str = "ravn_history.db"):
+    def __init__(self, db_path: Optional[str] = None):
         """
         DatabaseManager'ı başlat
 
         Args:
-            db_path: Veritabanı dosya yolu
+            db_path: Veritabanı dosya yolu (None = use OS-specific default)
         """
-        self.db_path = db_path
+        # Ensure config directories exist and migrate legacy files
+        ensure_directories_exist()
+        migrate_all_legacy_files()
+        
+        if db_path is None:
+            self.db_path = str(get_database_file_path())
+        else:
+            # Support both legacy path and explicit path
+            self.db_path = db_path
+        
         self.conn = None
         self._connect()
+        self._run_migrations()
         self._create_tables()
+        logger.debug(f"DatabaseManager initialized with path: {self.db_path}")
 
     def _connect(self):
         """Veritabanına bağlan"""
         try:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row
+            logger.debug(f"Connected to database: {self.db_path}")
         except Exception as e:
-            print(f"Veritabanı bağlantı hatası: {e}")
+            logger.error(f"Veritabanı bağlantı hatası: {e}")
 
     def _create_tables(self):
         """Tabloları oluştur"""
@@ -133,6 +165,140 @@ class DatabaseManager:
             )
         ''')
 
+        self.conn.commit()
+
+    def _run_migrations(self):
+        """Run schema migrations with backup protection."""
+        if not self.conn:
+            raise DatabaseMigrationError("Database connection is not initialized")
+
+        self._ensure_schema_version_table()
+        current_version = self.get_schema_version()
+
+        if current_version >= LATEST_SCHEMA_VERSION:
+            return
+
+        for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):
+            backup_path = self.backup_database()
+            logger.info(
+                "Applying database migration v%s -> v%s (backup: %s)",
+                target_version - 1,
+                target_version,
+                backup_path,
+            )
+            try:
+                if target_version == 2:
+                    self._migrate_v1_to_v2()
+                else:
+                    raise DatabaseMigrationError(
+                        f"No migration script available for schema v{target_version}"
+                    )
+                self._set_schema_version(target_version)
+            except Exception as exc:
+                raise DatabaseMigrationError(
+                    f"Migration to schema v{target_version} failed: {exc}"
+                ) from exc
+
+    def _ensure_schema_version_table(self):
+        """Create schema_version table if not present and initialize row."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            '''
+        )
+        cursor.execute('SELECT version FROM schema_version WHERE id = 1')
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute(
+                '''
+                INSERT INTO schema_version (id, version, updated_at)
+                VALUES (1, 1, ?)
+                ''',
+                (self._utc_now_iso(),),
+            )
+        self.conn.commit()
+
+    def get_schema_version(self) -> int:
+        """Return current schema version."""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT version FROM schema_version WHERE id = 1')
+        row = cursor.fetchone()
+        if row is None:
+            return 1
+        return int(row["version"])
+
+    def _set_schema_version(self, version: int):
+        """Persist schema version after migration."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            UPDATE schema_version
+            SET version = ?, updated_at = ?
+            WHERE id = 1
+            ''',
+            (version, self._utc_now_iso()),
+        )
+        self.conn.commit()
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def backup_database(self) -> str:
+        """Create a timestamped backup before migration attempt."""
+        source_path = Path(self.db_path)
+        backup_dir = source_path.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        backup_path = backup_dir / f"{source_path.stem}.migration-{timestamp}.bak"
+
+        if source_path.exists():
+            shutil.copy2(source_path, backup_path)
+        else:
+            backup_path.write_bytes(b"")
+
+        return str(backup_path)
+
+    def _migrate_v1_to_v2(self):
+        """
+        Migration script v1 -> v2.
+
+        Phase 2 config dir relocation shipped at filesystem level. This migration
+        records the transition in DB metadata so startup can apply versioned DB
+        migrations deterministically.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS migration_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_version INTEGER NOT NULL,
+                to_version INTEGER NOT NULL,
+                migration_name TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                details TEXT
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            INSERT INTO migration_history (
+                from_version, to_version, migration_name, applied_at, details
+            ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            (
+                1,
+                2,
+                "config_dir_relocation",
+                self._utc_now_iso(),
+                "Recorded Phase 2 config/data relocation migration",
+            ),
+        )
         self.conn.commit()
 
     def add_download(self, record: DownloadRecord) -> int:
@@ -323,57 +489,70 @@ class DatabaseManager:
 class ConfigManager:
     """Konfigürasyon yöneticisi"""
 
-    DEFAULT_CONFIG = {
-        'default_download_path': str(Path.home() / 'Downloads' / 'RAVN'),
-        'default_format': 'MP4',
-        'default_quality': '1080p',
-        'theme': 'nordic',
-        'concurrent_downloads': 1,
-        'auto_cleanup': False,
-        'auto_update_check': True,
-        'ffmpeg_path': 'ffmpeg',
-        'language': 'tr',
-        'notifications_enabled': True,
-        'history_limit': 1000,
-        'auto_subtitle_download': False,
-        'preferred_subtitle_language': 'tr',
-    }
+    DEFAULT_CONFIG = get_default_config()
 
-    def __init__(self, config_file: str = "ravn_config.json"):
+    def __init__(self, config_file: Optional[str] = None):
         """
         ConfigManager'ı başlat
 
         Args:
-            config_file: Konfigürasyon dosyası yolu
+            config_file: Konfigürasyon dosyası yolu (None = use OS-specific default)
         """
-        self.config_file = config_file
+        # Ensure config directories exist and migrate legacy files
+        ensure_directories_exist()
+        migrate_all_legacy_files()
+        
+        if config_file is None:
+            self.config_file = str(get_config_file_path())
+        else:
+            # Support both legacy path and explicit path
+            self.config_file = config_file
+        
         self.config = self._load_config()
+        logger.debug(f"ConfigManager initialized with path: {self.config_file}")
 
     def _load_config(self) -> Dict[str, Any]:
-        """Konfigürasyonu yükle"""
+        """Konfigürasyonu yükle ve şemaya göre doğrula"""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     loaded_config = json.load(f)
-                    # Eksik anahtarları varsayılan değerlerle doldur
-                    for key, value in self.DEFAULT_CONFIG.items():
-                        if key not in loaded_config:
-                            loaded_config[key] = value
-                    return loaded_config
+                    # Validate and fill missing keys with defaults
+                    validated_config, errors = validate_config(loaded_config)
+                    if errors:
+                        for error in errors:
+                            logger.warning(f"Config validation: {error}")
+                    return validated_config
             except Exception as e:
-                print(f"Konfigürasyon yükleme hatası: {e}")
-                return self.DEFAULT_CONFIG.copy()
+                logger.error(f"Konfigürasyon yükleme hatası: {e}")
+                return get_default_config()
         else:
-            return self.DEFAULT_CONFIG.copy()
+            # Create new config with defaults
+            config = get_default_config()
+            # Ensure parent directory exists before saving
+            config_path = Path(self.config_file)
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(self.config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+                logger.info(f"Created new config file at {self.config_file}")
+            except Exception as e:
+                logger.error(f"Failed to create config file: {e}")
+            return config
 
     def save_config(self) -> bool:
         """Konfigürasyonu kaydet"""
         try:
+            # Ensure parent directory exists
+            config_path = Path(self.config_file)
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
+            logger.debug(f"Saved config to {self.config_file}")
             return True
         except Exception as e:
-            print(f"Konfigürasyon kaydetme hatası: {e}")
+            logger.error(f"Konfigürasyon kaydetme hatası: {e}")
             return False
 
     def get(self, key: str, default: Any = None) -> Any:

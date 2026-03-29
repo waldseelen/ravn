@@ -2,17 +2,45 @@
 Ana uygulama penceresi - CustomTkinter arayüzü (Sekmeli)
 """
 
+import threading
 import customtkinter as ctk
 from customtkinter import filedialog
 from PIL import Image
 import os
 import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from ravn_app.ui.converter_tab import ConverterTab
 from ravn_app.ui.subtitle_tab import SubtitleTab
 from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
+from ravn_app.ui.queue_panel import QueuePanel
 from ravn_app.core.database import DatabaseManager, ConfigManager
 from ravn_app.core.platform_support import PlatformManager
+from ravn_app.core.downloader import YouTubeDownloader, DownloadFormat, DownloadQuality
+from ravn_app.core.task_manager import TaskType, get_task_queue
+from ravn_app.core.error_handler import YtDlpErrorParser, format_error_for_user
+from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes
+from ravn_app.ui.design_tokens import Icons
+from ravn_app.ui.advanced_features import NotificationManager, SystemTrayIntegration
+
+
+# Map UI dropdown labels to enum values
+_QUALITY_MAP = {
+    "En İyi": DownloadQuality.BEST,
+    "1080p": DownloadQuality.HIGH_1080P,
+    "720p": DownloadQuality.MEDIUM_720P,
+    "480p": DownloadQuality.LOW_480P,
+    "Sadece Ses": DownloadQuality.AUDIO_ONLY,
+}
+
+_FORMAT_MAP = {
+    "MP4": DownloadFormat.MP4,
+    "WebM": DownloadFormat.WEBM,
+    "MKV": DownloadFormat.MKV,
+    "MP3": DownloadFormat.MP3,
+    "M4A": DownloadFormat.M4A,
+}
 
 
 class YouTubeDownloaderApp(ctk.CTk):
@@ -29,66 +57,96 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.geometry("1200x800")
         self.minsize(1000, 700)
 
-        # Database ve Config yönetimi (Faz 4)
-        self.db_manager = DatabaseManager("ravn_history.db")
-        self.config_manager = ConfigManager("ravn_config.json")
+        # Database ve Config yönetimi (Faz 4) - uses OS-specific paths
+        self.db_manager = DatabaseManager()
+        self.config_manager = ConfigManager()
         self.platform_manager = PlatformManager()  # Platform desteği
+
+        # Downloader ve task manager
+        self.downloader = YouTubeDownloader()
+        self.task_queue = get_task_queue()
+        self.queue_paused = False
+        self.playlist_entries: List[Dict[str, Any]] = []
+        self.playlist_selection_vars: List[ctk.BooleanVar] = []
+        self.playlist_source_url = ""
+        self.is_playlist_fetching = False
+        self.is_info_fetching = False
+        self.batch_mode_var = ctk.BooleanVar(value=False)  # Batch download mode
 
         # Tema yönetimi
         self.current_theme = self.config_manager.get('theme', 'nordic')
+        self.tray = None
         self._setup_ui()
+        self._setup_tray_integration()
+        self.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
     def __del__(self):
         """Uygulama kapanırken veritabanını kapat"""
-        if hasattr(self, 'db_manager'):
-            self.db_manager.close()
+        db_manager = self.__dict__.get("db_manager")
+        if db_manager:
+            db_manager.close()
 
     def _setup_ui(self):
         """UI bileşenlerini kur"""
         # Üst başlık
-        header_frame = ctk.CTkFrame(self, fg_color="#1a1a1a")
+        header_frame = ctk.CTkFrame(self, fg_color=Colors.BG_PRIMARY)
         header_frame.pack(fill="x", padx=0, pady=0)
 
+        header_inner = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_inner.pack(pady=(12, 10))
+
         title = ctk.CTkLabel(
-            header_frame,
-            text="🎬 RAVN - Media Manager",
-            font=ctk.CTkFont(size=22, weight="bold")
+            header_inner,
+            text="RAVN  —  Media Manager",
+            font=Fonts.TITLE
         )
-        title.pack(pady=15)
+        title.pack()
+
+        subtitle = ctk.CTkLabel(
+            header_inner,
+            text="Media downloader & converter",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED
+        )
+        subtitle.pack()
 
         # Sekmeli arayüz
         self.tabview = ctk.CTkTabview(self, anchor="nw")
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Sekme: İndir (Faz 1)
-        download_tab = self.tabview.add("📥 İndir")
+        download_tab = self.tabview.add(f"{Icons.DOWNLOAD}  İndir")
         self._setup_download_tab(download_tab)
 
         # Sekme: Dönüştür (Faz 2)
-        converter_tab = self.tabview.add("🔄 Dönüştür")
+        converter_tab = self.tabview.add(f"{Icons.CONVERT}  Dönüştür")
         self._setup_converter_tab(converter_tab)
 
         # Sekme: Altyazı (Faz 3)
-        subtitle_tab = self.tabview.add("📝 Altyazı")
+        subtitle_tab = self.tabview.add(f"{Icons.SUBTITLE}  Altyazı")
         self._setup_subtitle_tab(subtitle_tab)
 
+        # Sekme: Kuyruk (Faz 4 - YENİ)
+        queue_tab = self.tabview.add(f"{Icons.QUEUE}  Kuyruk")
+        self._setup_queue_tab(queue_tab)
+
         # Sekme: Geçmiş (Faz 4)
-        history_tab = self.tabview.add("📚 Geçmiş")
+        history_tab = self.tabview.add(f"{Icons.HISTORY}  Geçmiş")
         self._setup_history_tab(history_tab)
 
         # Sekme: Ayarlar (Faz 4 & 5)
-        settings_tab = self.tabview.add("⚙️ Ayarlar")
+        settings_tab = self.tabview.add(f"{Icons.SETTINGS}  Ayarlar")
         self._setup_settings_tab_full(settings_tab)
 
         # Alt durum çubuğu
-        footer_frame = ctk.CTkFrame(self, fg_color="#1a1a1a")
+        footer_frame = ctk.CTkFrame(self, fg_color=Colors.BG_PRIMARY)
         footer_frame.pack(fill="x", padx=0, pady=0)
 
         status = ctk.CTkLabel(
             footer_frame,
-            text="Hazır • v1.0.0",
-            font=ctk.CTkFont(size=10),
-            text_color="#888888"
+            text="RAVN v1.0.0  •  Hazır",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED
         )
         status.pack(pady=5)
 
@@ -100,8 +158,8 @@ class YouTubeDownloaderApp(ctk.CTk):
 
         title = ctk.CTkLabel(
             header_frame,
-            text="📥 Video İndir",
-            font=("Arial", 18, "bold")
+            text="Video İndir",
+            font=Fonts.H1
         )
         title.pack(anchor="w")
 
@@ -112,7 +170,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         platform_label = ctk.CTkLabel(
             platform_frame,
             text="Platform:",
-            font=("Arial", 12)
+            font=Fonts.LABEL
         )
         platform_label.pack(side="left", padx=5)
 
@@ -123,67 +181,803 @@ class YouTubeDownloaderApp(ctk.CTk):
             command=lambda x: self._on_platform_selected(x)
         )
         platform_menu.pack(side="left", padx=5)
+        self.selected_platform_label = ctk.CTkLabel(
+            platform_frame,
+            text="",
+            corner_radius=Sizes.CORNER_MD,
+            fg_color=Colors.BTN_SECONDARY,
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.SMALL,
+            width=120
+        )
+        self.selected_platform_label.pack(side="left", padx=8)
+        self.selected_platform_label.configure(text="URL")
 
-        # URL giriş alanı
+        # URL giriş alanı (tek veya çoklu)
         url_frame = ctk.CTkFrame(tab, fg_color="transparent")
         url_frame.pack(fill="x", padx=15, pady=10)
 
         url_label = ctk.CTkLabel(
             url_frame,
             text="URL:",
-            font=("Arial", 12)
+            font=Fonts.LABEL
         )
         url_label.pack(side="left", padx=5)
 
+        # Batch mode toggle (use existing variable or create if not exists)
+        if not hasattr(self, 'batch_mode_var'):
+            self.batch_mode_var = ctk.BooleanVar(value=False)
+            
+        batch_toggle = ctk.CTkCheckBox(
+            url_frame,
+            text="Toplu İndirme",
+            variable=self.batch_mode_var,
+            command=self._toggle_batch_mode,
+            font=Fonts.SMALL
+        )
+        batch_toggle.pack(side="left", padx=10)
+
+        # Single URL entry (default)
         self.url_entry = ctk.CTkEntry(
             url_frame,
             placeholder_text="Video URL'sini gir...",
             width=400
         )
         self.url_entry.pack(side="left", padx=5, fill="x", expand=True)
+        self.url_entry.bind("<KeyRelease>", self._on_url_changed)
+
+        # Batch URL text area (hidden by default)
+        self.batch_url_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        batch_info = ctk.CTkLabel(
+            self.batch_url_frame,
+            text="Her satıra bir URL yazın (maks. 50)",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED
+        )
+        batch_info.pack(anchor="w", padx=5, pady=2)
+
+        self.batch_url_text = ctk.CTkTextbox(
+            self.batch_url_frame,
+            height=120,
+            font=Fonts.MONO,
+            wrap="none"
+        )
+        self.batch_url_text.pack(fill="x", padx=5)
+        # Initially hidden
+
+        # Kalite ve format seçenekleri
+        options_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        options_frame.pack(fill="x", padx=15, pady=5)
+
+        quality_label = ctk.CTkLabel(
+            options_frame,
+            text="Kalite:",
+            font=Fonts.LABEL
+        )
+        quality_label.pack(side="left", padx=5)
+
+        self.quality_menu = ctk.CTkOptionMenu(
+            options_frame,
+            values=["En İyi", "1080p", "720p", "480p", "Sadece Ses"]
+        )
+        self.quality_menu.pack(side="left", padx=5)
+
+        format_label = ctk.CTkLabel(
+            options_frame,
+            text="Format:",
+            font=Fonts.LABEL
+        )
+        format_label.pack(side="left", padx=15)
+
+        self.format_menu = ctk.CTkOptionMenu(
+            options_frame,
+            values=["MP4", "WebM", "MKV", "MP3", "M4A"]
+        )
+        self.format_menu.pack(side="left", padx=5)
 
         # Bilgi etiketi
         self.info_label = ctk.CTkLabel(
             tab,
-            text="Desteklenen platformlar: " + ", ".join(platforms),
-            text_color="#999999",
-            font=("Arial", 10)
+            text=(
+                "Akış: URL gir  →  Verileri Getir  →  (playlist ise seçim yap)  →  İndir\n"
+                + "Desteklenen platformlar: "
+                + ", ".join(platforms)
+            ),
+            text_color=Colors.TEXT_MUTED,
+            font=Fonts.SMALL,
+            justify="left"
         )
-        self.info_label.pack(pady=10)
+        self.info_label.pack(fill="x", padx=15, pady=(6, 10))
+
+        # Playlist seçim alanı (yalnızca playlist linklerinde görünür)
+        self.playlist_frame = ctk.CTkFrame(tab, fg_color=Colors.BG_SURFACE)
+
+        playlist_title = ctk.CTkLabel(
+            self.playlist_frame,
+            text="Playlist içeriği",
+            font=Fonts.LABEL_BOLD
+        )
+        playlist_title.pack(anchor="w", padx=10, pady=(10, 4))
+
+        self.playlist_summary_label = ctk.CTkLabel(
+            self.playlist_frame,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED
+        )
+        self.playlist_summary_label.pack(anchor="w", padx=10, pady=(0, 6))
+
+        controls_row = ctk.CTkFrame(self.playlist_frame, fg_color="transparent")
+        controls_row.pack(fill="x", padx=10, pady=(0, 6))
+
+        self.playlist_select_all_btn = ctk.CTkButton(
+            controls_row,
+            text="Tümünü Seç",
+            width=120,
+            height=30,
+            command=self._select_all_playlist_items,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.SMALL
+        )
+        self.playlist_select_all_btn.pack(side="left")
+
+        self.playlist_clear_btn = ctk.CTkButton(
+            controls_row,
+            text="Seçimi Temizle",
+            width=120,
+            height=30,
+            command=self._clear_all_playlist_items,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.SMALL
+        )
+        self.playlist_clear_btn.pack(side="left", padx=(8, 0))
+
+        self.playlist_list_frame = ctk.CTkScrollableFrame(self.playlist_frame, height=180)
+        self.playlist_list_frame.pack(fill="x", padx=10, pady=(0, 10))
+        self.playlist_frame.pack_forget()
+
+        # Veri çekme butonu (playlist/video metadata için)
+        self.fetch_data_btn = ctk.CTkButton(
+            tab,
+            text="Verileri Getir",
+            command=self._fetch_download_data,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER
+        )
+        self.fetch_data_btn.pack(padx=15, pady=(0, 8), fill="x")
 
         # İndir butonu
-        download_btn = ctk.CTkButton(
+        self.download_btn = ctk.CTkButton(
             tab,
-            text="📥 İndir",
+            text="İndir",
             command=self._download_video,
-            font=("Arial", 14, "bold"),
-            height=40
+            font=Fonts.LABEL_BOLD,
+            height=Sizes.BTN_HEIGHT_LG,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER
         )
-        download_btn.pack(padx=15, pady=10, fill="x")
+        self.download_btn.pack(padx=15, pady=(0, 10), fill="x")
+
+        # İlerleme çubuğu
+        self.download_progress = ctk.CTkProgressBar(tab)
+        self.download_progress.set(0)
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self.download_progress.pack_forget()  # Başlangıçta gizli
+
+        # Durum etiketi
+        self.download_status_label = ctk.CTkLabel(
+            tab,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_SECONDARY
+        )
+        self.download_status_label.pack(pady=5)
+
+        # Hata çerçevesi
+        self.error_frame = ctk.CTkFrame(tab, fg_color=Colors.ERROR_BG)
+        # Başlangıçta gizli; hata oluştuğunda pack edilecek
+
+        error_top_row = ctk.CTkFrame(self.error_frame, fg_color="transparent")
+        error_top_row.pack(fill="x", padx=10, pady=5)
+
+        self.error_message_label = ctk.CTkLabel(
+            error_top_row,
+            text="",
+            text_color=Colors.ERROR,
+            font=Fonts.LABEL,
+            wraplength=700,
+            justify="left"
+        )
+        self.error_message_label.pack(side="left", fill="x", expand=True)
+
+        self.toggle_details_btn = ctk.CTkButton(
+            error_top_row,
+            text="Teknik Detaylar",
+            command=self._toggle_error_details,
+            width=130,
+            height=28,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.SMALL
+        )
+        self.toggle_details_btn.pack(side="right", padx=5)
+
+        self.raw_error_textbox = ctk.CTkTextbox(
+            self.error_frame,
+            height=100,
+            font=Fonts.MONO,
+            text_color=Colors.TEXT_SECONDARY,
+            fg_color=Colors.BG_PRIMARY
+        )
+        # Başlangıçta gizli
+        self._raw_error_visible = False
 
     def _on_platform_selected(self, platform: str):
         """Platform seçildiğinde çağrılır"""
-        print(f"Platform seçildi: {platform}")
+        self.selected_platform_label.configure(
+            text=platform.upper(),
+            fg_color=Colors.BTN_SECONDARY
+        )
 
-    def _download_video(self):
-        """Videoyu indir"""
-        url = self.url_entry.get()
-        if not url:
-            print("URL giriniz")
+    def _toggle_batch_mode(self):
+        """Toggle between single and batch URL input"""
+        if self.batch_mode_var.get():
+            # Switch to batch mode
+            self.url_entry.pack_forget()
+            self.batch_url_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.info_label)
+            self.fetch_data_btn.configure(state="disabled")
+            self.info_label.configure(
+                text="Toplu indirme modunda her satıra bir URL yazın. Verileri Getir butonu devre dışı."
+            )
+        else:
+            # Switch to single mode
+            self.batch_url_frame.pack_forget()
+            self.url_entry.pack(side="left", padx=5, fill="x", expand=True)
+            self.fetch_data_btn.configure(state="normal")
+            platforms = self.platform_manager.get_supported_platforms()
+            self.info_label.configure(
+                text=(
+                    "Akış: URL gir  →  Verileri Getir  →  (playlist ise seçim yap)  →  İndir\n"
+                    + "Desteklenen platformlar: "
+                    + ", ".join(platforms)
+                )
+            )
+
+    def _on_url_changed(self, _event=None):
+        """URL değiştiğinde platform badge bilgisini güncelle."""
+        url = self.url_entry.get().strip()
+        badge = self.platform_manager.get_platform_badge(url)
+        self.selected_platform_label.configure(
+            text=f"{badge['icon']} {badge['label']}",
+            fg_color=badge["color"]
+        )
+        playlist_entries = self.__dict__.get("playlist_entries", [])
+        playlist_source = self.__dict__.get("playlist_source_url", "")
+        if playlist_entries and playlist_source and playlist_source != url:
+            self._clear_playlist_selection()
+
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            if self._looks_like_playlist_url(url):
+                fetch_data_btn.configure(text="Playlist Verilerini Getir")
+            else:
+                fetch_data_btn.configure(text="Video Bilgilerini Getir")
+
+    @staticmethod
+    def _looks_like_playlist_url(url: str) -> bool:
+        """URL'nin playlist linki olma olasılığını kontrol et."""
+        lowered = url.lower()
+        return (
+            "list=" in lowered
+            or "/playlist" in lowered
+            or "/sets/" in lowered
+            or "/collection/" in lowered
+        )
+
+    @staticmethod
+    def _format_duration(seconds: Any) -> str:
+        """Saniyeyi okunabilir süre metnine çevir."""
+        if not isinstance(seconds, (int, float)) or seconds <= 0:
+            return ""
+        seconds = int(seconds)
+        minutes, sec = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours:d}:{minutes:02d}:{sec:02d}"
+        return f"{minutes:d}:{sec:02d}"
+
+    def _clear_playlist_selection(self):
+        """Playlist seçimiyle ilgili UI ve state bilgisini temizle."""
+        self.playlist_entries = []
+        self.playlist_selection_vars = []
+        self.playlist_source_url = ""
+        self.is_playlist_fetching = False
+        self.is_info_fetching = False
+
+        playlist_list_frame = self.__dict__.get("playlist_list_frame")
+        if playlist_list_frame is not None:
+            for child in playlist_list_frame.winfo_children():
+                child.destroy()
+
+        playlist_frame = self.__dict__.get("playlist_frame")
+        if playlist_frame is not None:
+            playlist_frame.pack_forget()
+
+        download_btn = self.__dict__.get("download_btn")
+        if download_btn is not None:
+            download_btn.configure(text="İndir", state="normal")
+
+    def _update_playlist_summary(self):
+        """Seçilen playlist öğesi bilgisini güncelle."""
+        playlist_summary_label = self.__dict__.get("playlist_summary_label")
+        if playlist_summary_label is None:
+            return
+        total = len(self.playlist_entries)
+        selected = sum(1 for var in self.playlist_selection_vars if var.get())
+        playlist_summary_label.configure(
+            text=f"{total} öğe bulundu • {selected} seçili"
+        )
+
+    def _select_all_playlist_items(self):
+        """Playlist listesindeki tüm öğeleri seç."""
+        for var in self.playlist_selection_vars:
+            var.set(True)
+        self._update_playlist_summary()
+
+    def _clear_all_playlist_items(self):
+        """Playlist listesindeki seçimleri temizle."""
+        for var in self.playlist_selection_vars:
+            var.set(False)
+        self._update_playlist_summary()
+
+    def _get_selected_playlist_entries(self) -> List[Dict[str, Any]]:
+        """Seçilen playlist öğelerini döndür."""
+        selected: List[Dict[str, Any]] = []
+        for entry, variable in zip(self.playlist_entries, self.playlist_selection_vars):
+            if variable.get():
+                selected.append(entry)
+        return selected
+
+    def _start_playlist_fetch(self, url: str):
+        """Playlist içeriğini çek ve kullanıcı seçimi için göster."""
+        self.is_playlist_fetching = True
+        self.error_frame.pack_forget()
+        self.download_progress.set(0)
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self.download_status_label.configure(text="Playlist bilgisi alınıyor...")
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(state="disabled", text="Veriler Getiriliyor...")
+        self.download_btn.configure(state="disabled", text="Liste Alınıyor...")
+
+        def run_playlist_fetch():
+            entries = self.downloader.extract_playlist_entries(url)
+            self.after(0, self._on_playlist_fetch_complete, url, entries)
+
+        threading.Thread(target=run_playlist_fetch, daemon=True).start()
+
+    def _on_playlist_fetch_complete(self, url: str, entries: List[Dict[str, Any]]):
+        """Playlist fetch tamamlandığında UI'ı güncelle."""
+        self.is_playlist_fetching = False
+        self._hide_progress()
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(state="normal")
+
+        if not entries:
+            self.download_btn.configure(state="normal", text="İndir")
+            self.download_status_label.configure(text="")
+            if fetch_data_btn is not None:
+                fetch_data_btn.configure(text="Playlist Verilerini Getir")
+            self._show_download_error(
+                "Playlist içeriği alınamadı. URL'yi kontrol edip tekrar deneyin.",
+                "Playlist entries not found",
+            )
             return
 
-        print(f"İndirme başlanıyor: {url}")
-        # TODO: Indirme işlemini çalıştır
+        self.playlist_entries = entries
+        self.playlist_source_url = url
+        self.playlist_selection_vars = []
+
+        for child in self.playlist_list_frame.winfo_children():
+            child.destroy()
+
+        for idx, entry in enumerate(entries, start=1):
+            variable = ctk.BooleanVar(value=True)
+            self.playlist_selection_vars.append(variable)
+            duration = self._format_duration(entry.get("duration"))
+            title = entry.get("title", "Unknown")
+            label = f"{idx}. {title}" if not duration else f"{idx}. {title} ({duration})"
+            item_checkbox = ctk.CTkCheckBox(
+                self.playlist_list_frame,
+                text=label,
+                variable=variable,
+                command=self._update_playlist_summary
+            )
+            item_checkbox.pack(anchor="w", padx=4, pady=2)
+
+        self._update_playlist_summary()
+        self.playlist_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.download_btn)
+        self.download_btn.configure(state="normal", text="Seçilenleri İndir")
+        self.download_status_label.configure(text="İndirilecek playlist öğelerini seçin.")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(text="Playlist Verilerini Yenile")
+
+    def _start_video_info_fetch(self, url: str):
+        """Tek video için metadata bilgisini getir."""
+        self.is_info_fetching = True
+        self.error_frame.pack_forget()
+        self.download_progress.set(0)
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self.download_status_label.configure(text="Video bilgisi alınıyor...")
+
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(state="disabled", text="Veriler Getiriliyor...")
+
+        def run_info_fetch():
+            info = self.downloader.extract_video_info(url)
+            self.after(0, self._on_video_info_fetch_complete, info)
+
+        threading.Thread(target=run_info_fetch, daemon=True).start()
+
+    def _on_video_info_fetch_complete(self, info: Optional[Dict[str, Any]]):
+        """Video metadata fetch sonucu."""
+        self.is_info_fetching = False
+        self._hide_progress()
+
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(state="normal", text="Video Bilgilerini Yenile")
+
+        if not info:
+            self.download_status_label.configure(text="")
+            self._show_download_error(
+                "Video bilgileri alınamadı. URL'yi kontrol edip tekrar deneyin.",
+                "Video info not found",
+            )
+            return
+
+        title = str(info.get("title") or "Bilinmiyor")
+        uploader = str(info.get("uploader") or "Bilinmiyor")
+        duration = self._format_duration(info.get("duration"))
+        details = f"{title} • {uploader}"
+        if duration:
+            details = f"{details} • {duration}"
+        self.download_status_label.configure(text=f"Hazır: {details}")
+
+    def _fetch_download_data(self):
+        """İndir öncesi metadata/playlist içeriğini getir."""
+        url = self.url_entry.get().strip()
+        if not url:
+            self._show_download_error("Lütfen bir URL girin.", "")
+            return
+
+        if self._looks_like_playlist_url(url):
+            if self.is_playlist_fetching:
+                return
+            self._start_playlist_fetch(url)
+            return
+
+        if self.is_info_fetching:
+            return
+        self._start_video_info_fetch(url)
+
+    def _start_single_download(
+        self,
+        url: str,
+        output_dir: str,
+        format_type: DownloadFormat,
+        quality: DownloadQuality
+    ):
+        """Tek medya URL'si için indirme başlat."""
+        self.error_frame.pack_forget()
+        self.download_progress.set(0)
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self.download_status_label.configure(text="İndirme başlatılıyor...")
+        self.download_btn.configure(state="disabled", text="İndiriliyor...")
+
+        def run_download():
+            try:
+                result = self.downloader.download(
+                    url=url,
+                    output_dir=output_dir,
+                    format_type=format_type,
+                    quality=quality,
+                    progress_callback=self._on_download_progress
+                )
+                if result.success:
+                    self.after(0, self._on_download_success, result)
+                else:
+                    self.after(0, self._on_download_failure, result.error_message)
+            except Exception as exc:
+                self.after(0, self._on_download_failure, str(exc))
+
+        thread = threading.Thread(target=run_download, daemon=True)
+        thread.start()
+
+    def _start_playlist_download(
+        self,
+        selected_entries: List[Dict[str, Any]],
+        output_dir: str,
+        format_type: DownloadFormat,
+        quality: DownloadQuality
+    ):
+        """Seçilen playlist öğelerini sıralı olarak indir."""
+        total = len(selected_entries)
+        self.error_frame.pack_forget()
+        self.download_progress.set(0)
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self.download_status_label.configure(text=f"{total} öğe indiriliyor...")
+        self.download_btn.configure(state="disabled", text="İndiriliyor...")
+
+        def run_playlist_download():
+            all_files: List[str] = []
+            for index, entry in enumerate(selected_entries, start=1):
+                entry_url = entry.get("url", "")
+                entry_title = entry.get("title", f"Öğe {index}")
+                if not entry_url:
+                    continue
+
+                def item_progress(percent: int, message: str, current=index, title=entry_title):
+                    overall = int(((current - 1) + max(0, min(100, percent)) / 100.0) / total * 100)
+                    prefix = f"{current}/{total} • {title}"
+                    if message:
+                        self._on_download_progress(overall, f"{prefix} • {message}")
+                    else:
+                        self._on_download_progress(overall, prefix)
+
+                result = self.downloader.download(
+                    url=entry_url,
+                    output_dir=output_dir,
+                    format_type=format_type,
+                    quality=quality,
+                    progress_callback=item_progress,
+                )
+
+                if not result.success:
+                    self.after(
+                        0,
+                        self._on_download_failure,
+                        f"Playlist indirmesi başarısız ({index}/{total}): {result.error_message}",
+                    )
+                    return
+
+                all_files.extend(result.output_files or [])
+
+            class _PlaylistResult:
+                def __init__(self, files: List[str]):
+                    self.output_files = files
+
+            self.after(0, self._on_download_success, _PlaylistResult(all_files))
+
+        threading.Thread(target=run_playlist_download, daemon=True).start()
+
+    def _download_video(self):
+        """Videoyu arka planda indir"""
+        if self.queue_paused:
+            self._show_download_error("Kuyruk duraklatıldı. Devam etmek için tekrar etkinleştirin.", "")
+            return
+
+        # Batch mode check (safe for tests that don't initialize UI)
+        batch_mode = False
+        try:
+            if hasattr(self, 'batch_mode_var'):
+                batch_mode = self.batch_mode_var.get()
+        except (AttributeError, RecursionError):
+            pass
+        
+        if batch_mode:
+            self._download_batch()
+            return
+
+        url = self.url_entry.get().strip()
+        if not url:
+            self._show_download_error("Lütfen bir URL girin.", "")
+            return
+
+        quality_label = self.quality_menu.get()
+        format_label = self.format_menu.get()
+
+        quality = _QUALITY_MAP.get(quality_label, DownloadQuality.BEST)
+        format_type = _FORMAT_MAP.get(format_label, DownloadFormat.MP4)
+
+        default_path = self.config_manager.get(
+            'default_download_path',
+            str(Path.home() / 'Downloads' / 'RAVN')
+        )
+        output_dir = str(Path(default_path))
+
+        if self._looks_like_playlist_url(url):
+            if self.is_playlist_fetching:
+                return
+
+            if self.playlist_source_url != url or not self.playlist_entries:
+                self._show_download_error("Önce 'Verileri Getir' butonuna basarak playlist içeriğini alın.", "")
+                return
+
+            selected_entries = self._get_selected_playlist_entries()
+            if not selected_entries:
+                self._show_download_error("Lütfen indirilecek en az bir playlist öğesi seçin.", "")
+                return
+
+            self._start_playlist_download(selected_entries, output_dir, format_type, quality)
+            return
+
+        self._start_single_download(url, output_dir, format_type, quality)
+
+    def _download_batch(self):
+        """Download multiple URLs from batch text area"""
+        batch_text = self.batch_url_text.get("1.0", "end").strip()
+        if not batch_text:
+            self._show_download_error("Lütfen en az bir URL girin.", "")
+            return
+
+        urls = [line.strip() for line in batch_text.split('\n') if line.strip()]
+        if not urls:
+            self._show_download_error("Geçerli URL bulunamadı.", "")
+            return
+
+        if len(urls) > 50:
+            self._show_download_error("Maksimum 50 URL destekleniyor. İlk 50 URL indirilecek.", "")
+            urls = urls[:50]
+
+        quality_label = self.quality_menu.get()
+        format_label = self.format_menu.get()
+
+        quality = _QUALITY_MAP.get(quality_label, DownloadQuality.BEST)
+        format_type = _FORMAT_MAP.get(format_label, DownloadFormat.MP4)
+
+        default_path = self.config_manager.get(
+            'default_download_path',
+            str(Path.home() / 'Downloads' / 'RAVN')
+        )
+        output_dir = str(Path(default_path))
+
+        # Queue all downloads
+        self.download_status_label.configure(text=f"{len(urls)} URL kuyruğa ekleniyor...")
+        self.download_btn.configure(state="disabled", text="Kuyruğa Ekleniyor...")
+
+        for idx, url in enumerate(urls, start=1):
+            task_name = f"Toplu İndirme {idx}/{len(urls)}"
+            self.task_queue.add_task(
+                task_type=TaskType.DOWNLOAD,
+                name=task_name,
+                execute_fn=lambda u=url: self.downloader.download(
+                    url=u,
+                    output_dir=output_dir,
+                    format_type=format_type,
+                    quality=quality
+                )
+            )
+
+        self.download_status_label.configure(text=f"{len(urls)} URL kuyruğa eklendi. Kuyruk sekmesinden takip edin.")
+        self.download_btn.configure(state="normal", text="İndir")
+
+        # Switch to queue tab to show progress
+        self.tabview.set("⚙  Kuyruk")
+
+    def _on_download_progress(self, percent: int, message: str):
+        """İlerleme callback'i — iş parçacığından çağrılır"""
+        self.after(0, self._apply_progress_update, percent, message)
+
+    def _apply_progress_update(self, percent: int, message: str):
+        """Ana iş parçacığında ilerleme çubuğunu güncelle"""
+        clamped = max(0.0, min(1.0, percent / 100.0))
+        self.download_progress.set(clamped)
+        if message:
+            self.download_status_label.configure(text=message)
+
+    def _on_download_success(self, result):
+        """İndirme başarılı — UI'ı güncelle"""
+        self.download_progress.set(1.0)
+        files = ", ".join(result.output_files) if result.output_files else "tamamlandı"
+        self.download_status_label.configure(
+            text=f"İndirme tamamlandı: {files}",
+            text_color=Colors.STATUS_DONE
+        )
+        if result.output_files:
+            NotificationManager.show_download_complete(Path(result.output_files[0]).name)
+        self.download_btn.configure(state="normal", text="İndir")
+        self.after(3000, lambda: (self._hide_progress(), self.download_status_label.configure(text="", text_color=Colors.TEXT_SECONDARY)))
+
+    def _on_download_failure(self, error_message: str):
+        """İndirme başarısız — hata mesajını göster"""
+        self._hide_progress()
+        self.download_btn.configure(state="normal", text="İndir")
+        self._show_download_error(error_message, error_message)
+
+    def _hide_progress(self):
+        """İlerleme çubuğunu gizle"""
+        self.download_progress.pack_forget()
+
+    def _show_download_error(self, raw_error: str, raw_text: str):
+        """Hata mesajını göster; hata çerçevesini görünür yap"""
+        error_info = YtDlpErrorParser.parse(raw_error)
+        user_message = format_error_for_user(error_info)
+
+        self.error_message_label.configure(text=user_message)
+
+        self.raw_error_textbox.configure(state="normal")
+        self.raw_error_textbox.delete("1.0", "end")
+        self.raw_error_textbox.insert("1.0", raw_text or raw_error)
+        self.raw_error_textbox.configure(state="disabled")
+
+        # Teknik detayları gizle
+        if self._raw_error_visible:
+            self.raw_error_textbox.pack_forget()
+            self._raw_error_visible = False
+            self.toggle_details_btn.configure(text="Teknik Detaylar")
+
+        self.error_frame.pack(padx=15, pady=5, fill="x")
+
+    def _toggle_error_details(self):
+        """Ham hata metnini göster / gizle"""
+        if self._raw_error_visible:
+            self.raw_error_textbox.pack_forget()
+            self._raw_error_visible = False
+            self.toggle_details_btn.configure(text="Teknik Detaylar")
+        else:
+            self.raw_error_textbox.pack(padx=10, pady=(0, 10), fill="x")
+            self._raw_error_visible = True
+            self.toggle_details_btn.configure(text="Gizle")
 
     def _setup_converter_tab(self, tab):
         """Dönüştürme sekmesini kur (Faz 2)"""
-        converter = ConverterTab(tab, db_manager=self.db_manager, fg_color="transparent")
+        converter = ConverterTab(
+            tab,
+            db_manager=self.db_manager,
+            notify_callback=self._notify_conversion_complete,
+            fg_color="transparent"
+        )
         converter.pack(fill="both", expand=True)
 
     def _setup_subtitle_tab(self, tab):
         """Altyazı sekmesini kur (Faz 3)"""
         subtitle_manager = SubtitleTab(tab, fg_color="transparent")
         subtitle_manager.pack(fill="both", expand=True)
+
+    def _setup_queue_tab(self, tab):
+        """Kuyruk sekmesini kur (Faz 4)"""
+        queue_panel = QueuePanel(
+            tab,
+            on_cancel_task=self._cancel_queue_task,
+            on_open_folder=self._open_output_folder,
+            fg_color="transparent"
+        )
+        queue_panel.pack(fill="both", expand=True)
+
+    def _cancel_queue_task(self, task_id: str):
+        """Cancel a task in the queue"""
+        if self.task_queue.cancel_task(task_id):
+            self.download_status_label.configure(text=f"Görev iptal edildi: {task_id}")
+        else:
+            self.download_status_label.configure(text=f"Görev iptal edilemedi: {task_id}")
+
+    def _open_output_folder(self, file_path: str):
+        """Open file explorer at output file location"""
+        import platform
+        import subprocess
+        from pathlib import Path
+        
+        folder_path = Path(file_path).parent
+        if not folder_path.exists():
+            return
+        
+        system = platform.system()
+        try:
+            if system == "Windows":
+                subprocess.run(["explorer", "/select,", str(file_path)], check=False)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", "-R", str(file_path)], check=False)
+            else:  # Linux
+                subprocess.run(["xdg-open", str(folder_path)], check=False)
+        except Exception as e:
+            logger.error(f"Failed to open folder: {e}")
 
     def _setup_history_tab(self, tab):
         """Geçmiş sekmesini kur (Faz 4)"""
@@ -202,6 +996,55 @@ class YouTubeDownloaderApp(ctk.CTk):
     def _change_theme(self, choice):
         """Tema rengini değiştir"""
         ctk.set_default_color_theme(choice)
+
+    def _notify_conversion_complete(self, output_file: str):
+        """Conversion success notification callback."""
+        NotificationManager.show_conversion_complete(Path(output_file).name)
+
+    def _setup_tray_integration(self):
+        """Initialize system tray integration if dependency is available."""
+        self.tray = SystemTrayIntegration(
+            app_name="RAVN",
+            on_open=self._restore_from_tray,
+            on_pause_queue=self._toggle_queue_pause,
+            on_quit=self._quit_from_tray,
+        )
+        if self.tray.available:
+            self.tray.run()
+
+    def _toggle_queue_pause(self):
+        """Pause/resume queue state used by UI-triggered jobs."""
+        self.queue_paused = self.task_queue.toggle_pause()
+        state_label = "Duraklatıldı" if self.queue_paused else "Devam"
+        self.download_status_label.configure(text=f"Kuyruk: {state_label}")
+
+    def _restore_from_tray(self):
+        """Show and focus window when tray Open is clicked."""
+        self.after(0, self._show_window)
+
+    def _show_window(self):
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def _on_window_close(self):
+        """Minimize to tray instead of closing."""
+        if not self.tray or not self.tray.available:
+            self._quit_app()
+            return
+        self.withdraw()
+        self.download_status_label.configure(
+            text="Uygulama sistem çekmecesine küçültüldü."
+        )
+
+    def _quit_from_tray(self):
+        """Terminate app via tray action."""
+        self.after(0, self._quit_app)
+
+    def _quit_app(self):
+        if self.tray:
+            self.tray.stop()
+        self.destroy()
 
 
 def main():

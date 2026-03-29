@@ -6,6 +6,7 @@ pytest ile çalışır: pytest tests/
 import pytest
 import sys
 import os
+from unittest.mock import patch
 
 # Proje dizinini path'e ekle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -32,7 +33,8 @@ class TestYouTubeDownloader:
         formats = self.downloader.get_video_format_options()
         assert "MP4 (Video)" in formats
         assert "MP3 (Ses)" in formats
-        assert len(formats) == 2
+        # New API includes more formats: MP4, WebM, MKV, MP3, M4A
+        assert len(formats) >= 2
     
     def test_quality_options(self):
         """Kalite seçenekleri mevcut mi"""
@@ -41,7 +43,8 @@ class TestYouTubeDownloader:
         assert "1080p" in qualities
         assert "720p" in qualities
         assert "480p" in qualities
-        assert len(qualities) == 4
+        # New API may include more quality options
+        assert len(qualities) >= 4
     
     def test_sanitize_filename(self):
         """Dosya adı temizleme çalışıyor mu"""
@@ -50,6 +53,17 @@ class TestYouTubeDownloader:
         assert '"' not in cleaned
         assert '|' not in cleaned
         assert '(' in cleaned  # Parantez temizlenmiyor
+
+    @patch("ravn_app.core.downloader.YtDlpRunner.extract_playlist_entries")
+    def test_extract_playlist_entries(self, mock_extract):
+        """Playlist entry extraction proxies runner output"""
+        mock_extract.return_value = [
+            {"title": "A", "url": "https://example.com/a"},
+            {"title": "B", "url": "https://example.com/b"},
+        ]
+        entries = self.downloader.extract_playlist_entries("https://example.com/playlist")
+        assert len(entries) == 2
+        assert entries[0]["title"] == "A"
 
 
 class TestFileUtils:

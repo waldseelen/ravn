@@ -19,106 +19,7 @@ All development tasks organized by priority and status.
 
 **Active Backlog:** Phase 5 (Build, Package & Distribution) remains open.
 
----
-
-## Phase 1 — Stabilization & Core Rewrite ✓ COMPLETE
-
-Core functions reviewed, rewritten, and optimized. All external process execution now uses unified runner wrappers.
-
-- [x] Audit all `subprocess` calls to FFmpeg — replace with `FFmpegRunner`
-- [x] Audit all `yt-dlp` calls — replace with `YtDlpRunner`
-- [x] Rewrite `converter.py`, `downloader.py`, `audio_normalizer.py`, `subtitle_manager.py`
-- [x] Add task manager for long-running operations
-- [x] Thread-safe callbacks (no direct UI calls from threads)
-- [x] Structured logging system (`~/.config/ravn/logs/ravn.log`)
-- [x] Hardened error handling with human-readable messages
-
-**Status:** Main media path fully stabilized. Some auxiliary modules have consolidation opportunities but remain functional.
-
----
-
-## Phase 2 — High Priority Features ✓ COMPLETE
-
-User-facing improvements with high impact. All completed and tested.
-
-### 2A — Config File Relocation [x]
-- [x] OS-aware config directory detection (Linux/macOS → `~/.config/ravn/`, Windows → `%APPDATA%\ravn\`)
-- [x] Migration of `ravn_config.json` and `ravn_history.db` on first run
-- [x] Config schema validation with sensible defaults
-
-### 2B — FFmpeg Error Messages [x]
-- [x] `FFmpegErrorParser` class for common error patterns
-- [x] User-friendly error displays in UI
-- [x] "Show technical details" toggle for power users
-
-### 2C — Drag & Drop Support [x]
-- [x] `tkinterdnd2` integration
-- [x] Drag & drop on Converter tab (video/audio files)
-- [x] Drag & drop on Subtitle tab (subtitle + video files)
-- [x] Visual drop zone highlight
-
-### 2D — CLI Interface [x]
-- [x] `ravn download <url> [--quality] [--format] [--output]`
-- [x] `ravn convert <file> [--format] [--quality] [--codec] [--output]`
-- [x] `ravn info <file>` — metadata display
-- [x] `ravn subtitle <video> --embed <subtitle-file>`
-- [x] `ravn history` — recent operations
-- [x] `--json` output flag on all commands
-- [x] Console script registration in `setup.py`
-
----
-
-## Phase 3 — Medium Priority Features ✓ COMPLETE
-
-### 3A — New Platform Support [x]
-
-Extend download capabilities to new sources.
-
-- [x] **[PLT-01]** TikTok platform handler in `platform_support.py`
-- [x] **[PLT-02]** Instagram platform handler (Reels, posts)
-- [x] **[PLT-03]** Twitch platform handler (VODs, clips)
-- [x] **[PLT-04]** Twitter/X platform handler
-- [x] **[PLT-05]** Generic "any yt-dlp supported URL" fallback
-- [x] **[PLT-06]** UI platform badge/icon next to detected URLs
-
-**Dependencies:** None. Can be started immediately.
-
-### 3B — Database Migration [x]
-
-Versioned migration system for schema updates.
-
-- [x] **[DB-01]** Add `schema_version` table to SQLite
-- [x] **[DB-02]** Migration runner (applies versioned scripts on startup)
-- [x] **[DB-03]** Migration script: v1 → v2 (config dir relocation)
-- [x] **[DB-04]** Automatic DB backup on migration
-
-**Dependencies:** None. Can be started immediately.
-
-### 3C — UI Tests [x]
-
-Comprehensive test suite for widget logic and CLI.
-
-- [x] **[TST-01]** Unit tests for all tab widget logic (without rendering)
-- [x] **[TST-02]** Tests for `FFmpegRunner` and `YtDlpRunner` (mocked subprocess)
-- [x] **[TST-03]** CLI command tests using `click.testing.CliRunner`
-- [x] **[TST-04]** Integration tests for full download → convert pipeline
-- [x] **[TST-05]** Achieve ≥ 95% code coverage (Phase 3 target modules: 97%)
-
-**Dependencies:** None. Can be started immediately.
-
-### 3D — System Tray [x]
-
-Background operation and desktop notification support.
-
-- [x] **[TRY-01]** Add `pystray` to `requirements.txt`
-- [x] **[TRY-02]** System tray icon with right-click menu (Open, Pause Queue, Quit)
-- [x] **[TRY-03]** Desktop notifications on download/conversion complete
-- [x] **[TRY-04]** Minimize to tray instead of closing
-
-**Dependencies:** None. Can be started immediately.
-
----
-
+-PHASE 1-2-3 COMPLETED- find next [] tasks
 
 
 
@@ -156,7 +57,7 @@ Full UI coverage and queue management.
 
 ### 4B — UI/UX Pro Max Enhancements [x]
 
-Design system, accessibility, and visual polish.
+Design system, accessibility, and visual polish. (Design tokens and colors defined; micro-interactions implemented via AnimationManager.)
 
 - [x] **[UX-01]** Visual Design & Theme — consistent corner radius, dark mode colors, semantic palette
 - [x] **[UX-02]** Icons — replace emojis with vector icons (Lucide or similar)
@@ -169,6 +70,157 @@ Design system, accessibility, and visual polish.
 - [x] **[UX-09]** Navigation — tab icons + text, clear active state
 
 **Dependencies:** Core GUI completeness (4A).
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Phase 4C — UI Polish & Micro-interactions (Nordic Brand Theme)
+
+Smooth transitions, micro-interactions, real-time feedback, and RAVN brand-consistent visual polish. Minimal animations that enhance usability without being distracting. Theme: Nordic kahverengi/beige minimalism with accent highlights.
+
+### 4C.1 — Brand Color Palette Update [  ]
+
+Align design system with RAVN brand (Nordic kahverengi + minimal beige).
+
+- [ ] **[BRD-01]** Update `design_tokens.py` — Add brand-primary kahverengi (#3D3230 or similar) as accent
+- [ ] **[BRD-02]** Define secondary accent — light beige (#D4C5B9 or warm gray)
+- [ ] **[BRD-03]** Replace blue accent (#3b82f6) → kahverengi for consistency
+- [ ] **[BRD-04]** Dark mode backgrounds — Keep #141414 but adjust surface colors for kahverengi harmony
+- [ ] **[BRD-05]** Success/error/warning — Maintain semantic colors but test contrast with new palette
+- [ ] **[BRD-06]** Hover state color — Use kahverengi-derived lighter shade for hover (not blue)
+
+**Output:** Updated `design_tokens.py` with Nordic theme fully integrated.
+
+### 4C.2 — Icon System & Placement [  ]
+
+Strategically place vector icons (not emojis) for clarity and brand consistency.
+
+**Navigation & Tabs:**
+- [ ] **[ICN-01]** Download tab — ⬇ → minimize icon or custom raven icon (top-left tab)
+- [ ] **[ICN-02]** Converter tab — ⇄ → gear/convert icon (second tab)
+- [ ] **[ICN-03]** Subtitle tab — ≡ → subtitle/speech icon (third tab)
+- [ ] **[ICN-04]** History tab — ◷ → history/clock icon (fourth tab)
+- [ ] **[ICN-05]** Settings tab — ⚙ → settings/cog icon (fifth tab)
+- [ ] **[ICN-06]** Queue panel — ☰ → queue/list icon (header or left sidebar)
+
+**Action Buttons:**
+- [ ] **[ICN-07]** Download button — Large + kahverengi icon indicator
+- [ ] **[ICN-08]** Convert button — Process/arrow icon
+- [ ] **[ICN-09]** Browse/Select button — Folder icon
+- [ ] **[ICN-10]** Cancel/Stop button — X or stop icon in red/error color
+- [ ] **[ICN-11]** Retry button — Clockwise arrow/refresh icon
+
+**Status Indicators:**
+- [ ] **[ICN-12]** Queued status — Purple hourglass or circle outline
+- [ ] **[ICN-13]** Running status — Animated spinner (2-3 rot/sec)
+- [ ] **[ICN-14]** Success status — Green checkmark (static, 150ms slide-in)
+- [ ] **[ICN-15]** Error status — Red X or exclamation (pulsing red)
+- [ ] **[ICN-16]** Paused status — Pause symbol (gray)
+
+**Form & Input:**
+- [ ] **[ICN-17]** URL input prefix icon — Link/chain icon (left of input)
+- [ ] **[ICN-18]** Quality selector prefix — Video/quality icon
+- [ ] **[ICN-19]** Format selector prefix — File type icon
+- [ ] **[ICN-20]** Error indicator — Exclamation triangle (red, right of field)
+- [ ] **[ICN-21]** Success indicator — Green checkmark (right of field, animated)
+- [ ] **[ICN-22]** Clear/Reset button — Trash or X icon (muted gray)
+
+**Implementation:** Use Lucide icon library (SVG) or custom Raven vector assets.
+
+### 4C.3 — Smooth State Transitions [  ]
+
+Smooth visual feedback for all interactive elements (150-250ms easing).
+
+- [ ] **[POL-01]** Button press states — scale (0.95–1.0) + kahverengi glow on click
+- [ ] **[POL-02]** Input field focus ring — animated kahverengi border (gray → brand kahverengi, 150ms)
+- [ ] **[POL-03]** Hover states — subtle beige background shift + opacity (100ms ease-out)
+- [ ] **[POL-04]** Tab switching — crossfade between tab content (150ms, no flicker)
+- [ ] **[POL-05]** Modal open/close — scale + fade animation (150-200ms, centered)
+- [ ] **[POL-06]** Dropdown expand/collapse — smooth height transition + kahverengi accent line
+- [ ] **[POL-07]** Progress bar fill — smooth linear fill (no jumps) + color pulse on 100%
+- [ ] **[POL-08]** Disabled state clarity — reduced opacity (0.5) + desaturated kahverengi
+
+**Implementation:** CustomTkinter animation loop using `after()` and easing functions. All transitions use kahverengi accent color.
+
+### 4C.4 — Loading & Operational Feedback [  ]
+
+Real-time visual feedback during async operations with brand consistency.
+
+- [ ] **[POL-09]** Animated spinner — kahverengi rotating icon (2-3 rotations/sec) during download/convert
+- [ ] **[POL-10]** Progress bar — kahverengi fill color + beige background (smooth 60fps updates)
+- [ ] **[POL-11]** Queue item entrance — slide-in from top + kahverengi accent bar (150ms)
+- [ ] **[POL-12]** Job status badges — color-coded icons (purple queued, orange running, green done)
+- [ ] **[POL-13]** "Processing..." — animated kahverengi icon + "Downloading..." text with ellipsis
+- [ ] **[POL-14]** Success feedback — brief green flash + checkmark animation (300ms total)
+- [ ] **[POL-15]** Completion sound/visual — Subtle kahverengi pulse + success checkmark
+
+**Implementation:** Use `ctk.CTkProgressBar` with kahverengi color; custom spinner widget.
+
+### 4C.5 — Error & Form Feedback [  ]
+
+Inline, contextual feedback without disruption. Brand-consistent error messaging.
+
+- [ ] **[POL-16]** Inline error messages — red icon + text below input (color fade-in, 150ms)
+- [ ] **[POL-17]** Input validation feedback — real-time (on blur, not keystroke)
+- [ ] **[POL-18]** Error recovery affordance — "Retry" or "Edit" hint with icon near error
+- [ ] **[POL-19]** Form field error state — red left border indicator + icon (no full red)
+- [ ] **[POL-20]** Success toast — slide-in from top-right, green checkmark + "Success" text (3s auto-dismiss)
+- [ ] **[POL-21]** Warning toast — amber/orange warning icon + clear message (4s auto-dismiss)
+
+**Implementation:** Inline `ctk.CTkLabel` with icon + color animation; custom toast widget.
+
+### 4C.6 — Visual Polish & Consistency [  ]
+
+Refinements that improve perceived quality and brand alignment.
+
+- [ ] **[POL-22]** Consistent corner radius — 8px for cards, 6px for buttons/inputs (soft Nordic feel)
+- [ ] **[POL-23]** Focus ring visibility — 2px kahverengi ring on all interactive elements
+- [ ] **[POL-24]** Smooth color transitions — all state changes use easing (not instant)
+- [ ] **[POL-25]** Empty state messaging — clear text + action icon (e.g., folder icon for "No files")
+- [ ] **[POL-26]** Loading skeleton — beige placeholder cards with subtle shimmer
+- [ ] **[POL-27]** Cursor feedback — pointer cursor on buttons + icons, text cursor on inputs
+- [ ] **[POL-28]** Drag & drop refinement — animated kahverengi dashed border on target zone
+- [ ] **[POL-29]** Scroll smoothness — smooth scrolling, no jank in queue/history
+- [ ] **[POL-30]** Brand consistency check — all UI elements use kahverengi/beige (not blue)
+
+**Implementation:** `ctk.CTkCanvas` for custom effects; frame-based animation loop.
+
+### 4C.7 — Accessibility & Motor Control [  ]
+
+Ensure micro-interactions don't harm accessibility.
+
+- [ ] **[POL-31]** Respect reduced-motion — disable animations if system preference detected
+- [ ] **[POL-32]** Keyboard navigation — all animations preserve tab order + focus visibility
+- [ ] **[POL-33]** Animation cancellation — allow user to interrupt long operations (click to stop)
+- [ ] **[POL-34]** Tooltip on hover — explain button actions with icons (300ms delay)
+- [ ] **[POL-35]** Screen reader support — icon labels + descriptive aria-labels
+
+**Implementation:** Platform detection for reduced-motion; focus management during transitions.
+
+**Dependencies:** Phase 4B (design tokens, colors, icons). Requires BRD-01 to BRD-06 complete before POL-* items.
 
 ---
 
@@ -211,7 +263,7 @@ Cross-platform binary builds and installers. (After GUI is polished)
 5. Settings panel for advanced options
 6. UI/UX enhancements (icons, themes, accessibility)
 
-**Phase 6 (After GUI is Done) — Build & Distribution:**
+**Phase 5 (After GUI is Done) — Build & Distribution:**
 1. PyInstaller spec updates with FFmpeg bundling
 2. Windows/Linux/macOS build pipelines
 3. GitHub Actions CI/CD setup

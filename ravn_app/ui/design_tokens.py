@@ -17,17 +17,18 @@ import customtkinter as ctk
 class Colors:
     """Semantic color tokens — all UI hex values must come from here."""
 
-    # Backgrounds (8px gradient scale)
-    BG_PRIMARY = "#141414"
-    BG_SURFACE = "#1e1e1e"
-    BG_CARD    = "#252525"
-    BG_INPUT   = "#2b2b2b"
-    BG_HOVER   = "#333333"
+    # Backgrounds (Nordic dark theme with kahverengi harmony)
+    BG_PRIMARY = "#141414"     # Dark base
+    BG_SURFACE = "#1e1e1e"     # Slightly lighter
+    BG_CARD    = "#252525"     # Card background
+    BG_INPUT   = "#2b2b2b"     # Input field background
+    BG_HOVER   = "#333333"     # Hover state background
 
-    # Accent / brand
-    ACCENT       = "#3b82f6"   # blue-500
-    ACCENT_HOVER = "#2563eb"   # blue-600
-    ACCENT_LIGHT = "#60a5fa"   # blue-400
+    # Accent / brand (RAVN Nordic kahverengi theme)
+    ACCENT       = "#8B6F47"   # kahverengi-500 (primary brand)
+    ACCENT_HOVER = "#7A5F3A"   # kahverengi-600 (darker on hover)
+    ACCENT_LIGHT = "#A68A6E"   # kahverengi-400 (lighter accent)
+    ACCENT_BEIGE = "#D4C5B9"   # beige-200 (secondary accent, contrasting)
 
     # Semantic feedback
     SUCCESS        = "#22c55e"   # green-500
@@ -39,8 +40,8 @@ class Colors:
     ERROR          = "#ef4444"   # red-500
     ERROR_BG       = "#2d1515"   # dark red bg
     ERROR_HOVER    = "#dc2626"   # red-600
-    INFO           = "#3b82f6"   # blue-500
-    INFO_BG        = "#1e2940"   # dark blue bg
+    INFO           = "#8B6F47"   # kahverengi-500 (brand info color)
+    INFO_BG        = "#2a2320"   # dark kahverengi bg
 
     # Destructive
     DANGER       = "#ef4444"
@@ -55,7 +56,7 @@ class Colors:
     # Borders
     BORDER        = "#2e2e2e"
     BORDER_STRONG = "#404040"
-    BORDER_ACCENT = "#3b82f6"
+    BORDER_ACCENT = "#8B6F47"   # kahverengi for accent borders
     BORDER_HOVER  = "#525252"
 
     # Status (for status labels / log text)
@@ -71,9 +72,9 @@ class Colors:
     BTN_SECONDARY       = "#374151"   # gray-700
     BTN_SECONDARY_HOVER = "#4b5563"   # gray-600
 
-    # Interactive states
-    FOCUS_RING = "#60a5fa"   # blue-400 for focus indicators
-    DRAG_OVER  = "#1e3a8a"   # blue-900 for drag-drop target
+    # Interactive states (kahverengi-aligned)
+    FOCUS_RING = "#A68A6E"   # kahverengi-400 for focus indicators
+    DRAG_OVER  = "#5C4A38"   # kahverengi-900 for drag-drop target
 
 
 class _FontRegistry:

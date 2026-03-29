@@ -13,6 +13,7 @@ from ravn_app.core.converter import (
     VideoConverter, BatchConverter, ConversionSettings,
     VideoCodec, AudioCodec, VideoQuality, AudioBitrate, CodecManager
 )
+from ravn_app.core.animation_manager import get_animation_manager
 from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
 
 try:
@@ -48,6 +49,8 @@ class ConverterTab(ctk.CTkFrame):
         self.is_converting = False
         self.db_manager = db_manager  # Veritabanı yöneticisi
         self.notify_callback = notify_callback
+        self.animation_manager = get_animation_manager()  # Animation utilities
+        self._spinner_animation_id = None  # Track active spinner
 
         self.setup_ui()
 
@@ -454,6 +457,18 @@ class ConverterTab(ctk.CTkFrame):
         self.is_converting = True
         self.convert_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
+
+        # Animate button disable and start spinner
+        self.animation_manager.animate_button_disabled(
+            self.convert_btn,
+            duration=150,
+            target_opacity=0.5
+        )
+        self._spinner_animation_id = self.animation_manager.start_spinner_loop(
+            self.status_label,
+            fps=3
+        )
+
         self.log_add("Dönüştürme başlatılıyor...")
 
         self.conversion_thread = Thread(
@@ -491,9 +506,21 @@ class ConverterTab(ctk.CTkFrame):
     def _on_conversion_success(self, settings: ConversionSettings, duration: float):
         """Main-thread: handle successful conversion."""
         self.is_converting = False
+
+        # Stop spinner and animate button enabled
+        if self._spinner_animation_id:
+            self.animation_manager.stop_animation(self._spinner_animation_id)
+            self._spinner_animation_id = None
+
         self.convert_btn.configure(state="normal")
+        self.animation_manager.animate_button_enabled(
+            self.convert_btn,
+            duration=150,
+            target_color="#f1f5f9"
+        )
+
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="Dönüştürme tamamlandı", text_color=Colors.STATUS_DONE)
+        self.status_label.configure(text="✓ Dönüştürme tamamlandı", text_color=Colors.STATUS_DONE)
         self.progress_var.set(100)
         if hasattr(self, 'db_manager') and self.db_manager:
             from ravn_app.core.database import ConversionRecord
@@ -517,18 +544,42 @@ class ConverterTab(ctk.CTkFrame):
     def _on_conversion_failure(self):
         """Main-thread: handle failed conversion."""
         self.is_converting = False
+
+        # Stop spinner and animate button enabled
+        if self._spinner_animation_id:
+            self.animation_manager.stop_animation(self._spinner_animation_id)
+            self._spinner_animation_id = None
+
         self.convert_btn.configure(state="normal")
+        self.animation_manager.animate_button_enabled(
+            self.convert_btn,
+            duration=150,
+            target_color="#f1f5f9"
+        )
+
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="Dönüştürme başarısız", text_color=Colors.STATUS_ERROR)
+        self.status_label.configure(text="✕ Dönüştürme başarısız", text_color=Colors.STATUS_ERROR)
         messagebox.showerror("Hata", "Dönüştürme sırasında hata oluştu")
 
     def stop_conversion(self):
         """Dönüştürmeyi durdur"""
         self.converter.stop()
         self.is_converting = False
+
+        # Stop spinner and animate button enabled
+        if self._spinner_animation_id:
+            self.animation_manager.stop_animation(self._spinner_animation_id)
+            self._spinner_animation_id = None
+
         self.convert_btn.configure(state="normal")
+        self.animation_manager.animate_button_enabled(
+            self.convert_btn,
+            duration=150,
+            target_color="#f1f5f9"
+        )
+
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="Durduruldu", text_color=Colors.STATUS_RUNNING)
+        self.status_label.configure(text="⏸ Durduruldu", text_color=Colors.STATUS_PAUSED)
         self.log_add("Dönüştürme durduruldu")
 
     def clear_fields(self):

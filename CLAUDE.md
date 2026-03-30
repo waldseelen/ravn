@@ -2,75 +2,116 @@
 
 ## Mission
 
-Work on RAVN as an in-progress desktop media application. Keep implementation and documentation aligned with the current repository state.
+Work on RAVN as an in-progress desktop media application. Keep implementation, tests, and documentation synchronized with repository reality.
+
+## Source Of Truth Order
+
+Use these files in order before substantial changes:
+
+1. `TASKS.md` (active backlog and status)
+2. `PROGRESS.md` (validated state snapshot)
+3. `ARCHITECTURE.md` (module boundaries and runtime flows)
+4. `README.md` (user-facing capabilities and operation)
+5. This file (`CLAUDE.md`) for workflow rules
+
+## Start Here (Code)
+
+- `ravn.py`
+- `ravn_app/ui/main_window.py`
+- `ravn_app/ui/tabs/download_tab.py`
+- `ravn_app/ui/components/error_panel.py`
+- `ravn_app/ui/components/playlist_sort_dialog.py`
+- `ravn_app/core/runners/`
+- `ravn_app/core/task_manager.py`
+- `ravn_app/core/downloader.py`
+- `ravn_app/core/converter.py`
+- `ravn_app/core/database.py`
+- `ravn_app/cli.py`
 
 ## Quick Context
 
-- Entry point: `ravn.py` (calls setup_logging, ensure_directories_exist, migrate_all_legacy_files before app init)
-- Main window shell: `ravn_app/ui/main_window.py`
-- Download tab logic: `ravn_app/ui/tabs/download_tab.py`
-- Reusable UI components: `ravn_app/ui/components/`
-- UI Components: `ravn_app/ui/ui_components.py` (Toast, Tooltip, InlineError, EmptyState, LoadingSkeleton)
-- Shared runners: `ravn_app/core/runners/` (paket olarak güncellendi)
-- Task queue: `ravn_app/core/task_manager.py`
-- Error parsing: `ravn_app/core/error_handler.py`
-- Logging: `ravn_app/core/logging_config.py`
-- Config paths (OS-aware): `ravn_app/core/config_paths.py`
-- Download logic: `ravn_app/core/downloader.py`
-- Conversion logic: `ravn_app/core/converter.py`
-- Persistence: `ravn_app/core/database.py`
-- Torrent runner: `ravn_app/core/runners/aria2.py` (Aria2Runner)
-- Torrent downloader: `ravn_app/core/torrent_downloader.py` (TorrentDownloader, TorrentDownloadMode)
-- Animation: `ravn_app/core/animation_manager.py`
-- CLI: `ravn_app/cli.py`
+- Entry point: `ravn.py` runs `setup_logging`, `ensure_directories_exist`, and `migrate_all_legacy_files` before app init.
+- UI shell: `ravn_app/ui/main_window.py` is a thin orchestrator.
+- Feature UI modules live in `ravn_app/ui/tabs/`; reusable widgets live in `ravn_app/ui/components/`.
+- Shared external tool execution lives in `ravn_app/core/runners/`.
+- OS-aware persistence paths live in `ravn_app/core/config_paths.py`.
+- Theme policy lives in `ravn_app/core/theme_catalog.py`.
+- Localization pipeline lives in `ravn_app/core/i18n.py` and `ravn_app/translations/`.
 
 ## Current Reality
 
-- Phase 1 (stabilization), Phase 2 (high-priority features), Phase 3 (medium-priority features), Phase 4A (core GUI completeness), Phase 4B (UI/UX enhancements), and Phase 4C (UI Polish & Micro-interactions) are complete.
-- Download UI is fully wired in `ravn_app/ui/tabs/download_tab.py` with background threads + `after()` UI callbacks.
-- `ravn_app/ui/main_window.py` is now a thin orchestrator that composes tabs and global window behavior.
-- Reusable download widgets were extracted to `ravn_app/ui/components/` (`error_panel.py`, `playlist_item.py`, `url_input.py`).
-- Config/history now live in OS-specific directories (Windows: `%APPDATA%\ravn\`, Linux: `~/.config/ravn/`).
-- CLI available via `ravn download/convert/info/subtitle/history` with `--json` flag.
-- Drag & drop works on converter and subtitle tabs (tkinterdnd2, fallback-safe).
-- Real-time FFmpeg progress parsing via `-progress pipe:1` is active in `VideoConverter`.
-- Queue panel widget shows live tasks (queued/running/completed) with cancel and open-folder buttons.
-- Batch download mode supports up to 50 URLs via multi-line text input.
-- Design system enhanced: Icons class replaces emojis, extended Colors with WCAG AA contrast, consistent 8px spacing grid.
-- All UI tabs use semantic icons, proper visual feedback, and accessibility-compliant color contrast.
-- Phase 4C.1–4C.7 complete: brand palette, icon placement, smooth transitions, loading feedback, toasts, validation, reduced-motion, tooltips.
-- Phase 6A–6G complete: aria2c/magnet/torrent support, streaming, CLI `ravn torrent` command.
-- Aria2Runner in `ravn_app/core/runners/aria2.py` handles magnet/torrent downloads with progress.
-- TorrentDownloader wraps Aria2Runner; supports FULL, SEQUENTIAL, STREAM modes with local HTTP server.
-- parse_aria2c_error() added to error_handler.py (errorCodes 1,2,3,6,9,13,24).
-- Torrent settings (aria2c_path, seed_time, max_connections) in "İndirme" settings tab.
-- download_tab.py auto-detects magnet/torrent URLs and routes to TorrentDownloader.
-- .torrent drag-drop onto URL entry (tkinterdnd2, fallback-safe).
-- Torrent mode selector (Tam İndir / Sıralı / Akışla İzle) appears on magnet/torrent URLs.
-- Toast notifications provide success/warning/error feedback on download completion.
-- Reduced-motion detection respects system preferences and `RAVN_REDUCED_MOTION` env var.
-- URL validation on blur shows success/error indicator.
-- Some auxiliary modules still use direct `subprocess` calls.
-- Phase 1–4 complete in `TASKS.md`; Phase 5 (build/packaging) remains open.
-- Settings tab consolidated from 4 to 3 sub-tabs; "Gelişmiş" merged into "İndirme".
-- System tray close behavior is user-configurable via `close_to_tray` config key.
-- Responsive layout: tabview max-width ~1200px with dynamic centering on window resize.
-- Playlist panel has in-panel "Approve and Download" button; `expand=True` visibility bug fixed.
-- File size estimate label shown next to URL input after video info fetch; updates correctly per quality (single-video info now includes `size_by_quality_mb` via `YtDlpRunner.compute_size_by_quality`).
-- ID3 auto-tagging: `download(embed_metadata=True)` embeds album art + metadata for MP3/M4A.
-- Auto-sort: `download(auto_sort=True)` organises files into `%(uploader,channel,creator)s/` subdirs.
-- Both options are checkboxes in the download tab options row and persistent "İndirme" settings.
-- All color tokens in `design_tokens.py` have `(light, dark)` tuple variants for full theme parity.
-- Converter tab codec/quality/format selectors have educational Tooltip descriptions.
-- Last known full-suite baseline (2026-03-30):
-  - `417 passed, 1 skipped` (418 collected)
-- Latest UI modularization checks:
-  - `tests/test_ui_logic.py`: `27 passed`
-  - `tests/test_ui_components.py` + `tests/test_app_builder.py`: `37 passed`
+- Phases 1-4C and Phase 6 are complete.
+- Phase 5 (build/packaging/distribution) remains open.
+- Primary media flows run through shared runners (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
+- Some auxiliary modules still call `subprocess` directly.
+- Download flow supports single URL, playlist, batch (up to 50 URLs), and torrent/magnet.
+- Torrent flow supports `FULL`, `SEQUENTIAL`, and `STREAM` modes.
+- Settings UI is compact single-page and scrollable (not nested sub-tabs).
+- Theme system is strict two-theme: `dark` and `light` (legacy aliases normalized).
+- Playlist fetch/sort dialog includes selected count, selected total size, high-contrast table headers, and stable action bar.
 
-## Preferred Approach
+## Verified Facts
+
+- Config and history paths are OS-aware via `ravn_app/core/config_paths.py`.
+- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent` (plus `--json`).
+- Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
+- FFmpeg realtime progress parsing is active.
+- Queue panel supports queued/running/completed states and cancel/open-folder actions.
+- Last full-suite baseline (2026-03-30): 417 passed, 1 skipped.
+- Latest targeted regression checks during refactor sessions: 85 passed.
+
+## Working Rules
 
 1. Verify code before making status claims.
-2. Prefer integration work over adding more surface area.
-3. Use shared runners for new external process execution.
-4. Keep docs synchronized when repository reality changes.
+2. Prefer integration over unnecessary new surface area.
+3. Use shared runners for any new external process execution paths.
+4. Keep docs synchronized whenever repository reality changes.
+5. If status/architecture changes, update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and `TASKS.md` together.
+6. If download flow changes, inspect `ravn_app/ui/tabs/download_tab.py`, `ravn_app/core/downloader.py`, and `ravn_app/ui/main_window.py` together.
+7. If persistence behavior changes, inspect `ravn_app/core/database.py`, `ravn_app/core/config_paths.py`, and startup migration in `ravn.py`.
+8. If CLI changes, update `ravn_app/cli.py`, command help text, and README examples.
+
+## Design And UX Constraints
+
+- Keep UI composition modular: thin shell + focused tabs + reusable components.
+- Keep settings compact and information-dense without nested complexity.
+- Keep user-facing strings i18n-based; avoid hardcoded TR/EN text in UI logic.
+- Maintain clear contrast and accessibility for table/list controls.
+- Respect reduced-motion behavior and avoid disruptive animations.
+
+## Theme And I18N Constraints
+
+- Theme IDs must normalize to `dark` or `light`.
+- Legacy theme names should map to canonical IDs, not expand theme count.
+- New UI labels, errors, tooltips, and button text must be translation-key based.
+- Translation keys must be added in both `ravn_app/translations/tr.json` and `ravn_app/translations/en.json`.
+
+## Torrent Constraints
+
+- Detect both magnet URI and `.torrent` links/files in download workflow.
+- Keep mode semantics stable:
+  - `FULL`: complete download
+  - `SEQUENTIAL`: playback-friendly piece ordering
+  - `STREAM`: local HTTP streaming path with quick play action
+- Surface aria2 progress and failures with user-readable feedback.
+
+## Verification Commands
+
+Use these before claiming completion on behavior changes:
+
+- `pytest -q`
+- `pytest -q tests/test_ui_logic.py`
+- `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
+- `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
+
+Prefer targeted subsets for quick iteration, then run broader verification where impact is wider.
+
+## Documentation Sync Policy
+
+If repository behavior or status changes:
+
+1. Update `README.md` for end-user behavior and usage.
+2. Update `ARCHITECTURE.md` for module/runtime structure.
+3. Update `PROGRESS.md` for validated state and test evidence.
+4. Update `TASKS.md` for open/closed work status.
+5. Update this file only for workflow, constraints, and engineering guidance.

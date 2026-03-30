@@ -5,6 +5,9 @@ pytest>=7.0
 requests>=2.31.0
 click>=8.0.0
 
+# Torrent / magnet support
+# aria2c is an external binary and must be installed on system PATH.
+aria2p>=0.12.1
 
 # Desktop App & Auto-Update
 pyinstaller>=5.0

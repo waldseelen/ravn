@@ -190,6 +190,7 @@ class Icons:
     HISTORY     = "◷"   # History/clock icon (ICN-04)
     SETTINGS    = "⚙"   # Settings/cog icon (ICN-05)
     QUEUE       = "☰"   # Queue/list icon (ICN-06)
+    TORRENT     = "⊕"   # Torrent/magnet icon (ICN-07b)
 
     # Action Buttons (ICN-07 to ICN-11)
     DOWNLOAD_BTN = "↓"   # Large download button indicator (ICN-07)

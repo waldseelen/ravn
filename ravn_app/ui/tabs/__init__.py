@@ -6,6 +6,7 @@ from ravn_app.ui.tabs.history_tab import HistoryTab
 from ravn_app.ui.tabs.queue_tab import QueueTab
 from ravn_app.ui.tabs.settings_tab import SettingsTab
 from ravn_app.ui.tabs.subtitle_tab import SubtitleTab
+from ravn_app.ui.tabs.torrent_tab import TorrentTab
 
 __all__ = [
     "ConverterTab",
@@ -14,4 +15,5 @@ __all__ = [
     "QueueTab",
     "SettingsTab",
     "SubtitleTab",
+    "TorrentTab",
 ]

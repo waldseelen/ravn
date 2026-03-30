@@ -28,7 +28,8 @@
     "subtitle": "Altyazi",
     "queue": "Kuyruk",
     "history": "Gecmis",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "torrent": "Torrent"
   },
   "mainWindow": {
     "taskCancelled": "Gorev iptal edildi: {taskId}",
@@ -322,5 +323,30 @@
     "torrentOutputDir": "Cikis klasoru  : {output}",
     "torrentMode": "Mod            : {mode}  seed-time={seedTime}dk",
     "torrentDownloadFailed": "Torrent indirmesi basarisiz"
+  },
+  "torrent": {
+    "title": "Torrent / Magnet Indir",
+    "sourceLabel": "Magnet veya .torrent dosyasi:",
+    "sourcePlaceholder": "magnet:?xt=urn:... veya dosya yolu",
+    "browseFile": "Dosya Sec",
+    "modeLabel": "Indirme Modu:",
+    "modeFull": "Tam Indir",
+    "modeSequential": "Sirali",
+    "modeStream": "Akisla Izle",
+    "outputDirLabel": "Kayit Konumu:",
+    "downloadBtn": "Indir",
+    "cancelBtn": "Iptal Et",
+    "openPlayerBtn": "Oynaticide Ac",
+    "logTitle": "Islem Ciktisi:",
+    "aria2cMissing": "aria2c bulunamadi — torrent ozelligi kullanim disi.",
+    "aria2cMissingDetail": "Kurmak icin: winget install aria2 (Windows) / brew install aria2 (macOS) / apt install aria2 (Linux)",
+    "noSource": "Lutfen bir magnet linki veya .torrent dosya yolu girin.",
+    "downloading": "Indiriliyor...",
+    "completed": "Indirme tamamlandi.",
+    "failed": "Indirme basarisiz: {error}",
+    "cancelled": "Indirme iptal edildi.",
+    "streamReady": "Akis hazir — oynaticiyi acin.",
+    "dropHint": ".torrent dosyasini buraya surukleyin",
+    "outputFiles": "Dosyalar: {count} dosya indirildi."
   }
 }

@@ -10,7 +10,8 @@
       "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"Tooltip\\\\|bind\\(\" {} +)",
       "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"wraplength=\\\\|font=Fonts\" {} +)",
       "Bash(grep:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

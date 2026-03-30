@@ -5,6 +5,7 @@ Geçmiş ve ayarlar arayüzü
 
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
+import tkinter.ttk as ttk
 from pathlib import Path
 import unicodedata
 from ..core.database import DatabaseManager, ConfigManager

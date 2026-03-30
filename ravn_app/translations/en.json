@@ -28,7 +28,8 @@
     "subtitle": "Subtitle",
     "queue": "Queue",
     "history": "History",
-    "settings": "Settings"
+    "settings": "Settings",
+    "torrent": "Torrent"
   },
   "mainWindow": {
     "taskCancelled": "Task cancelled: {taskId}",
@@ -322,5 +323,30 @@
     "torrentOutputDir": "Output dir     : {output}",
     "torrentMode": "Mode           : {mode}  seed-time={seedTime}m",
     "torrentDownloadFailed": "Torrent download failed"
+  },
+  "torrent": {
+    "title": "Torrent / Magnet Download",
+    "sourceLabel": "Magnet link or .torrent file:",
+    "sourcePlaceholder": "magnet:?xt=urn:... or file path",
+    "browseFile": "Browse File",
+    "modeLabel": "Download Mode:",
+    "modeFull": "Full Download",
+    "modeSequential": "Sequential",
+    "modeStream": "Stream",
+    "outputDirLabel": "Save Location:",
+    "downloadBtn": "Download",
+    "cancelBtn": "Cancel",
+    "openPlayerBtn": "Open in Player",
+    "logTitle": "Output:",
+    "aria2cMissing": "aria2c not found — torrent feature is disabled.",
+    "aria2cMissingDetail": "Install: winget install aria2 (Windows) / brew install aria2 (macOS) / apt install aria2 (Linux)",
+    "noSource": "Please enter a magnet link or .torrent file path.",
+    "downloading": "Downloading...",
+    "completed": "Download complete.",
+    "failed": "Download failed: {error}",
+    "cancelled": "Download cancelled.",
+    "streamReady": "Stream ready — open in your player.",
+    "dropHint": "Drop .torrent file here",
+    "outputFiles": "Files: {count} file(s) downloaded."
   }
 }

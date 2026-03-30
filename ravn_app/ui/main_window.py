@@ -18,7 +18,7 @@ from ravn_app.core.platform_support import PlatformManager
 from ravn_app.core.task_manager import get_task_queue
 from ravn_app.ui.advanced_features import NotificationManager, SystemTrayIntegration, ThemeManager
 from ravn_app.ui.design_tokens import Colors, Fonts, Icons
-from ravn_app.ui.tabs import ConverterTab, DownloadTab, HistoryTab, QueueTab, SettingsTab, SubtitleTab
+from ravn_app.ui.tabs import ConverterTab, DownloadTab, HistoryTab, QueueTab, SettingsTab, SubtitleTab, TorrentTab
 from ravn_app.ui.ui_components import ToastManager
 
 
@@ -121,6 +121,14 @@ class YouTubeDownloaderApp(ctk.CTk):
 
         subtitle_tab = self.tabview.add(f"{Icons.SUBTITLE}  {t('tabs.subtitle')}")
         SubtitleTab(subtitle_tab, fg_color="transparent").pack(fill="both", expand=True)
+
+        torrent_tab = self.tabview.add(f"{Icons.TORRENT}  {t('tabs.torrent')}")
+        TorrentTab(
+            torrent_tab,
+            config_manager=self.config_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            fg_color="transparent",
+        ).pack(fill="both", expand=True)
 
         queue_tab = self.tabview.add(f"{Icons.QUEUE}  {t('tabs.queue')}")
         QueueTab(

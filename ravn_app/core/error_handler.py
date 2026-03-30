@@ -395,3 +395,99 @@ def parse_ytdlp_error(stderr: str, return_code: int = 1) -> str:
     """Quick parse yt-dlp error to user message"""
     error = YtDlpErrorParser.parse(stderr, return_code)
     return error.message
+
+
+class Aria2cErrorParser:
+    """
+    Parse aria2c stderr/exit codes to extract human-readable error messages.
+    Maps aria2c errorCode values to Turkish user-friendly messages.
+    """
+
+    ERROR_PATTERNS: List[Tuple[str, ErrorCategory, str, str]] = [
+        (r"errorCode=2|timed? out",
+         ErrorCategory.NETWORK_ERROR,
+         "Zaman aşımı",
+         "Bağlantı zaman aşımına uğradı. Tekrar deneyin."),
+
+        (r"errorCode=3|resource not found",
+         ErrorCategory.FILE_NOT_FOUND,
+         "Kaynak bulunamadı",
+         "İndirme kaynağı bulunamadı. Bağlantıyı kontrol edin."),
+
+        (r"errorCode=6|network problem|connection refused",
+         ErrorCategory.NETWORK_ERROR,
+         "Ağ hatası",
+         "İnternet bağlantınızı kontrol edin ve tekrar deneyin."),
+
+        (r"errorCode=9|not enough disk|no space left",
+         ErrorCategory.RESOURCE_ERROR,
+         "Disk dolu",
+         "Disk alanı yetersiz. Alan açıp tekrar deneyin."),
+
+        (r"errorCode=13|file already exists",
+         ErrorCategory.FILE_ACCESS,
+         "Dosya zaten mevcut",
+         "Hedef dosya zaten mevcut. Farklı bir konum seçin."),
+
+        (r"errorCode=24|unauthorized|authentication",
+         ErrorCategory.PERMISSION_ERROR,
+         "Kimlik doğrulama hatası",
+         "Erişim için kimlik bilgileri gerekiyor."),
+
+        (r"errorCode=1|unknown error",
+         ErrorCategory.UNKNOWN_ERROR,
+         "Bilinmeyen hata",
+         "Teknik detaylar için günlükleri inceleyin."),
+    ]
+
+    @classmethod
+    def parse(cls, stderr: str, return_code: int = 1) -> ErrorInfo:
+        """
+        Parse aria2c stderr and return structured error info.
+
+        Args:
+            stderr: aria2c stderr output
+            return_code: Process return code
+
+        Returns:
+            ErrorInfo with parsed error details
+        """
+        if return_code == 0:
+            return ErrorInfo(
+                category=ErrorCategory.UNKNOWN_ERROR,
+                message="No error",
+                raw_error=stderr,
+            )
+
+        for pattern, category, message, suggestion in cls.ERROR_PATTERNS:
+            if re.search(pattern, stderr, re.IGNORECASE):
+                return ErrorInfo(
+                    category=category,
+                    message=message,
+                    suggestion=suggestion,
+                    is_recoverable=category in (
+                        ErrorCategory.NETWORK_ERROR,
+                        ErrorCategory.RESOURCE_ERROR,
+                    ),
+                    raw_error=stderr,
+                )
+
+        lines = [ln.strip() for ln in stderr.splitlines() if ln.strip()]
+        error_line = ""
+        for line in reversed(lines):
+            if "error" in line.lower():
+                error_line = line[:200]
+                break
+
+        return ErrorInfo(
+            category=ErrorCategory.UNKNOWN_ERROR,
+            message=error_line or "İndirme başarısız",
+            suggestion="Teknik detaylar için günlükleri inceleyin.",
+            raw_error=stderr,
+        )
+
+
+def parse_aria2c_error(stderr: str, return_code: int = 1) -> str:
+    """Quick parse aria2c error to user message"""
+    error = Aria2cErrorParser.parse(stderr, return_code)
+    return error.message

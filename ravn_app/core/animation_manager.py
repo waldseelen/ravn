@@ -16,12 +16,12 @@ import customtkinter as ctk
 def detect_reduced_motion() -> bool:
     """
     Detect if user prefers reduced motion (POL-31).
-    
+
     Checks platform-specific settings:
     - Windows: SystemParametersInfo for SPI_GETCLIENTAREAANIMATION
     - macOS: NSWorkspace accessibilityDisplayShouldReduceMotion
     - Linux: GTK/GNOME reduced-motion setting
-    
+
     Returns True if reduced motion is preferred.
     """
     # Check environment variable override first
@@ -30,7 +30,7 @@ def detect_reduced_motion() -> bool:
         return True
     if env_val in ("0", "false", "no"):
         return False
-    
+
     if sys.platform == "win32":
         try:
             import ctypes
@@ -43,7 +43,7 @@ def detect_reduced_motion() -> bool:
             return not result.value
         except Exception:
             pass
-    
+
     elif sys.platform == "darwin":
         try:
             # macOS: check accessibility setting
@@ -56,7 +56,7 @@ def detect_reduced_motion() -> bool:
             return result.stdout.strip() == "1"
         except Exception:
             pass
-    
+
     else:
         # Linux: check GNOME/GTK setting
         try:
@@ -69,7 +69,7 @@ def detect_reduced_motion() -> bool:
             return result.stdout.strip().lower() == "false"
         except Exception:
             pass
-    
+
     return False
 
 
@@ -425,7 +425,7 @@ class AnimationManager:
         # POL-31: Skip animation if reduced motion preferred
         if self.reduced_motion:
             try:
-                widget.configure(border_color=end_color)
+                widget.configure(border_color=self._resolve_widget_color(end_color))
             except Exception:
                 pass
             return
@@ -436,11 +436,13 @@ class AnimationManager:
 
         start_time = [0]
         start_color = focus_color if not focused else idle_color
+        start_color_resolved = self._resolve_single_color(start_color)
+        end_color_resolved = self._resolve_single_color(end_color)
 
         def animate_frame():
             progress = min(1.0, start_time[0] / max(1, duration))
             eased = EasingFunction.ease_out(progress)
-            current = self._interpolate_hex(start_color, end_color, eased)
+            current = self._interpolate_hex(start_color_resolved, end_color_resolved, eased)
             try:
                 widget.configure(border_color=current)
             except Exception:
@@ -551,7 +553,7 @@ class AnimationManager:
         # POL-31: Skip animation if reduced motion preferred
         if self.reduced_motion:
             try:
-                widget.configure(**{option_name: end_color})
+                widget.configure(**{option_name: self._resolve_widget_color(end_color)})
             except Exception:
                 pass
             return
@@ -561,11 +563,13 @@ class AnimationManager:
             self._cancel_animation(widget_id)
 
         start_time = [0]
+        start_color_resolved = self._resolve_single_color(start_color)
+        end_color_resolved = self._resolve_single_color(end_color)
 
         def animate_frame():
             progress = min(1.0, start_time[0] / max(1, duration))
             eased = EasingFunction.ease_in_out(progress)
-            color = self._interpolate_hex(start_color, end_color, eased)
+            color = self._interpolate_hex(start_color_resolved, end_color_resolved, eased)
             try:
                 widget.configure(**{option_name: color})
             except Exception:
@@ -582,12 +586,64 @@ class AnimationManager:
         animate_frame()
 
     @staticmethod
-    def _hex_to_rgb(hex_color: str) -> tuple:
-        """Convert hex color to RGB tuple."""
-        hex_color = hex_color.lstrip("#")
-        if len(hex_color) == 6:
-            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        return (255, 255, 255)
+    def _resolve_appearance_color(color: Any) -> Any:
+        """Resolve tuple/list CTk color tokens to a single mode-specific value."""
+        if isinstance(color, (list, tuple)):
+            try:
+                appearance_mode = 1 if ctk.get_appearance_mode().lower() == "dark" else 0
+            except Exception:
+                appearance_mode = 0
+
+            try:
+                color = ctk.ThemeManager.single_color(color, appearance_mode)
+            except Exception:
+                if len(color) > appearance_mode:
+                    color = color[appearance_mode]
+                elif len(color) > 0:
+                    color = color[0]
+                else:
+                    color = ""
+
+        return color
+
+    @staticmethod
+    def _resolve_widget_color(color: Any) -> str:
+        """Resolve colors for widget configure() while preserving valid CTk tokens."""
+        color = AnimationManager._resolve_appearance_color(color)
+
+        if isinstance(color, str):
+            return color.strip()
+
+        return str(color or "")
+
+    @staticmethod
+    def _resolve_single_color(color: Any) -> str:
+        """Resolve tuple/list CTk colors to a single valid #RRGGBB value."""
+        color = AnimationManager._resolve_appearance_color(color)
+
+        if not isinstance(color, str):
+            color = str(color or "")
+
+        normalized = color.strip()
+        if normalized.startswith("#"):
+            normalized = normalized[1:]
+
+        is_hex = all(ch in "0123456789abcdefABCDEF" for ch in normalized)
+        if len(normalized) == 3 and is_hex:
+            normalized = "".join(ch * 2 for ch in normalized)
+            is_hex = True
+
+        if len(normalized) == 6 and is_hex:
+            return f"#{normalized}"
+
+        return "#ffffff"
+
+    @staticmethod
+    def _hex_to_rgb(hex_color: Any) -> tuple:
+        """Convert color token to RGB tuple."""
+        resolved_color = AnimationManager._resolve_single_color(hex_color)
+        hex_color = resolved_color.lstrip("#")
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     @staticmethod
     def _rgb_to_hex(r: int, g: int, b: int) -> str:

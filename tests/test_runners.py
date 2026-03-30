@@ -15,6 +15,8 @@ from ravn_app.core.runners import (
     RunnerStatus,
     get_ffmpeg_runner,
     get_ytdlp_runner,
+    Aria2Runner,
+    get_aria2c_runner,
 )
 
 
@@ -606,6 +608,104 @@ class TestYtDlpRunner:
         assert entries[0]["filesize_mb"] == 53.0
 
     @patch('subprocess.run')
+    def test_extract_playlist_entries_size_fallback_keeps_selected_resolution(self, mock_run):
+        """When selected quality size is unknown, fallback size should not overwrite selected resolution."""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 120,
+                    "formats": [
+                        {
+                            "format_id": "22",
+                            "width": 1280,
+                            "height": 720,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "format_note": "720p"
+                        },
+                        {
+                            "format_id": "137+140",
+                            "width": 1920,
+                            "height": 1080,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 90 * 1024 * 1024,
+                            "format_note": "1080p"
+                        },
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="720p",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "1280x720"
+        assert entries[0]["filesize_mb"] == 90.0
+
+    @patch('subprocess.run')
+    def test_extract_playlist_entries_prefers_split_1080_over_progressive_360(self, mock_run):
+        """Test 1080p selection prefers video-only 1080 + audio over lower progressive formats."""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 120,
+                    "formats": [
+                        {
+                            "format_id": "18",
+                            "width": 640,
+                            "height": 360,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 20 * 1024 * 1024,
+                            "format_note": "360p"
+                        },
+                        {
+                            "format_id": "137",
+                            "width": 1920,
+                            "height": 1080,
+                            "vcodec": "avc1",
+                            "acodec": "none",
+                            "filesize": 80 * 1024 * 1024,
+                            "format_note": "1080p"
+                        },
+                        {
+                            "format_id": "140",
+                            "vcodec": "none",
+                            "acodec": "mp4a",
+                            "filesize": 9 * 1024 * 1024,
+                            "format_note": "audio"
+                        },
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="1080p",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "1920x1080"
+        assert entries[0]["filesize_mb"] == 89.0
+
+    @patch('subprocess.run')
     def test_extract_playlist_entries_audio_only_prefers_pure_audio_stream(self, mock_run):
         """Test audio-only quality avoids muxed video+audio formats when pure audio exists."""
         mock_data = {
@@ -792,3 +892,167 @@ class TestRunnerStatus:
         assert RunnerStatus.FAILED.value == "failed"
         assert RunnerStatus.CANCELLED.value == "cancelled"
         assert RunnerStatus.TIMEOUT.value == "timeout"
+
+
+class TestAria2Runner:
+    """Tests for Aria2Runner class."""
+
+    # ------------------------------------------------------------------
+    # _build_command tests
+    # ------------------------------------------------------------------
+
+    def test_build_command_basic(self):
+        """Basic command contains expected flags and source."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="https://example.com/file.iso",
+            output_dir="/tmp/downloads",
+        )
+        assert cmd[0] == "aria2c"
+        assert "--console-log-level=notice" in cmd
+        assert "--show-console-readout=false" in cmd
+        assert "--summary-interval=1" in cmd
+        assert "https://example.com/file.iso" in cmd
+
+    def test_build_command_sequential_true(self):
+        """sequential=True adds head-first torrent flags."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="magnet:?xt=urn:example",
+            output_dir="/tmp/dl",
+            sequential=True,
+        )
+        assert "--file-allocation=none" in cmd
+        assert "--enable-sequential-download=true" in cmd
+        assert "--bt-prioritize-piece=head=5M" in cmd
+
+    def test_build_command_sequential_false(self):
+        """sequential=False (default) does NOT add sequential flags."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="https://example.com/file.iso",
+            output_dir="/tmp/dl",
+            sequential=False,
+        )
+        assert "--file-allocation=none" not in cmd
+        assert "--enable-sequential-download=true" not in cmd
+
+    def test_build_command_seed_time_zero(self):
+        """seed_time=0 adds --seed-time=0 flag."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="magnet:?xt=urn:example",
+            output_dir="/tmp/dl",
+            seed_time=0,
+        )
+        assert "--seed-time=0" in cmd
+
+    def test_build_command_seed_time_nonzero(self):
+        """seed_time > 0 does NOT add --seed-time=0."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="magnet:?xt=urn:example",
+            output_dir="/tmp/dl",
+            seed_time=60,
+        )
+        assert "--seed-time=0" not in cmd
+
+    def test_build_command_with_extra_args(self):
+        """extra_args are appended to the command."""
+        runner = Aria2Runner()
+        cmd = runner._build_command(
+            source="https://example.com/file.iso",
+            output_dir="/tmp/dl",
+            extra_args=["--max-connection-per-server=5"],
+        )
+        assert "--max-connection-per-server=5" in cmd
+
+    # ------------------------------------------------------------------
+    # _parse_error tests
+    # ------------------------------------------------------------------
+
+    def test_parse_error_unknown(self):
+        """errorCode=1 maps to a 'bilinmeyen' message."""
+        runner = Aria2Runner()
+        result = runner._parse_error("errorCode=1 unknown error occurred")
+        assert "bilinmeyen" in result.lower()
+
+    def test_parse_error_resource_not_found(self):
+        """errorCode=3 maps to a resource-not-found message."""
+        runner = Aria2Runner()
+        result = runner._parse_error("errorCode=3 resource not found")
+        assert "kaynak" in result.lower() or "bulunamadı" in result.lower()
+
+    def test_parse_error_network(self):
+        """errorCode=6 maps to a network-error message."""
+        runner = Aria2Runner()
+        result = runner._parse_error("errorCode=6 network problem")
+        assert "ağ" in result.lower() or "network" in result.lower()
+
+    def test_parse_error_disk_full(self):
+        """errorCode=9 maps to a disk/space message."""
+        runner = Aria2Runner()
+        result = runner._parse_error("errorCode=9 not enough disk space")
+        assert "disk" in result.lower() or "space" in result.lower()
+
+    def test_parse_error_file_exists(self):
+        """errorCode=13 maps to a file-exists message."""
+        runner = Aria2Runner()
+        result = runner._parse_error("errorCode=13 file already exists")
+        assert (
+            "dosya" in result.lower()
+            or "mevcut" in result.lower()
+            or "exists" in result.lower()
+        )
+
+    def test_parse_error_fallback(self):
+        """Unrecognised stderr still returns a non-empty string."""
+        runner = Aria2Runner()
+        result = runner._parse_error("Some random error text")
+        assert len(result) > 0
+
+    # ------------------------------------------------------------------
+    # is_available tests
+    # ------------------------------------------------------------------
+
+    @patch.object(Aria2Runner, "_find_executable", return_value="/usr/bin/aria2c")
+    def test_is_available_true(self, mock_find):
+        """is_available() returns True when executable is found."""
+        runner = Aria2Runner()
+        assert runner.is_available() is True
+
+    @patch.object(Aria2Runner, "_find_executable", return_value=None)
+    def test_is_available_false(self, mock_find):
+        """is_available() returns False when executable is not found."""
+        runner = Aria2Runner()
+        assert runner.is_available() is False
+
+    # ------------------------------------------------------------------
+    # Factory function tests
+    # ------------------------------------------------------------------
+
+    def test_get_aria2c_runner_default(self):
+        """get_aria2c_runner() returns an Aria2Runner with default path."""
+        runner = get_aria2c_runner()
+        assert isinstance(runner, Aria2Runner)
+        assert runner.executable_path == "aria2c"
+
+    def test_get_aria2c_runner_custom_path(self):
+        """get_aria2c_runner() accepts a custom executable path."""
+        runner = get_aria2c_runner("/custom/aria2c")
+        assert runner.executable_path == "/custom/aria2c"
+
+    # ------------------------------------------------------------------
+    # Progress regex tests
+    # ------------------------------------------------------------------
+
+    def test_parse_progress_regex(self):
+        """Percent and DL-speed regex patterns parse aria2c output correctly."""
+        import re
+
+        percent_pattern = re.compile(r"\((\d+)%\)")
+        dl_pattern = re.compile(r"DL:(\S+)")
+
+        line = "(45%) DL:1.2MiB"
+        assert percent_pattern.search(line).group(1) == "45"
+        assert dl_pattern.search(line).group(1) == "1.2MiB"

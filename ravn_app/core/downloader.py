@@ -85,7 +85,8 @@ class YouTubeDownloader:
         try:
             info = self._runner.extract_info(url)
             if info:
-                return {
+                quality_data = self._runner.compute_size_by_quality(info)
+                result = {
                     'title': info.get('title', 'Unknown'),
                     'duration': info.get('duration', 0),
                     'uploader': info.get('uploader', 'Unknown'),
@@ -96,6 +97,8 @@ class YouTubeDownloader:
                     'formats': info.get('formats', []),
                     'webpage_url': info.get('webpage_url', url),
                 }
+                result.update(quality_data)
+                return result
             return None
         except Exception as e:
             logger.error(f"Bilgi alınamadı: {e}")
@@ -164,7 +167,9 @@ class YouTubeDownloader:
         format_type: DownloadFormat = DownloadFormat.MP4,
         quality: DownloadQuality = DownloadQuality.BEST,
         progress_callback: Optional[Callable[[int, str], None]] = None,
-        retries: int = DEFAULT_RETRIES
+        retries: int = DEFAULT_RETRIES,
+        embed_metadata: bool = False,
+        auto_sort: bool = False,
     ) -> DownloadResult:
         """
         Video indir
@@ -176,6 +181,8 @@ class YouTubeDownloader:
             quality: Kalite seviyesi
             progress_callback: İlerleme callback'i
             retries: Deneme sayısı
+            embed_metadata: Ses dosyalarına ID3/metadata ve albüm kapağı göm
+            auto_sort: İndirilen dosyaları kanal/sanatçı adına göre klasörlere ayır
 
         Returns:
             DownloadResult: İndirme sonucu
@@ -195,9 +202,23 @@ class YouTubeDownloader:
                 '--audio-quality', '0'
             ])
 
+        # ID3 / metadata embedding for audio formats
+        if embed_metadata and format_type in [DownloadFormat.MP3, DownloadFormat.M4A]:
+            extra_args.extend([
+                '--add-metadata',
+                '--embed-thumbnail',
+                '--convert-thumbnails', 'jpg',
+            ])
+
+        # Auto-sort by channel/uploader name
+        filename_template = "%(title)s.%(ext)s"
+        if auto_sort:
+            filename_template = "%(uploader,channel,creator)s/%(title)s.%(ext)s"
+
         result = self._runner.download(
             url=url,
             output_dir=output_dir,
+            filename_template=filename_template,
             format_spec=format_spec,
             extra_args=extra_args,
             retries=retries,

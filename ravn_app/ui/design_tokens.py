@@ -18,11 +18,11 @@ class Colors:
     """Semantic color tokens — all UI hex values must come from here."""
 
     # Backgrounds (Nordic dark theme with kahverengi harmony)
-    BG_PRIMARY = "#141414"     # Dark base
-    BG_SURFACE = "#1e1e1e"     # Slightly lighter
-    BG_CARD    = "#252525"     # Card background
-    BG_INPUT   = "#2b2b2b"     # Input field background
-    BG_HOVER   = "#333333"     # Hover state background
+    BG_PRIMARY = ("#F5F0EC", "#141414")   # (light, dark) base
+    BG_SURFACE = ("#EDE8E3", "#1E1E1E")   # (light, dark) slightly lighter
+    BG_CARD    = ("#E6DFD8", "#252525")   # (light, dark) card background
+    BG_INPUT   = ("#DDD6CE", "#2D2D2D")   # (light, dark) input field background
+    BG_HOVER   = ("#D8D0C8", "#2A2A2A")   # (light, dark) hover state background
 
     # Accent / brand (RAVN Nordic kahverengi theme)
     # Nordic brown palette inspired by Scandinavian minimalism
@@ -39,7 +39,7 @@ class Colors:
     WARNING_BG     = "#2d2410"   # dark amber bg
     WARNING_HOVER  = "#d97706"   # amber-600
     ERROR          = "#ef4444"   # red-500 (4.90:1)
-    ERROR_BG       = "#2d1515"   # dark red bg
+    ERROR_BG       = ("#FDF0F0", "#2D1515")   # (light, dark) red bg
     ERROR_HOVER    = "#dc2626"   # red-600
     INFO           = "#987a4e"   # kahverengi-500 brand info (4.59:1)
     INFO_BG        = "#2a2320"   # dark kahverengi bg
@@ -49,14 +49,14 @@ class Colors:
     DANGER_HOVER = "#dc2626"
 
     # Text (WCAG AA contrast compliant: ≥4.5:1 for normal text)
-    TEXT_PRIMARY   = "#f1f5f9"   # slate-100 (16.82:1 on BG_PRIMARY)
-    TEXT_SECONDARY = "#94a3b8"   # slate-400 (7.18:1 on BG_PRIMARY)
-    TEXT_MUTED     = "#6e7f98"   # slate-500 adjusted (4.52:1 on BG_PRIMARY)
+    TEXT_PRIMARY   = ("#1A1210", "#E8E0D8")   # (light, dark) primary text
+    TEXT_SECONDARY = ("#4A3D35", "#B8A99A")   # (light, dark) secondary text
+    TEXT_MUTED     = ("#7A6B60", "#7A6B60")   # same for both modes
     TEXT_DISABLED  = "#4b5563"   # gray-600 (intentionally low contrast)
 
     # Borders
-    BORDER        = "#2e2e2e"
-    BORDER_STRONG = "#404040"
+    BORDER        = ("#C4B5A8", "#3A3330")   # (light, dark)
+    BORDER_STRONG = ("#A89080", "#5A4A40")   # (light, dark)
     BORDER_ACCENT = "#987a4e"   # kahverengi for accent borders (WCAG AA)
     BORDER_HOVER  = "#525252"
 
@@ -70,12 +70,12 @@ class Colors:
     STATUS_CANCELLED = "#6b7280" # gray-500
 
     # Secondary buttons
-    BTN_SECONDARY       = "#374151"   # gray-700
-    BTN_SECONDARY_HOVER = "#4b5563"   # gray-600
+    BTN_SECONDARY       = ("#D4C5B9", "#3A3330")   # (light, dark)
+    BTN_SECONDARY_HOVER = ("#C4B0A0", "#4A4340")   # (light, dark)
 
     # Interactive states (kahverengi-aligned)
     FOCUS_RING = "#A68A6E"   # kahverengi-400 for focus indicators
-    DRAG_OVER  = "#5C4A38"   # kahverengi-900 for drag-drop target
+    DRAG_OVER  = ("#EAE0D5", "#2A2218")   # (light, dark) drag-drop target
     HOVER_BEIGE = "#3b332f"  # subtle beige hover tint (POL-03)
     PROGRESS_BG = "#3a312c"  # beige-brown progress track
     PROGRESS_FILL = "#987a4e"  # brand progress fill

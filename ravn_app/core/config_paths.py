@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import logging
 
+from ravn_app.core.theme_catalog import get_theme_ids, normalize_theme_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -227,7 +229,7 @@ CONFIG_SCHEMA = {
     'default_download_path': {'type': str, 'default': None},  # Will use ~/Downloads/RAVN
     'default_format': {'type': str, 'default': 'MP4', 'allowed': ['MP4', 'MKV', 'WEBM', 'AVI', 'MOV']},
     'default_quality': {'type': str, 'default': '1080p', 'allowed': ['360p', '480p', '720p', '1080p', '1440p', '2160p', 'best']},
-    'theme': {'type': str, 'default': 'nordic', 'allowed': ['nordic', 'blue', 'green', 'dark-blue']},
+    'theme': {'type': str, 'default': 'nordic', 'allowed': get_theme_ids()},
     'concurrent_downloads': {'type': int, 'default': 1, 'min': 1, 'max': 5},
     'auto_cleanup': {'type': bool, 'default': False},
     'auto_update_check': {'type': bool, 'default': True},
@@ -272,6 +274,12 @@ def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
     
     schema = CONFIG_SCHEMA[key]
     expected_type = schema['type']
+
+    if key == 'theme' and isinstance(value, str):
+        normalized = normalize_theme_id(value)
+        if normalized != value:
+            return False, normalized, f"Normalized legacy theme for {key}: {value} -> {normalized}"
+        return True, normalized, ""
     
     # Type check
     if not isinstance(value, expected_type):

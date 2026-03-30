@@ -1,0 +1,5 @@
+2026-03-30 05:53:46,147 [INFO] ravn_app.setup_logging:149 - RAVN logging initialized - level=INFO
+2026-03-30 05:53:46,147 [INFO] ravn_app.setup_logging:151 - Log file: C:\Users\bugra\DEV\ravn\.tmp_appdata_i18n_review\ravn\logs\ravn.log
+2026-03-30 05:53:46,291 [INFO] ravn_app.core.config_paths.migrate_legacy_config:179 - Migrated config from C:\Users\bugra\DEV\ravn\ravn_config.json to C:\Users\bugra\DEV\ravn\.tmp_appdata_i18n_review\ravn\ravn_config.json
+2026-03-30 05:53:46,292 [INFO] ravn_app.core.config_paths.migrate_legacy_database:207 - Migrated database from C:\Users\bugra\DEV\ravn\ravn_history.db to C:\Users\bugra\DEV\ravn\.tmp_appdata_i18n_review\ravn\data\ravn_history.db
+2026-03-30 05:53:46,302 [WARNING] ravn_app.core.database._load_config:524 - Config validation: Normalized legacy theme for theme: forest -> sand

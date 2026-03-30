@@ -14,7 +14,9 @@ from ravn_app.core.converter import (
     VideoCodec, AudioCodec, VideoQuality, AudioBitrate, CodecManager
 )
 from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.core.i18n import t
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.ui_components import Tooltip
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -52,28 +54,51 @@ class ConverterTab(ctk.CTkFrame):
         self.animation_manager = get_animation_manager()  # Animation utilities
         self._spinner_animation_id = None  # Track active spinner
         self._progress_value = 0.0
+        self.configure(fg_color=Colors.BG_PRIMARY)
 
         self.setup_ui()
+
+    @staticmethod
+    def _style_combo(combo):
+        combo.configure(
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
+            border_color=Colors.BORDER,
+        )
+
+    @staticmethod
+    def _style_entry(entry):
+        entry.configure(
+            fg_color=Colors.BG_INPUT,
+            text_color=Colors.TEXT_PRIMARY,
+            placeholder_text_color=Colors.TEXT_MUTED,
+            border_color=Colors.BORDER,
+        )
 
     def setup_ui(self):
         """UI bileşenlerini kur"""
         # Başlık
         title = ctk.CTkLabel(
             self,
-            text="Video Dönüştürücü",
-            font=Fonts.H1
+            text=t("converter.title"),
+            font=Fonts.H1,
+            text_color=Colors.TEXT_PRIMARY,
         )
         title.pack(pady=Spacing.SM, padx=Spacing.SM)
 
         # Ana frame
-        main_frame = ctk.CTkFrame(self)
+        main_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
         main_frame.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
 
         # ===== Giriş Dosyası =====
-        input_frame = ctk.CTkFrame(main_frame)
+        input_frame = ctk.CTkFrame(main_frame, fg_color=Colors.BG_SURFACE)
         input_frame.pack(fill="x", pady=Spacing.MD)
 
-        ctk.CTkLabel(input_frame, text="Giriş Dosyası:", font=Fonts.H2).pack(anchor="w")
+        ctk.CTkLabel(input_frame, text=t("converter.inputFile"), font=Fonts.H2).pack(anchor="w")
 
         # Drop zone frame with dashed-border effect
         self._dnd_drop_zone = ctk.CTkFrame(
@@ -85,26 +110,27 @@ class ConverterTab(ctk.CTkFrame):
 
         self._dnd_hint_label = ctk.CTkLabel(
             self._dnd_drop_zone,
-            text="Dosya sürükle & bırak veya seç",
+            text=t("converter.dropHint"),
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED
         )
         self._dnd_hint_label.pack(pady=(4, 0))
 
-        input_subframe = ctk.CTkFrame(self._dnd_drop_zone)
+        input_subframe = ctk.CTkFrame(self._dnd_drop_zone, fg_color="transparent")
         input_subframe.pack(fill="x", pady=Spacing.SM)
 
         self.input_path = ctk.CTkEntry(
             input_subframe,
-            placeholder_text="Video dosyasını seç...",
+            placeholder_text=t("converter.inputPlaceholder"),
             corner_radius=Sizes.CORNER_SM,  # POL-22
         )
+        self._style_entry(self.input_path)
         self.input_path.pack(side="left", fill="x", expand=True, padx=(0, 5))
         self.input_path.configure(cursor=Cursors.TEXT)  # POL-27
 
         browse_btn = ctk.CTkButton(
             input_subframe,
-            text=f"{Icons.BROWSE} Seç",
+            text=f"{Icons.BROWSE} {t('common.select')}",
             width=100,
             command=self.select_input_file,
             corner_radius=Sizes.CORNER_SM,  # POL-22
@@ -113,14 +139,14 @@ class ConverterTab(ctk.CTkFrame):
         browse_btn.configure(cursor=Cursors.POINTER)  # POL-27
 
         # ===== Format ve Codec Seçimi =====
-        options_frame = ctk.CTkFrame(main_frame, corner_radius=Sizes.CORNER_MD)  # POL-22
+        options_frame = ctk.CTkFrame(main_frame, corner_radius=Sizes.CORNER_MD, fg_color=Colors.BG_CARD)  # POL-22
         options_frame.pack(fill="x", pady=Spacing.MD)
 
         # Video Codec
-        video_frame = ctk.CTkFrame(options_frame)
+        video_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
         video_frame.pack(side="left", fill="x", expand=True, padx=5)
 
-        ctk.CTkLabel(video_frame, text="Video Codec:", font=Fonts.LABEL_BOLD).pack(anchor="w")
+        ctk.CTkLabel(video_frame, text=t("converter.videoCodec"), font=Fonts.LABEL_BOLD).pack(anchor="w")
         self.video_codec = ctk.CTkComboBox(
             video_frame,
             values=list(CodecManager.VIDEO_CODECS.keys()),
@@ -128,13 +154,15 @@ class ConverterTab(ctk.CTkFrame):
             corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.video_codec.set("h264")
+        self._style_combo(self.video_codec)
         self.video_codec.pack(fill="x", pady=Spacing.SM)
+        Tooltip(self.video_codec, "H.264: En uyumlu codec, geniş cihaz desteği\nH.265/HEVC: 2x daha iyi sıkıştırma, modern cihazlar gerektirir\nVP9: Açık kaynak, WebM için idealdir\nAV1: En yeni, en verimli; kodlama yavaş")
 
         # Ses Codec
-        audio_frame = ctk.CTkFrame(options_frame)
+        audio_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
         audio_frame.pack(side="left", fill="x", expand=True, padx=5)
 
-        ctk.CTkLabel(audio_frame, text="Ses Codec:", font=Fonts.LABEL_BOLD).pack(anchor="w")
+        ctk.CTkLabel(audio_frame, text=t("converter.audioCodec"), font=Fonts.LABEL_BOLD).pack(anchor="w")
         self.audio_codec = ctk.CTkComboBox(
             audio_frame,
             values=list(CodecManager.AUDIO_CODECS.keys()),
@@ -142,13 +170,15 @@ class ConverterTab(ctk.CTkFrame):
             corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.audio_codec.set("aac")
+        self._style_combo(self.audio_codec)
         self.audio_codec.pack(fill="x", pady=Spacing.SM)
+        Tooltip(self.audio_codec, "AAC: Yüksek kalite, geniş uyumluluk (MP4/M4A)\nMP3: Evrensel ses formatı, maksimum uyumluluk\nOpus: En iyi kalite/boyut oranı (WebM/OGG)\nFLAC: Kayıpsız ses, büyük dosya boyutu")
 
         # Kalite
-        quality_frame = ctk.CTkFrame(options_frame)
+        quality_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
         quality_frame.pack(side="left", fill="x", expand=True, padx=5)
 
-        ctk.CTkLabel(quality_frame, text="Kalite:", font=Fonts.LABEL_BOLD).pack(anchor="w")
+        ctk.CTkLabel(quality_frame, text=t("converter.quality"), font=Fonts.LABEL_BOLD).pack(anchor="w")
         self.quality = ctk.CTkComboBox(
             quality_frame,
             values=["Kayıpsız", "Çok Yüksek", "Yüksek", "Orta", "Düşük", "Çok Düşük"],
@@ -156,19 +186,21 @@ class ConverterTab(ctk.CTkFrame):
             corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.quality.set("Yüksek")
+        self._style_combo(self.quality)
         self.quality.pack(fill="x", pady=Spacing.SM)
+        Tooltip(self.quality, "Kayıpsız: Orijinal kalite korunur, büyük dosya\nÇok Yüksek: %95+ kalite, küçük kayıp\nYüksek: İyi denge, önerilen seçim\nOrta: Web paylaşımı için uygun\nDüşük / Çok Düşük: Küçük dosya, belirgin kalite kaybı")
 
         # ===== İleri Ayarlar =====
-        advanced_frame = ctk.CTkFrame(main_frame)
+        advanced_frame = ctk.CTkFrame(main_frame, fg_color=Colors.BG_CARD)
         advanced_frame.pack(fill="x", pady=Spacing.MD)
 
-        ctk.CTkLabel(advanced_frame, text="İleri Ayarlar:", font=Fonts.LABEL_BOLD).pack(anchor="w", pady=Spacing.SM)
+        ctk.CTkLabel(advanced_frame, text=t("converter.advanced"), font=Fonts.LABEL_BOLD).pack(anchor="w", pady=Spacing.SM)
 
         # Hız Preset
-        preset_frame = ctk.CTkFrame(advanced_frame)
+        preset_frame = ctk.CTkFrame(advanced_frame, fg_color="transparent")
         preset_frame.pack(fill="x", pady=Spacing.SM)
 
-        ctk.CTkLabel(preset_frame, text="Hız:").pack(side="left", padx=5)
+        ctk.CTkLabel(preset_frame, text=t("converter.speed")).pack(side="left", padx=5)
         self.preset = ctk.CTkComboBox(
             preset_frame,
             values=["Hızlı", "Orta", "Yavaş"],
@@ -176,10 +208,11 @@ class ConverterTab(ctk.CTkFrame):
             width=150
         )
         self.preset.set("Orta")
+        self._style_combo(self.preset)
         self.preset.pack(side="left", padx=5)
 
         # Hardware Acceleration
-        ctk.CTkLabel(preset_frame, text="Hızlandırma:").pack(side="left", padx=5)
+        ctk.CTkLabel(preset_frame, text=t("converter.accel")).pack(side="left", padx=5)
         self.hwaccel = ctk.CTkComboBox(
             preset_frame,
             values=["Yok", "NVENC", "Quick Sync"],
@@ -187,13 +220,14 @@ class ConverterTab(ctk.CTkFrame):
             width=150
         )
         self.hwaccel.set("Yok")
+        self._style_combo(self.hwaccel)
         self.hwaccel.pack(side="left", padx=5)
 
         # Ses Bitrate
-        bitrate_frame = ctk.CTkFrame(advanced_frame)
+        bitrate_frame = ctk.CTkFrame(advanced_frame, fg_color="transparent")
         bitrate_frame.pack(fill="x", pady=Spacing.SM)
 
-        ctk.CTkLabel(bitrate_frame, text="Ses Bitrate:").pack(side="left", padx=5)
+        ctk.CTkLabel(bitrate_frame, text=t("converter.audioBitrate")).pack(side="left", padx=5)
         self.audio_bitrate = ctk.CTkComboBox(
             bitrate_frame,
             values=["320k (Çok Yüksek)", "192k (Yüksek)", "128k (Orta)", "96k (Düşük)"],
@@ -201,29 +235,32 @@ class ConverterTab(ctk.CTkFrame):
             width=200
         )
         self.audio_bitrate.set("128k (Orta)")
+        self._style_combo(self.audio_bitrate)
         self.audio_bitrate.pack(side="left", padx=5)
 
         # ===== Çıkış Dosyası =====
-        output_frame = ctk.CTkFrame(main_frame)
+        output_frame = ctk.CTkFrame(main_frame, fg_color=Colors.BG_SURFACE)
         output_frame.pack(fill="x", pady=Spacing.MD)
 
-        ctk.CTkLabel(output_frame, text="Çıkış Dosyası:", font=Fonts.H2).pack(anchor="w")
+        ctk.CTkLabel(output_frame, text=t("converter.outputFile"), font=Fonts.H2).pack(anchor="w")
 
-        output_subframe = ctk.CTkFrame(output_frame)
+        output_subframe = ctk.CTkFrame(output_frame, fg_color="transparent")
         output_subframe.pack(fill="x", pady=Spacing.SM)
 
-        self.output_path = ctk.CTkEntry(output_subframe, placeholder_text="Otomatik olarak adlandırılacak...")
+        self.output_path = ctk.CTkEntry(output_subframe, placeholder_text=t("converter.outputPlaceholder"))
+        self._style_entry(self.output_path)
         self.output_path.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        Tooltip(self.output_path, "Çıkış dosya formatı seçilen video codec'e göre belirlenir:\nh264/h265 → .mp4  •  vp9/av1 → .webm  •  xvid → .avi")
 
         ctk.CTkButton(
             output_subframe,
-            text=f"{Icons.BROWSE} Seç",
+            text=f"{Icons.BROWSE} {t('common.select')}",
             width=100,
             command=self.select_output_file
         ).pack(side="left")
 
         # ===== Progress Bar =====
-        progress_frame = ctk.CTkFrame(main_frame)
+        progress_frame = ctk.CTkFrame(main_frame, fg_color=Colors.BG_SURFACE)
         progress_frame.pack(fill="x", pady=Spacing.MD)
 
         self.progress_var = ctk.DoubleVar(value=0)
@@ -240,17 +277,17 @@ class ConverterTab(ctk.CTkFrame):
         # Status
         self.status_label = ctk.CTkLabel(
             progress_frame,
-            text="Hazır",
+            text=t("converter.statusReady"),
             font=Fonts.LABEL,
             text_color=Colors.STATUS_IDLE
         )
         self.status_label.pack(anchor="w", pady=Spacing.SM)
 
         # ===== Log Alanı =====
-        log_frame = ctk.CTkFrame(main_frame)
+        log_frame = ctk.CTkFrame(main_frame, fg_color=Colors.BG_SURFACE)
         log_frame.pack(fill="both", expand=True, pady=Spacing.MD)
 
-        ctk.CTkLabel(log_frame, text="İşlem Günlüğü:", font=Fonts.LABEL_BOLD).pack(anchor="w")
+        ctk.CTkLabel(log_frame, text=t("converter.logTitle"), font=Fonts.LABEL_BOLD).pack(anchor="w")
 
         scrollbar = ctk.CTkScrollbar(log_frame)
         scrollbar.pack(side="right", fill="y")
@@ -259,18 +296,21 @@ class ConverterTab(ctk.CTkFrame):
             log_frame,
             yscrollcommand=scrollbar.set,
             height=150,
-            font=Fonts.MONO
+            font=Fonts.MONO,
+            fg_color=Colors.BG_INPUT,
+            text_color=Colors.TEXT_PRIMARY,
+            border_color=Colors.BORDER,
         )
         self.log_text.pack(fill="both", expand=True, pady=Spacing.SM)
         scrollbar.configure(command=self.log_text.yview)
 
         # ===== Butonlar =====
-        button_frame = ctk.CTkFrame(main_frame)
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(fill="x", pady=Spacing.MD)
 
         self.convert_btn = ctk.CTkButton(
             button_frame,
-            text=f"{Icons.CONVERT_BTN} Dönüştür",
+            text=f"{Icons.CONVERT_BTN} {t('converter.convert')}",
             command=self.start_conversion,
             fg_color=Colors.ACCENT,
             hover_color=Colors.ACCENT_HOVER,
@@ -281,7 +321,7 @@ class ConverterTab(ctk.CTkFrame):
 
         self.stop_btn = ctk.CTkButton(
             button_frame,
-            text=f"{Icons.CANCEL_BTN} Durdur",
+            text=f"{Icons.CANCEL_BTN} {t('converter.stop')}",
             command=self.stop_conversion,
             fg_color=Colors.DANGER,
             hover_color=Colors.DANGER_HOVER,
@@ -293,7 +333,7 @@ class ConverterTab(ctk.CTkFrame):
 
         self.clear_btn = ctk.CTkButton(
             button_frame,
-            text=f"{Icons.CLEAR_BTN} Temizle",
+            text=f"{Icons.CLEAR_BTN} {t('converter.clear')}",
             command=self.clear_fields,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
@@ -340,7 +380,7 @@ class ConverterTab(ctk.CTkFrame):
             )
             self._dnd_hint_label.configure(
                 text_color=Colors.ACCENT_LIGHT,
-                text=f"{Icons.ARROW_DOWN} Dosyayı buraya bırak"
+                text=f"{Icons.ARROW_DOWN} {t('converter.dropFilePrompt')}"
             )
         except Exception:
             pass
@@ -354,7 +394,7 @@ class ConverterTab(ctk.CTkFrame):
             )
             self._dnd_hint_label.configure(
                 text_color=Colors.TEXT_MUTED,
-                text=f"{Icons.FILE} Video dosyasını buraya sürükle"
+                text=f"{Icons.FILE} {t('converter.dropVideoPrompt')}"
             )
         except Exception:
             pass
@@ -362,7 +402,7 @@ class ConverterTab(ctk.CTkFrame):
     def select_input_file(self):
         """Giriş dosyasını seç"""
         file = filedialog.askopenfilename(
-            title="Video dosyasını seç",
+            title=t("converter.selectInputTitle"),
             filetypes=[
                 ("Tüm Video Dosyaları", "*.mp4 *.mkv *.avi *.mov *.webm *.flv"),
                 ("MP4", "*.mp4"),
@@ -383,7 +423,7 @@ class ConverterTab(ctk.CTkFrame):
     def select_output_file(self):
         """Çıkış dosyasını seç"""
         file = filedialog.asksaveasfilename(
-            title="Çıkış dosyasını seç",
+            title=t("converter.selectOutputTitle"),
             defaultextension=".mp4",
             filetypes=[
                 ("MP4", "*.mp4"),
@@ -429,11 +469,11 @@ class ConverterTab(ctk.CTkFrame):
         output_file = self.output_path.get()
 
         if not input_file:
-            messagebox.showerror("Hata", "Lütfen giriş dosyasını seçin")
+            messagebox.showerror(t("converter.errorTitle"), t("converter.inputRequired"))
             return
 
         if not os.path.exists(input_file):
-            messagebox.showerror("Hata", "Giriş dosyası bulunamadı")
+            messagebox.showerror(t("converter.errorTitle"), t("converter.inputMissing"))
             return
 
         # Otomatik çıkış dosyası adlandırması
@@ -451,7 +491,7 @@ class ConverterTab(ctk.CTkFrame):
             audio_codec = CodecManager.get_audio_codec(self.audio_codec.get())
 
             if not video_codec or not audio_codec:
-                messagebox.showerror("Hata", "Geçersiz codec seçimi")
+                messagebox.showerror(t("converter.errorTitle"), t("converter.invalidCodec"))
                 return
 
             preset_map = {"Hızlı": "fast", "Orta": "medium", "Yavaş": "slow"}
@@ -466,7 +506,7 @@ class ConverterTab(ctk.CTkFrame):
                 preset=preset_map.get(self.preset.get(), "medium")
             )
         except Exception as e:
-            messagebox.showerror("Hata", f"Ayar hatası: {str(e)}")
+            messagebox.showerror(t("converter.errorTitle"), t("converter.settingsError", error=str(e)))
             return
 
         # Dönüştürmeyi ayrı thread'de çalıştır
@@ -485,7 +525,7 @@ class ConverterTab(ctk.CTkFrame):
             fps=3
         )
 
-        self.log_add("Dönüştürme başlatılıyor...")
+        self.log_add(t("converter.starting"))
 
         self.conversion_thread = Thread(
             target=self._conversion_worker,
@@ -542,7 +582,7 @@ class ConverterTab(ctk.CTkFrame):
         )
 
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="✓ Dönüştürme tamamlandı", text_color=Colors.STATUS_DONE)
+        self.status_label.configure(text=t("converter.successLabel"), text_color=Colors.STATUS_DONE)
         self.progress_var.set(100)
         self._progress_value = 1.0
         if hasattr(self, 'db_manager') and self.db_manager:
@@ -562,7 +602,10 @@ class ConverterTab(ctk.CTkFrame):
                 pass
         if self.notify_callback:
             self.notify_callback(settings.output_file)
-        messagebox.showinfo("Başarılı", f"Video başarıyla dönüştürüldü:\n{settings.output_file}")
+        messagebox.showinfo(
+            t("converter.successTitle"),
+            t("converter.successMessage", output=settings.output_file),
+        )
 
     def _on_conversion_failure(self):
         """Main-thread: handle failed conversion."""
@@ -581,8 +624,8 @@ class ConverterTab(ctk.CTkFrame):
         )
 
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="✕ Dönüştürme başarısız", text_color=Colors.STATUS_ERROR)
-        messagebox.showerror("Hata", "Dönüştürme sırasında hata oluştu")
+        self.status_label.configure(text=t("converter.failedLabel"), text_color=Colors.STATUS_ERROR)
+        messagebox.showerror(t("converter.errorTitle"), t("converter.errorMessage"))
 
     def stop_conversion(self):
         """Dönüştürmeyi durdur"""
@@ -602,8 +645,8 @@ class ConverterTab(ctk.CTkFrame):
         )
 
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="⏸ Durduruldu", text_color=Colors.STATUS_PAUSED)
-        self.log_add("Dönüştürme durduruldu")
+        self.status_label.configure(text=t("converter.stoppedLabel"), text_color=Colors.STATUS_PAUSED)
+        self.log_add(t("converter.stoppedLog"))
 
     def clear_fields(self):
         """Alanları temizle"""
@@ -611,7 +654,7 @@ class ConverterTab(ctk.CTkFrame):
         self.output_path.delete(0, "end")
         self.log_text.delete("1.0", "end")
         self.progress_var.set(0)
-        self.status_label.configure(text="Hazır", text_color=Colors.STATUS_IDLE)
+        self.status_label.configure(text=t("converter.statusReady"), text_color=Colors.STATUS_IDLE)
         self.video_codec.set("h264")
         self.audio_codec.set("aac")
         self.quality.set("Yüksek")

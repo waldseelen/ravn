@@ -6,12 +6,13 @@ pytest ile çalışır: pytest tests/
 import pytest
 import sys
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 # Proje dizinini path'e ekle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ravn_app.core.downloader import YouTubeDownloader
+from ravn_app.core.downloader import DownloadFormat, DownloadQuality, YouTubeDownloader
+from ravn_app.core.runners import RunnerResult
 from ravn_app.utils.file_utils import sanitize_filename, format_bytes
 from ravn_app.utils.system_utils import find_executable, get_platform
 
@@ -64,6 +65,86 @@ class TestYouTubeDownloader:
         entries = self.downloader.extract_playlist_entries("https://example.com/playlist")
         assert len(entries) == 2
         assert entries[0]["title"] == "A"
+
+    def test_download_audio_includes_metadata_embedding_args(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {
+            "title": "Track",
+            "uploader": "Artist",
+            "description": "lyrics text",
+            "thumbnail": "https://example.com/thumb.jpg",
+        }
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp3"]},
+        )
+        self.downloader._apply_audio_metadata = Mock()
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP3,
+            quality=DownloadQuality.AUDIO_ONLY,
+        )
+
+        call_kwargs = self.downloader._runner.download.call_args.kwargs
+        extra_args = call_kwargs["extra_args"]
+        assert "--embed-metadata" in extra_args
+        assert "--embed-thumbnail" in extra_args
+        assert "--parse-metadata" in extra_args
+
+    def test_download_audio_triggers_audio_metadata_postprocessing(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {
+            "title": "Track",
+            "uploader": "Artist",
+            "description": "lyrics text",
+            "thumbnail": "https://example.com/thumb.jpg",
+        }
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp3"]},
+        )
+        self.downloader._apply_audio_metadata = Mock()
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP3,
+            quality=DownloadQuality.AUDIO_ONLY,
+        )
+
+        self.downloader._apply_audio_metadata.assert_called_once()
+
+    def test_download_auto_sort_uses_artist_subfolder(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {
+            "title": "Track",
+            "artist": "AC/DC",
+            "uploader": "Uploader Name",
+            "description": "lyrics",
+            "thumbnail": "",
+        }
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp3"]},
+        )
+        self.downloader._apply_audio_metadata = Mock()
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP3,
+            quality=DownloadQuality.AUDIO_ONLY,
+            auto_sort_enabled=True,
+            auto_sort_mode="artist",
+        )
+
+        call_kwargs = self.downloader._runner.download.call_args.kwargs
+        assert call_kwargs["output_dir"].endswith("ACDC")
 
 
 class TestFileUtils:

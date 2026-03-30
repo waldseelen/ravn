@@ -35,6 +35,7 @@ class TaskType(Enum):
     NORMALIZE = "normalize"
     SUBTITLE = "subtitle"
     GENERIC = "generic"
+    TORRENT = "torrent"
 
 
 @dataclass

@@ -9,6 +9,8 @@ This repository contains a desktop media manager named RAVN. It uses CustomTkint
 - `TASKS.md`
 - `ravn.py`
 - `ravn_app/ui/main_window.py`
+- `ravn_app/ui/tabs/download_tab.py`
+- `ravn_app/ui/components/error_panel.py`
 - `ravn_app/core/runners.py`
 - `ravn_app/core/task_manager.py`
 - `ravn_app/core/downloader.py`
@@ -20,7 +22,10 @@ This repository contains a desktop media manager named RAVN. It uses CustomTkint
 
 - Main media execution paths use shared runners from `ravn_app/core/runners.py`.
 - Some auxiliary modules still use direct `subprocess` calls.
-- Download tab is wired: `_download_video()` in `ravn_app/ui/main_window.py` calls `YouTubeDownloader` in a background thread with thread-safe UI callbacks.
+- `ravn_app/ui/main_window.py` is a thin orchestration shell (window lifecycle + tab composition).
+- Download tab is wired in `ravn_app/ui/tabs/download_tab.py`, including background-thread execution and thread-safe UI callbacks.
+- Reusable download UI pieces are extracted under `ravn_app/ui/components/` (`error_panel.py`, `playlist_item.py`, `url_input.py`).
+- Compatibility import wrapper exists at `ravn_app/ui/download_tab.py`.
 - Startup migration (`ensure_directories_exist`, `migrate_all_legacy_files`) runs in `ravn.py` before app init.
 - Config and history now resolve via OS-specific paths in `ravn_app/core/config_paths.py`.
 - CLI is available via `ravn_app/cli.py` (commands: download, convert, info, subtitle, history, serve).
@@ -38,16 +43,30 @@ This repository contains a desktop media manager named RAVN. It uses CustomTkint
 - Tooltip component provides 300ms hover tooltips for action buttons.
 - URL validation on blur shows success/error indicator.
 - Playlist metadata fetch now includes per-video selected-quality size/resolution and selected-total size summary.
+- Single video info fetch also computes `size_by_quality_mb` / `resolution_by_quality` maps (via `YtDlpRunner.compute_size_by_quality`), so the size estimate label updates correctly when quality changes.
+- ID3 auto-tagging: when `embed_metadata=True` and format is MP3/M4A, yt-dlp embeds album art (`--embed-thumbnail --convert-thumbnails jpg`) and metadata (`--add-metadata`).
+- Auto-sort: when `auto_sort=True`, yt-dlp output template is `%(uploader,channel,creator)s/%(title)s.%(ext)s`, grouping files under channel/artist subdirectories.
+- Both options exposed as checkboxes in the download tab options row and as persistent settings in the "İndirme" settings sub-tab.
 - Download tab playlist panel is expanded for long-list usability (wider, denser rows, easier scrolling).
-- Verified 2026-03-30 (Phase 4C.5/4C.6/4C.7 session):
+- Settings tab consolidated from 4 sub-tabs to 3: "Gelişmiş" removed and merged into "İndirme".
+- System tray close behavior is user-configurable via `close_to_tray` bool in config (set by `close_behavior_combo` in General settings).
+- Responsive layout: `_on_window_resize` centers tabview with ~1200px max width on large displays.
+- Playlist panel has an in-panel "Approve and Download" button (`playlist_approve_btn`); `expand=True` visibility bug fixed.
+- File size estimate label displayed next to URL input; updates after video info fetch and on quality change.
+- All color tokens in `design_tokens.py` converted to `(light, dark)` tuples for full Light/Dark theme parity (14 attributes).
+- Converter tab video_codec, audio_codec, quality, and output_path selectors have educational Tooltip descriptions.
+- Last known full-suite baseline (2026-03-30):
   - `pytest --collect-only -q` → `418` collected
   - `pytest -q` → `417 passed, 1 skipped`
+- UI modularization regression checks:
+  - `pytest -q tests/test_ui_logic.py` → `27 passed`
+  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py` → `37 passed`
 
 ## Working Rules
 
 - Prefer shared runners for new FFmpeg, FFprobe, and yt-dlp execution paths.
 - Do not describe the repo as fully complete or production-ready unless the code and backlog actually support that claim.
-- If you change repository status, update `README.md`, `PROGRESS.md`, and `CHANGELOG.md` together.
-- If you touch download flow, inspect both `ravn_app/ui/main_window.py` and `ravn_app/core/downloader.py`.
+- If you change repository status, update `README.md`, `PROGRESS.md`, and `ARCHITECTURE.md` together.
+- If you touch download flow, inspect `ravn_app/ui/tabs/download_tab.py`, `ravn_app/core/downloader.py`, and orchestration edges in `ravn_app/ui/main_window.py`.
 - If you touch persistence, account for the OS-aware path migration in `ravn_app/core/config_paths.py`.
 - If you touch CLI, update `setup.py` entry points accordingly.

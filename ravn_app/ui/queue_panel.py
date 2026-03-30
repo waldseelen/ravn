@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.core.i18n import t
 from ravn_app.core.task_manager import Task, TaskStatus, TaskType, get_task_queue
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 
@@ -107,7 +108,7 @@ class QueueItemWidget(ctk.CTkFrame):
         if task.status == TaskStatus.RUNNING and on_cancel:
             self.cancel_btn = ctk.CTkButton(
                 button_frame,
-                text=f"{Icons.STOP} İptal",
+                text=f"{Icons.STOP} {t('queue.cancel')}",
                 command=lambda: on_cancel(task.id),
                 width=80,
                 height=28,
@@ -121,7 +122,7 @@ class QueueItemWidget(ctk.CTkFrame):
         elif task.status == TaskStatus.COMPLETED and on_open_folder and task.result and task.result.output_path:
             self.open_btn = ctk.CTkButton(
                 button_frame,
-                text=f"{Icons.FOLDER} Klasör",
+                text=f"{Icons.FOLDER} {t('queue.folder')}",
                 command=lambda: on_open_folder(task.result.output_path),
                 width=80,
                 height=28,
@@ -243,18 +244,18 @@ class QueueItemWidget(ctk.CTkFrame):
             if task.started_at and task.completed_at:
                 delta = (task.completed_at - task.started_at).total_seconds()
                 duration = f" • {delta:.1f}s"
-            return f"Tamamlandı{duration}"
+            return t("queue.statusCompleted", duration=duration)
         elif task.status == TaskStatus.FAILED:
-            error_msg = task.result.error_message[:50] if task.result and task.result.error_message else "Hata"
-            return f"Başarısız: {error_msg}"
+            error_msg = task.result.error_message[:50] if task.result and task.result.error_message else t("common.unknown")
+            return t("queue.statusFailed", error=error_msg)
         elif task.status == TaskStatus.CANCELLED:
-            return "İptal edildi"
+            return t("queue.statusCancelled")
         elif task.status == TaskStatus.PAUSED:
-            return "Duraklatıldı"
+            return t("queue.statusPaused")
         elif task.status == TaskStatus.QUEUED:
-            return "Kuyrukta bekliyor"
+            return t("queue.statusQueued")
         else:
-            return "Beklemede"
+            return t("queue.statusPending")
 
     def update_task(self, task: Task):
         """Update widget with new task state"""
@@ -334,7 +335,7 @@ class QueuePanel(ctk.CTkFrame):
 
         title = ctk.CTkLabel(
             header,
-            text=f"{Icons.QUEUE}  Görev Kuyruğu",
+            text=f"{Icons.QUEUE}  {t('queue.title')}",
             font=Fonts.H1
         )
         title.pack(side="left")
@@ -358,7 +359,7 @@ class QueuePanel(ctk.CTkFrame):
         # Placeholder when empty
         self.empty_label = ctk.CTkLabel(
             self.task_list,
-            text="Henüz görev yok.\nİndirme veya dönüştürme başlattığınızda burada görünecek.",
+            text=t("queue.empty"),
             font=Fonts.LABEL,
             text_color=Colors.TEXT_MUTED,
             justify="center"
@@ -379,7 +380,7 @@ class QueuePanel(ctk.CTkFrame):
 
         if tasks:
             self.stats_label.configure(
-                text=f"Aktif: {active} • Kuyruk: {queued} • Tamamlanan: {completed}"
+                text=t("queue.stats", active=active, queued=queued, completed=completed)
             )
             self.empty_label.pack_forget()
         else:

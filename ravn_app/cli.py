@@ -4,6 +4,7 @@ Entry point: ravn_app.cli:cli
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -30,13 +31,33 @@ from ravn_app.core.database import (
     DatabaseManager,
     DownloadRecord,
 )
+from ravn_app.core.i18n import get_i18n
 from ravn_app.core.runners import FFmpegRunner
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
+from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_CLI_I18N = None
+
+
+def _tr(key: str, **kwargs) -> str:
+    global _CLI_I18N
+    preferred_lang = str(os.environ.get("RAVN_LANG", "en")).strip().lower()
+    if preferred_lang not in ("tr", "en"):
+        preferred_lang = "en"
+
+    if _CLI_I18N is None:
+        _CLI_I18N = get_i18n(config_manager=None, default_lang=preferred_lang)
+        _CLI_I18N.set_language(preferred_lang, persist=False)
+    elif _CLI_I18N.language != preferred_lang:
+        _CLI_I18N.set_language(preferred_lang, persist=False)
+
+    return _CLI_I18N.t(key, **kwargs)
+
 
 def _output(data: object, as_json: bool) -> None:
     """Print data as JSON or a human-readable string."""
@@ -54,7 +75,7 @@ def _error(message: str, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps({"success": False, "error": message}), err=True)
     else:
-        click.echo(f"Error: {message}", err=True)
+        click.echo(f"{_tr('cli.errorPrefix')}: {message}", err=True)
     sys.exit(1)
 
 
@@ -141,8 +162,8 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
     dl_format = _FORMAT_MAP[fmt.lower()]
 
     if not as_json:
-        click.echo(f"Downloading: {url}")
-        click.echo(f"Quality: {quality}  Format: {fmt}  Output: {output_dir}")
+        click.echo(_tr("cli.downloadStarting", url=url))
+        click.echo(_tr("cli.downloadStatus", quality=quality, format=fmt, output=str(output_dir)))
 
     def _progress(percent: int, status: str) -> None:
         if not as_json:
@@ -164,7 +185,7 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
         click.echo()  # newline after progress
 
     if not result.success:
-        _error(result.error_message or "Download failed", as_json)
+        _error(result.error_message or _tr("cli.downloadFailed"), as_json)
 
     # Persist to DB
     try:
@@ -194,7 +215,7 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
     if as_json:
         _output(payload, as_json=True)
     else:
-        click.echo(f"\nDone. Files saved to: {output_dir}")
+        click.echo(f"\n{_tr('cli.doneFiles', output=str(output_dir))}")
         for f in result.output_files:
             click.echo(f"  {f}")
 
@@ -252,14 +273,18 @@ def convert_cmd(
     output_path: Path = output or file.with_suffix(f".{fmt.lower()}")
 
     if output_path == file:
-        _error(
-            "Output path is identical to the input file. Use --output to specify a different path.",
-            as_json,
-        )
+        _error(_tr("cli.sameOutputError"), as_json)
 
     if not as_json:
-        click.echo(f"Converting: {file}")
-        click.echo(f"  -> {output_path}  [{codec.upper()} / {quality}]")
+        click.echo(_tr("cli.convertStarting", file=str(file)))
+        click.echo(
+            _tr(
+                "cli.convertStatus",
+                output=str(output_path),
+                codec=codec.upper(),
+                quality=quality,
+            )
+        )
 
     settings = ConversionSettings(
         input_file=str(file),
@@ -276,7 +301,7 @@ def convert_cmd(
         _error(str(exc), as_json)
 
     if not success:
-        _error("Conversion failed. Check ffmpeg is installed and the input is valid.", as_json)
+        _error(_tr("cli.conversionFailed"), as_json)
 
     # Persist to DB
     try:
@@ -305,7 +330,7 @@ def convert_cmd(
     if as_json:
         _output(payload, as_json=True)
     else:
-        click.echo(f"\nConversion complete: {output_path}")
+        click.echo(f"\n{_tr('cli.convertDone', output=str(output_path))}")
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +349,7 @@ def info_cmd(file: Path, as_json: bool):
         _error(str(exc), as_json)
 
     if data is None:
-        _error(f"Could not probe file: {file}", as_json)
+        _error(_tr("cli.probeFailed", file=str(file)), as_json)
 
     fmt_info = data.get("format", {})
     streams = data.get("streams", [])
@@ -369,14 +394,15 @@ def info_cmd(file: Path, as_json: bool):
     if as_json:
         _output(payload, as_json=True)
     else:
-        click.echo(f"File      : {payload['file']}")
-        click.echo(f"Duration  : {payload['duration']}")
-        click.echo(f"Resolution: {payload['resolution']}  @{payload['fps']} fps")
-        click.echo(f"Video     : {payload['video_codec']}")
-        click.echo(f"Audio     : {payload['audio_codec']}")
-        click.echo(f"Bitrate   : {payload['bitrate_kbps']} kbps")
-        click.echo(f"Size      : {file_size / (1024 * 1024):.2f} MB")
-        click.echo(f"Container : {payload['container']}")
+        label_width = 10
+        click.echo(f"{_tr('cli.infoFile'):<{label_width}}: {payload['file']}")
+        click.echo(f"{_tr('cli.infoDuration'):<{label_width}}: {payload['duration']}")
+        click.echo(f"{_tr('cli.infoResolution'):<{label_width}}: {payload['resolution']}  @{payload['fps']} fps")
+        click.echo(f"{_tr('cli.infoVideo'):<{label_width}}: {payload['video_codec']}")
+        click.echo(f"{_tr('cli.infoAudio'):<{label_width}}: {payload['audio_codec']}")
+        click.echo(f"{_tr('cli.infoBitrate'):<{label_width}}: {payload['bitrate_kbps']} kbps")
+        click.echo(f"{_tr('cli.infoSize'):<{label_width}}: {file_size / (1024 * 1024):.2f} MB")
+        click.echo(f"{_tr('cli.infoContainer'):<{label_width}}: {payload['container']}")
 
 
 # ---------------------------------------------------------------------------
@@ -416,9 +442,9 @@ def subtitle_cmd(
     output_path: Path = output or video.with_stem(video.stem + "_subtitled")
 
     if not as_json:
-        click.echo(f"Embedding subtitle: {subtitle_file}")
-        click.echo(f"  into: {video}")
-        click.echo(f"  output: {output_path}")
+        click.echo(_tr("cli.subtitleEmbedding", subtitle=str(subtitle_file)))
+        click.echo(_tr("cli.subtitleInto", video=str(video)))
+        click.echo(_tr("cli.subtitleOutput", output=str(output_path)))
 
     embedder = SubtitleEmbedder()
     try:
@@ -432,7 +458,7 @@ def subtitle_cmd(
         _error(str(exc), as_json)
 
     if not success:
-        _error("Subtitle embedding failed.", as_json)
+        _error(_tr("cli.subtitleEmbedFailed"), as_json)
 
     payload = {
         "success": True,
@@ -444,7 +470,7 @@ def subtitle_cmd(
     if as_json:
         _output(payload, as_json=True)
     else:
-        click.echo(f"\nSubtitle embedded: {output_path}")
+        click.echo(f"\n{_tr('cli.subtitleDone', output=str(output_path))}")
 
 
 # ---------------------------------------------------------------------------
@@ -466,7 +492,7 @@ def history_cmd(limit: int, record_type: str, as_json: bool):
     try:
         db = DatabaseManager()
     except Exception as exc:
-        _error(f"Cannot open database: {exc}", as_json)
+        _error(_tr("cli.dbOpenFail", error=str(exc)), as_json)
 
     records = []
 
@@ -486,7 +512,7 @@ def history_cmd(limit: int, record_type: str, as_json: bool):
                     "status": d.status,
                 })
         except Exception as exc:
-            _error(f"Failed to read download history: {exc}", as_json)
+            _error(_tr("cli.historyReadDownloadFail", error=str(exc)), as_json)
 
     if record_type in ("convert", "all"):
         try:
@@ -503,7 +529,7 @@ def history_cmd(limit: int, record_type: str, as_json: bool):
                     "status": c.status,
                 })
         except Exception as exc:
-            _error(f"Failed to read conversion history: {exc}", as_json)
+            _error(_tr("cli.historyReadConversionFail", error=str(exc)), as_json)
 
     db.close()
 
@@ -515,19 +541,103 @@ def history_cmd(limit: int, record_type: str, as_json: bool):
         _output({"count": len(records), "records": records}, as_json=True)
     else:
         if not records:
-            click.echo("No history found.")
+            click.echo(_tr("cli.historyEmpty"))
             return
         for rec in records:
             if rec["type"] == "download":
-                click.echo(
-                    f"[{rec['date']}] DOWNLOAD  {rec.get('title') or rec['url']}"
-                    f"  [{rec['format']} / {rec['quality']}]  {rec['status']}"
-                )
+                click.echo(_tr(
+                    "cli.historyDownloadLine",
+                    date=rec["date"],
+                    typeLabel=_tr("cli.historyTypeDownload"),
+                    title=rec.get("title") or rec["url"],
+                    format=rec["format"],
+                    quality=rec["quality"],
+                    status=rec["status"],
+                ))
             else:
-                click.echo(
-                    f"[{rec['date']}] CONVERT   {rec['input_file']}"
-                    f" -> {rec['output_file']}  {rec['status']}"
-                )
+                click.echo(_tr(
+                    "cli.historyConversionLine",
+                    date=rec["date"],
+                    typeLabel=_tr("cli.historyTypeConversion"),
+                    input=rec["input_file"],
+                    output=rec["output_file"],
+                    status=rec["status"],
+                ))
+
+
+# ---------------------------------------------------------------------------
+# ravn torrent
+# ---------------------------------------------------------------------------
+
+@cli.command("torrent")
+@click.argument("source")
+@click.option(
+    "--output-dir",
+    default=None,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Output directory (default: ~/Downloads/RAVN).",
+)
+@click.option("--sequential", is_flag=True, default=False, help="Enable sequential (head-first) download.")
+@click.option("--seed-time", default=0, show_default=True, help="Seed time in minutes after download (0 = no seeding).")
+@click.option("--aria2c", "aria2c_path", default="aria2c", show_default=True, help="Path to aria2c executable.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def torrent_cmd(
+    source: str,
+    output_dir: Optional[Path],
+    sequential: bool,
+    seed_time: int,
+    aria2c_path: str,
+    as_json: bool,
+):
+    """Download a magnet link or .torrent file via aria2c."""
+    downloader = TorrentDownloader(aria2c_path)
+
+    if not downloader.is_available():
+        _error(_tr("cli.torrentAria2Missing"), as_json)
+
+    out = output_dir or Path.home() / "Downloads" / "RAVN"
+    out.mkdir(parents=True, exist_ok=True)
+
+    mode = TorrentDownloadMode.SEQUENTIAL if sequential else TorrentDownloadMode.FULL
+
+    if not as_json:
+        click.echo(_tr("cli.torrentSource", source=source))
+        click.echo(_tr("cli.torrentOutputDir", output=str(out)))
+        click.echo(_tr("cli.torrentMode", mode=mode.value, seedTime=seed_time))
+
+    def _progress(percent: int, status: str) -> None:
+        if not as_json:
+            click.echo(f"\r  {percent:3d}%  {status}", nl=False)
+
+    try:
+        result = downloader.download(
+            source=source,
+            output_dir=str(out),
+            mode=mode,
+            progress_callback=_progress,
+            seed_time=seed_time,
+        )
+    except Exception as exc:
+        _error(str(exc), as_json)
+
+    if not as_json:
+        click.echo()
+
+    if not result.success:
+        _error(result.error_message or _tr("cli.torrentDownloadFailed"), as_json)
+
+    payload = {
+        "success": True,
+        "source": result.source,
+        "output_dir": str(out),
+        "files": result.output_files,
+    }
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"\n{_tr('cli.doneFiles', output=str(out))}")
+        for f in result.output_files:
+            click.echo(f"  {f}")
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +648,7 @@ def history_cmd(limit: int, record_type: str, as_json: bool):
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
 def serve_cmd(as_json: bool):
     """Start the REST API server (not yet implemented)."""
-    message = "REST API server not yet implemented"
+    message = _tr("cli.serveNotImplemented")
     if as_json:
         _output({"success": False, "message": message}, as_json=True)
     else:

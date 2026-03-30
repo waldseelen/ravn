@@ -1,16 +1,17 @@
 # RAVN
 
-RAVN is a desktop media manager built with CustomTkinter. The repository contains working modules for downloading, converting, subtitle handling, packaging, update checks, and persistence, but the product is still under active integration and cleanup.
+RAVN is a desktop media manager built with CustomTkinter. Core download, convert, and subtitle flows are complete. UI is modularized and production-ready for Phase 5 (build/packaging work).
 
 ## Status
 
 - Main entry point: `python ravn.py`
-- GUI tabs exist for download, convert, subtitle, history, and settings
-- Main media modules now use shared runners from `ravn_app/core/runners.py`
-- Some auxiliary modules still use direct `subprocess` calls and remain candidates for consolidation
-- The download tab is not fully wired yet; `_download_video()` in `ravn_app/ui/main_window.py` still contains a TODO
-- Config and history still default to repo-root files: `ravn_config.json` and `ravn_history.db`
-- `TASKS.md` is the canonical backlog; Phase 2 through Phase 6 are still open
+- GUI tabs: download (single/batch), convert, subtitle, history, settings, queue monitoring
+- Main media modules use shared runners from `ravn_app/core/runners.py`
+- Download tab logic fully wired in `ravn_app/ui/tabs/download_tab.py` with background execution and async UI callbacks
+- Reusable UI components extracted under `ravn_app/ui/components/` (error_panel, playlist_item, url_input)
+- Main window is thin orchestration shell for tab composition and window lifecycle
+- Config and history: OS-aware directories (Windows: `%APPDATA%\ravn\`, Linux: `~/.config/ravn/`)
+- Phases 1–4D complete; Phase 5 (build/packaging/distribution) open in `TASKS.md`
 
 ## Requirements
 
@@ -36,10 +37,10 @@ python -m ravn_app.ui.main_window
 
 ## Tests
 
-Verified in this session on 2026-03-29:
+Verified on 2026-03-30:
 
-- `pytest --collect-only -q` -> `283` collected
-- `pytest -q` -> `282 passed, 1 skipped`
+- Last baseline: `pytest -q` → `417 passed, 1 skipped` (`418` collected)
+- UI modularization regression: `27 passed` (test_ui_logic.py), `37 passed` (test_ui_components.py + test_app_builder.py)
 
 Useful commands:
 

@@ -6,6 +6,7 @@ Tests verify that easing functions produce correct curves for smooth transitions
 
 import os
 import unittest
+from unittest.mock import patch
 from ravn_app.core.animation_manager import (
     EasingFunction, AnimationManager, detect_reduced_motion
 )
@@ -133,6 +134,80 @@ class TestAnimationManager(unittest.TestCase):
         r1, g1, b1 = self.manager._hex_to_rgb("#ffffff")
         r2, g2, b2 = self.manager._hex_to_rgb("ffffff")
         self.assertEqual((r1, g1, b1), (r2, g2, b2))
+
+    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Light")
+    def test_hex_to_rgb_resolves_tuple_light_mode(self, _appearance_mode):
+        """Tuple color tokens should resolve to light-mode entry."""
+        rgb = self.manager._hex_to_rgb(("#112233", "#445566"))
+        self.assertEqual(rgb, (17, 34, 51))
+
+    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    def test_hex_to_rgb_resolves_tuple_dark_mode(self, _appearance_mode):
+        """Tuple color tokens should resolve to dark-mode entry."""
+        rgb = self.manager._hex_to_rgb(("#112233", "#445566"))
+        self.assertEqual(rgb, (68, 85, 102))
+
+    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    def test_hex_to_rgb_resolves_list_dark_mode(self, _appearance_mode):
+        """List color tokens should resolve to dark-mode entry."""
+        rgb = self.manager._hex_to_rgb(["#001122", "#334455"])
+        self.assertEqual(rgb, (51, 68, 85))
+
+    def test_hex_to_rgb_invalid_falls_back_to_white(self):
+        """Invalid colors should safely fall back to white."""
+        rgb = self.manager._hex_to_rgb("not-a-color")
+        self.assertEqual(rgb, (255, 255, 255))
+
+    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    def test_interpolate_hex_with_tuple_tokens(self, _appearance_mode):
+        """Color interpolation should resolve tuple tokens deterministically."""
+        color = self.manager._interpolate_hex(("#000000", "#101010"), ("#ffffff", "#f0f0f0"), 0.5)
+        self.assertEqual(color.lower(), "#808080")
+
+    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    def test_animate_color_transition_reduced_motion_resolves_tuple_end_color(self, _appearance_mode):
+        """Reduced-motion path should resolve tuple end colors before configure."""
+        self.manager.set_reduced_motion(True)
+
+        class DummyWidget:
+            def __init__(self):
+                self.configured = {}
+
+            def configure(self, **kwargs):
+                self.configured.update(kwargs)
+
+        widget = DummyWidget()
+        self.manager.animate_color_transition(
+            widget,
+            "fg_color",
+            "#000000",
+            ("#010203", "#a0b0c0"),
+            duration=AnimationManager.DURATION_MICRO,
+        )
+
+        self.assertEqual(widget.configured.get("fg_color"), "#a0b0c0")
+
+    def test_animate_color_transition_reduced_motion_preserves_transparent(self):
+        """Reduced-motion path should keep transparent token unchanged."""
+        self.manager.set_reduced_motion(True)
+
+        class DummyWidget:
+            def __init__(self):
+                self.configured = {}
+
+            def configure(self, **kwargs):
+                self.configured.update(kwargs)
+
+        widget = DummyWidget()
+        self.manager.animate_color_transition(
+            widget,
+            "fg_color",
+            "#000000",
+            "transparent",
+            duration=AnimationManager.DURATION_MICRO,
+        )
+
+        self.assertEqual(widget.configured.get("fg_color"), "transparent")
 
     def test_rgb_to_hex(self):
         """Convert RGB to hex."""

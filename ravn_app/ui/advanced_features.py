@@ -8,6 +8,14 @@ from tkinter import filedialog
 from typing import Optional, Callable, List
 import threading
 import time
+
+from ravn_app.core.theme_catalog import (
+    THEMES,
+    get_theme_definition,
+    get_theme_display_name,
+    get_theme_display_names,
+    normalize_theme_id,
+)
 from ravn_app.ui.design_tokens import Icons
 
 
@@ -211,63 +219,30 @@ class KeyboardShortcuts:
 class ThemeManager:
     """Gelişmiş tema yöneticisi"""
 
-    THEMES = {
-        'nordic': {
-            'name': 'Nordic',
-            'primary': '#5E81AC',
-            'secondary': '#81A1C1',
-            'background': '#2E3440',
-            'surface': '#3B4252',
-            'text': '#ECEFF4'
-        },
-        'forest': {
-            'name': 'Forest',
-            'primary': '#8FBC8F',
-            'secondary': '#228B22',
-            'background': '#2F4F2F',
-            'surface': '#3B5B3B',
-            'text': '#F0FFF0'
-        },
-        'aurora': {
-            'name': 'Aurora',
-            'primary': '#BF616A',
-            'secondary': '#D08770',
-            'background': '#3B4252',
-            'surface': '#434C5E',
-            'text': '#ECEFF4'
-        },
-        'dark': {
-            'name': 'Dark',
-            'primary': '#1E1E1E',
-            'secondary': '#2D2D2D',
-            'background': '#121212',
-            'surface': '#1E1E1E',
-            'text': '#FFFFFF'
-        },
-        'light': {
-            'name': 'Light',
-            'primary': '#FFFFFF',
-            'secondary': '#F5F5F5',
-            'background': '#FAFAFA',
-            'surface': '#FFFFFF',
-            'text': '#000000'
-        }
-    }
+    THEMES = THEMES
 
     @staticmethod
     def apply_theme(theme_name: str):
         """Tema uygula"""
-        if theme_name in ThemeManager.THEMES:
-            theme = ThemeManager.THEMES[theme_name]
-            ctk.set_appearance_mode("dark" if theme_name != 'light' else "light")
-            # Renkleri uygula (widget'larda kullanılacak)
-            return theme
-        return ThemeManager.THEMES['nordic']
+        theme = get_theme_definition(theme_name)
+        ctk.set_appearance_mode(theme["appearance_mode"])
+        ctk.set_default_color_theme(theme["color_theme"])
+        return theme
 
     @staticmethod
     def get_theme_names() -> List[str]:
         """Tema isimlerini al"""
-        return [theme['name'] for theme in ThemeManager.THEMES.values()]
+        return get_theme_display_names()
+
+    @staticmethod
+    def get_theme_display_name(theme_name: str) -> str:
+        """Normalize edilmiş tema için UI etiketini döndür."""
+        return get_theme_display_name(theme_name)
+
+    @staticmethod
+    def normalize_theme_name(theme_name: str) -> str:
+        """UI veya legacy config değerlerini desteklenen tema adına indirger."""
+        return normalize_theme_id(theme_name)
 
 
 class SearchFilter:

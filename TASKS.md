@@ -13,10 +13,6 @@ All development tasks organized by priority and status.
 
 ---
 
-
-
-
-
 ## Phase 4C — UI Polish & Micro-interactions (Nordic Brand Theme)
 
 Smooth transitions, micro-interactions, real-time feedback, and RAVN brand-consistent visual polish. Minimal animations that enhance usability without being distracting. Theme: Nordic kahverengi/beige minimalism with accent highlights.
@@ -41,6 +37,7 @@ Align design system with RAVN brand (Nordic kahverengi + minimal beige).
 **Dependencies:** None. Start immediately.
 
 ---
+
 ### 4C.2 — Icon System & Placement [x]
 
 **Priority:** MEDIUM — Visual consistency (depends on color palette being set).
@@ -48,6 +45,7 @@ Align design system with RAVN brand (Nordic kahverengi + minimal beige).
 Strategically place vector icons (not emojis) for clarity and brand consistency.
 
 **Navigation & Tabs:**
+
 - [x] **[ICN-01]** Download tab — ⬇ → minimize icon or custom raven icon (top-left tab)
 - [x] **[ICN-02]** Converter tab — ⇄ → gear/convert icon (second tab)
 - [x] **[ICN-03]** Subtitle tab — ≡ → subtitle/speech icon (third tab)
@@ -56,6 +54,7 @@ Strategically place vector icons (not emojis) for clarity and brand consistency.
 - [x] **[ICN-06]** Queue panel — ☰ → queue/list icon (header or left sidebar)
 
 **Action Buttons:**
+
 - [x] **[ICN-07]** Download button — Large + kahverengi icon indicator
 - [x] **[ICN-08]** Convert button — Process/arrow icon
 - [x] **[ICN-09]** Browse/Select button — Folder icon
@@ -63,6 +62,7 @@ Strategically place vector icons (not emojis) for clarity and brand consistency.
 - [x] **[ICN-11]** Retry button — Clockwise arrow/refresh icon
 
 **Status Indicators:**
+
 - [x] **[ICN-12]** Queued status — Purple hourglass or circle outline
 - [x] **[ICN-13]** Running status — Animated spinner (2-3 rot/sec)
 - [x] **[ICN-14]** Success status — Green checkmark (static, 150ms slide-in)
@@ -70,6 +70,7 @@ Strategically place vector icons (not emojis) for clarity and brand consistency.
 - [x] **[ICN-16]** Paused status — Pause symbol (gray)
 
 **Form & Input:**
+
 - [x] **[ICN-17]** URL input prefix icon — Link/chain icon (left of input)
 - [x] **[ICN-18]** Quality selector prefix — Video/quality icon
 - [x] **[ICN-19]** Format selector prefix — File type icon
@@ -82,25 +83,6 @@ Strategically place vector icons (not emojis) for clarity and brand consistency.
 **Dependencies:** 4C.1 (colors). Can start once BRD-01 to BRD-06 complete.
 
 ---
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ### 4C.3 — Smooth State Transitions [x]
 
@@ -142,37 +124,6 @@ Real-time visual feedback during async operations with brand consistency. Spinne
 **Dependencies:** 4C.1 (colors), 4C.3 (animations). POL-09 spinner already works via AnimationManager.
 
 ---
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ### 4C.5 — Error & Form Feedback [x]
 
@@ -233,32 +184,18 @@ Ensure micro-interactions don't harm accessibility.
 
 ---
 
+## Phase 6 — Torrent/Magnet Entegrasyonu
 
+- [x] 6A: Aria2Runner
+- [x] 6B: TorrentDownloader
+- [x] 6C: Hata Yönetimi (parse_aria2c_error)
+- [x] 6D: URL Router + Drag-Drop
+- [x] 6E: Ayarlar
+- [x] 6F: CLI (ravn torrent)
+- [x] 6G: Stream UI
+- [x] 6H: Dokümantasyon
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+---
 
 ## Phase 5 — Build, Package & Distribution
 
@@ -292,6 +229,7 @@ Cross-platform binary builds and installers. (After GUI is polished)
 ## Quick Reference: What's Next?
 
 **Phase 4 (Next Priority) — GUI Polish & Full Controllability:**
+
 1. Audit all core features — every function has UI control
 2. Real-time FFmpeg progress bar parsing
 3. Download queue panel with job management
@@ -300,6 +238,7 @@ Cross-platform binary builds and installers. (After GUI is polished)
 6. UI/UX enhancements (icons, themes, accessibility)
 
 **Phase 5 (After GUI is Done) — Build & Distribution:**
+
 1. PyInstaller spec updates with FFmpeg bundling
 2. Windows/Linux/macOS build pipelines
 3. GitHub Actions CI/CD setup

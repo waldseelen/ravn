@@ -638,8 +638,12 @@ class SettingsTab(ctk.CTkFrame):
         self.history_limit_entry.insert(0, str(self.config.get('history_limit', 1000)))
         self.auto_subtitle_var.set(self.config.get('auto_subtitle_download', False))
         self.subtitle_lang_combo.set(self.config.get('preferred_subtitle_language', 'tr'))
-        self.embed_metadata_var.set(self.config.get('embed_metadata', False))
-        self.auto_sort_var.set(self.config.get('auto_sort_by_channel', False))
+        embed_metadata_var = getattr(self, 'embed_metadata_var', getattr(self, 'auto_id3_var', None))
+        auto_sort_var = getattr(self, 'auto_sort_var', None)
+        if embed_metadata_var is not None:
+            embed_metadata_var.set(self.config.get('embed_metadata', False))
+        if auto_sort_var is not None:
+            auto_sort_var.set(self.config.get('auto_sort_by_channel', False))
 
         self.aria2c_path_entry.insert(0, self.config.get('aria2c_path', 'aria2c'))
         self.torrent_seed_time_entry.insert(0, str(self.config.get('torrent_seed_time', 0)))

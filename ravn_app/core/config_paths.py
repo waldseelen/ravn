@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def get_config_directory() -> Path:
     """
     Get the configuration directory based on OS.
-    
+
     Returns:
         Path to config directory:
         - Windows: %APPDATA%/ravn/
@@ -34,14 +34,14 @@ def get_config_directory() -> Path:
     else:  # Linux and others
         xdg_config = os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))
         config_dir = Path(xdg_config) / 'ravn'
-    
+
     return config_dir
 
 
 def get_data_directory() -> Path:
     """
     Get the data directory based on OS.
-    
+
     Returns:
         Path to data directory:
         - Windows: %APPDATA%/ravn/data/
@@ -56,14 +56,14 @@ def get_data_directory() -> Path:
     else:  # Linux and others
         xdg_data = os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local' / 'share'))
         data_dir = Path(xdg_data) / 'ravn'
-    
+
     return data_dir
 
 
 def get_cache_directory() -> Path:
     """
     Get the cache directory based on OS.
-    
+
     Returns:
         Path to cache directory:
         - Windows: %LOCALAPPDATA%/ravn/cache/
@@ -78,7 +78,7 @@ def get_cache_directory() -> Path:
     else:  # Linux and others
         xdg_cache = os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))
         cache_dir = Path(xdg_cache) / 'ravn'
-    
+
     return cache_dir
 
 
@@ -95,7 +95,7 @@ def get_database_file_path() -> Path:
 def ensure_directories_exist() -> Dict[str, Path]:
     """
     Create all required directories if they don't exist.
-    
+
     Returns:
         Dict with paths to created directories
     """
@@ -104,7 +104,7 @@ def ensure_directories_exist() -> Dict[str, Path]:
         'data': get_data_directory(),
         'cache': get_cache_directory(),
     }
-    
+
     for name, path in directories.items():
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -112,14 +112,14 @@ def ensure_directories_exist() -> Dict[str, Path]:
         except Exception as e:
             logger.error(f"Failed to create {name} directory {path}: {e}")
             raise
-    
+
     return directories
 
 
 def find_legacy_config_file() -> Optional[Path]:
     """
     Find legacy config file in project root or current directory.
-    
+
     Returns:
         Path to legacy config if found, None otherwise
     """
@@ -128,18 +128,18 @@ def find_legacy_config_file() -> Optional[Path]:
         Path.cwd() / 'ravn_config.json',
         Path(__file__).parent.parent.parent / 'ravn_config.json',  # Project root
     ]
-    
+
     for path in legacy_locations:
         if path.exists():
             return path
-    
+
     return None
 
 
 def find_legacy_database_file() -> Optional[Path]:
     """
     Find legacy database file in project root or current directory.
-    
+
     Returns:
         Path to legacy database if found, None otherwise
     """
@@ -147,32 +147,32 @@ def find_legacy_database_file() -> Optional[Path]:
         Path.cwd() / 'ravn_history.db',
         Path(__file__).parent.parent.parent / 'ravn_history.db',  # Project root
     ]
-    
+
     for path in legacy_locations:
         if path.exists():
             return path
-    
+
     return None
 
 
 def migrate_legacy_config() -> bool:
     """
     Migrate legacy config file from project root to config directory.
-    
+
     Returns:
         True if migration was performed, False otherwise
     """
     legacy_path = find_legacy_config_file()
     new_path = get_config_file_path()
-    
+
     if legacy_path is None:
         logger.debug("No legacy config file found")
         return False
-    
+
     if new_path.exists():
         logger.debug(f"Config file already exists at {new_path}, skipping migration")
         return False
-    
+
     try:
         ensure_directories_exist()
         shutil.copy2(legacy_path, new_path)
@@ -186,21 +186,21 @@ def migrate_legacy_config() -> bool:
 def migrate_legacy_database() -> bool:
     """
     Migrate legacy database file from project root to data directory.
-    
+
     Returns:
         True if migration was performed, False otherwise
     """
     legacy_path = find_legacy_database_file()
     new_path = get_database_file_path()
-    
+
     if legacy_path is None:
         logger.debug("No legacy database file found")
         return False
-    
+
     if new_path.exists():
         logger.debug(f"Database file already exists at {new_path}, skipping migration")
         return False
-    
+
     try:
         ensure_directories_exist()
         shutil.copy2(legacy_path, new_path)
@@ -214,7 +214,7 @@ def migrate_legacy_database() -> bool:
 def migrate_all_legacy_files() -> Dict[str, bool]:
     """
     Migrate all legacy files on first run.
-    
+
     Returns:
         Dict with migration status for each file type
     """
@@ -239,13 +239,17 @@ CONFIG_SCHEMA = {
     'history_limit': {'type': int, 'default': 1000, 'min': 100, 'max': 10000},
     'auto_subtitle_download': {'type': bool, 'default': False},
     'preferred_subtitle_language': {'type': str, 'default': 'tr'},
+    'auto_id3_tagging': {'type': bool, 'default': True},
+    'auto_embed_lyrics': {'type': bool, 'default': True},
+    'auto_sort_downloads': {'type': bool, 'default': False},
+    'auto_sort_mode': {'type': str, 'default': 'artist', 'allowed': ['artist', 'channel']},
 }
 
 
 def get_default_config() -> Dict[str, Any]:
     """
     Get default configuration values.
-    
+
     Returns:
         Dict with default config values
     """
@@ -261,17 +265,17 @@ def get_default_config() -> Dict[str, Any]:
 def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
     """
     Validate a single config value against the schema.
-    
+
     Args:
         key: Config key
         value: Value to validate
-        
+
     Returns:
         Tuple of (is_valid, corrected_value, error_message)
     """
     if key not in CONFIG_SCHEMA:
         return True, value, ""  # Unknown keys are allowed
-    
+
     schema = CONFIG_SCHEMA[key]
     expected_type = schema['type']
 
@@ -280,54 +284,54 @@ def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
         if normalized != value:
             return False, normalized, f"Normalized legacy theme for {key}: {value} -> {normalized}"
         return True, normalized, ""
-    
+
     # Type check
     if not isinstance(value, expected_type):
         default = schema['default']
         if key == 'default_download_path' and default is None:
             default = str(Path.home() / 'Downloads' / 'RAVN')
         return False, default, f"Invalid type for {key}: expected {expected_type.__name__}"
-    
+
     # Range check for integers
     if expected_type == int:
         if 'min' in schema and value < schema['min']:
             return False, schema['min'], f"{key} must be at least {schema['min']}"
         if 'max' in schema and value > schema['max']:
             return False, schema['max'], f"{key} must be at most {schema['max']}"
-    
+
     # Allowed values check
     if 'allowed' in schema and value not in schema['allowed']:
         return False, schema['default'], f"Invalid value for {key}: must be one of {schema['allowed']}"
-    
+
     return True, value, ""
 
 
 def validate_config(config: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
     """
     Validate entire config against schema and apply defaults for missing keys.
-    
+
     Args:
         config: Config dict to validate
-        
+
     Returns:
         Tuple of (validated_config, list_of_errors)
     """
     errors = []
     validated = {}
-    
+
     # Get defaults first
     defaults = get_default_config()
-    
+
     # Validate provided values
     for key, value in config.items():
         is_valid, corrected, error = validate_config_value(key, value)
         if not is_valid:
             errors.append(error)
         validated[key] = corrected
-    
+
     # Fill in missing keys with defaults
     for key, default_value in defaults.items():
         if key not in validated:
             validated[key] = default_value
-    
+
     return validated, errors

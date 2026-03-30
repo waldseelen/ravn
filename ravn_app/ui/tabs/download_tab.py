@@ -637,6 +637,11 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.downloadLoading')}...")
         self._set_button_loading_state(self.download_btn, is_loading=True)
 
+        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
+        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
+        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
+        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
+
         def run_download():
             try:
                 result = self.downloader.download(
@@ -645,6 +650,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     format_type=format_type,
                     quality=quality,
                     progress_callback=self._on_download_progress,
+                    embed_metadata=embed_metadata,
+                    embed_lyrics=embed_lyrics,
+                    auto_sort_enabled=auto_sort_enabled,
+                    auto_sort_mode=auto_sort_mode,
                 )
                 if result.success:
                     self.after(0, self._on_download_success, result)
@@ -677,6 +686,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
         format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
+        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
+        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
+        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
+        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
 
         default_path = self.config_manager.get(
             "default_download_path",
@@ -853,6 +866,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     output_dir=output_dir,
                     format_type=format_type,
                     quality=quality,
+                    embed_metadata=embed_metadata,
+                    embed_lyrics=embed_lyrics,
+                    auto_sort_enabled=auto_sort_enabled,
+                    auto_sort_mode=auto_sort_mode,
                 ),
             )
 
@@ -871,6 +888,12 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         quality_label = self._get_selected_quality_label()
         size_by_quality = self._last_video_info.get("size_by_quality_mb") or {}
         size_mb = float(size_by_quality.get(quality_label, 0) or 0)
+        if size_mb <= 0:
+            size_mb = float(size_by_quality.get(t("download.qualityBest"), 0) or 0)
+        if size_mb <= 0:
+            size_mb = float(size_by_quality.get("En İyi", 0) or 0)
+        if size_mb <= 0:
+            size_mb = float(size_by_quality.get("Best", 0) or 0)
         if size_mb <= 0:
             filesize = self._last_video_info.get("filesize") or self._last_video_info.get("filesize_approx") or 0
             size_mb = float(filesize) / (1024 * 1024) if filesize else 0

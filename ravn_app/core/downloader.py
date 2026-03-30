@@ -160,6 +160,174 @@ class YouTubeDownloader:
         """Dosya adını temizle"""
         return re.sub(r'[\/*?:"<>|]', "", name)
 
+    def _resolve_sort_subfolder(self, video_info: Optional[Dict[str, Any]], auto_sort_mode: str) -> str:
+        """Metadata'dan klasörleme için alt klasör adını üret."""
+        if not isinstance(video_info, dict):
+            return ""
+
+        mode = (auto_sort_mode or "artist").strip().lower()
+        if mode == "channel":
+            candidates = [
+                video_info.get("channel"),
+                video_info.get("uploader"),
+                video_info.get("creator"),
+                video_info.get("artist"),
+            ]
+        else:
+            candidates = [
+                video_info.get("artist"),
+                video_info.get("album_artist"),
+                video_info.get("creator"),
+                video_info.get("uploader"),
+                video_info.get("channel"),
+            ]
+
+        for raw_value in candidates:
+            if not raw_value:
+                continue
+            normalized = self.sanitize_filename(str(raw_value).strip()).strip(" .")
+            if normalized:
+                return normalized
+        return ""
+
+    def _resolve_output_dir(
+        self,
+        output_dir: str,
+        video_info: Optional[Dict[str, Any]],
+        auto_sort_enabled: bool,
+        auto_sort_mode: str,
+    ) -> str:
+        """Otomatik klasörleme açıksa hedef klasörü metadata'ya göre güncelle."""
+        if not auto_sort_enabled:
+            return output_dir
+
+        subfolder = self._resolve_sort_subfolder(video_info, auto_sort_mode)
+        if not subfolder:
+            return output_dir
+
+        return str(Path(output_dir) / subfolder)
+
+    @staticmethod
+    def _collect_audio_metadata(video_info: Optional[Dict[str, Any]]) -> Dict[str, str]:
+        """Audio etiketleme için normalize metadata sözlüğü hazırla."""
+        if not isinstance(video_info, dict):
+            return {}
+
+        title = str(video_info.get("track") or video_info.get("title") or "").strip()
+        artist = str(
+            video_info.get("artist")
+            or video_info.get("album_artist")
+            or video_info.get("uploader")
+            or video_info.get("channel")
+            or ""
+        ).strip()
+        album = str(
+            video_info.get("album")
+            or video_info.get("playlist_title")
+            or video_info.get("channel")
+            or video_info.get("uploader")
+            or ""
+        ).strip()
+        lyrics = str(video_info.get("description") or "").strip()
+
+        if len(lyrics) > 10000:
+            lyrics = lyrics[:10000]
+
+        return {
+            "title": title,
+            "artist": artist,
+            "album": album,
+            "lyrics": lyrics,
+        }
+
+    def _build_audio_download_args(self, embed_metadata: bool, embed_lyrics: bool) -> List[str]:
+        """yt-dlp/ffmpeg tarafında metadata gömme argümanları."""
+        if not embed_metadata:
+            return []
+
+        args = [
+            "--embed-metadata",
+            "--add-metadata",
+            "--embed-thumbnail",
+            "--convert-thumbnails", "jpg",
+            "--parse-metadata", "uploader:%(artist)s",
+            "--parse-metadata", "channel:%(artist)s",
+            "--parse-metadata", "playlist_title:%(album)s",
+            "--parse-metadata", "playlist:%(album)s",
+        ]
+
+        if embed_lyrics:
+            args.extend(["--parse-metadata", "description:%(meta_lyrics)s"])
+
+        return args
+
+    def _apply_audio_metadata(
+        self,
+        downloaded_files: List[str],
+        video_info: Optional[Dict[str, Any]],
+        embed_lyrics: bool,
+    ) -> None:
+        """İndirilen ses dosyalarına mutagen ile metadata iyileştirme uygula."""
+        if not downloaded_files:
+            return
+
+        metadata = self._collect_audio_metadata(video_info)
+        if not metadata:
+            return
+
+        try:
+            from mutagen.id3 import ID3, ID3NoHeaderError, TALB, TIT2, TPE1, USLT
+            from mutagen.mp3 import MP3
+            from mutagen.mp4 import MP4
+        except Exception:
+            logger.debug("mutagen bulunamadı, derin metadata iyileştirmesi atlandı")
+            return
+
+        for file_path in downloaded_files:
+            suffix = Path(file_path).suffix.lower()
+            if suffix not in {".mp3", ".m4a"}:
+                continue
+            if not os.path.exists(file_path):
+                continue
+
+            try:
+                if suffix == ".mp3":
+                    audio = MP3(file_path, ID3=ID3)
+                    if audio.tags is None:
+                        try:
+                            audio.add_tags()
+                        except ID3NoHeaderError:
+                            pass
+
+                    if metadata.get("title"):
+                        audio.tags.delall("TIT2")
+                        audio.tags.add(TIT2(encoding=3, text=metadata["title"]))
+                    if metadata.get("artist"):
+                        audio.tags.delall("TPE1")
+                        audio.tags.add(TPE1(encoding=3, text=metadata["artist"]))
+                    if metadata.get("album"):
+                        audio.tags.delall("TALB")
+                        audio.tags.add(TALB(encoding=3, text=metadata["album"]))
+                    if embed_lyrics and metadata.get("lyrics"):
+                        audio.tags.delall("USLT")
+                        audio.tags.add(USLT(encoding=3, lang="eng", text=metadata["lyrics"]))
+
+                    audio.save()
+                    continue
+
+                audio = MP4(file_path)
+                if metadata.get("title"):
+                    audio["\u00a9nam"] = [metadata["title"]]
+                if metadata.get("artist"):
+                    audio["\u00a9ART"] = [metadata["artist"]]
+                if metadata.get("album"):
+                    audio["\u00a9alb"] = [metadata["album"]]
+                if embed_lyrics and metadata.get("lyrics"):
+                    audio["\u00a9lyr"] = [metadata["lyrics"]]
+                audio.save()
+            except Exception as err:
+                logger.warning(f"Audio metadata iyileştirme atlandı ({file_path}): {err}")
+
     def download(
         self,
         url: str,
@@ -168,8 +336,11 @@ class YouTubeDownloader:
         quality: DownloadQuality = DownloadQuality.BEST,
         progress_callback: Optional[Callable[[int, str], None]] = None,
         retries: int = DEFAULT_RETRIES,
-        embed_metadata: bool = False,
+        embed_metadata: bool = True,
+        embed_lyrics: bool = True,
         auto_sort: bool = False,
+        auto_sort_enabled: Optional[bool] = None,
+        auto_sort_mode: str = "artist",
     ) -> DownloadResult:
         """
         Video indir
@@ -182,15 +353,34 @@ class YouTubeDownloader:
             progress_callback: İlerleme callback'i
             retries: Deneme sayısı
             embed_metadata: Ses dosyalarına ID3/metadata ve albüm kapağı göm
+            embed_lyrics: Metadata gömme sırasında açıklamadan şarkı sözü alanını üretmeye çalış
             auto_sort: İndirilen dosyaları kanal/sanatçı adına göre klasörlere ayır
+            auto_sort_enabled: auto_sort için yeni isimlendirme (geriye uyumlu)
+            auto_sort_mode: Klasörleme modu: artist veya channel
 
         Returns:
             DownloadResult: İndirme sonucu
         """
         logger.info(f"İndirme başlatılıyor: {url}")
 
+        sort_enabled = auto_sort if auto_sort_enabled is None else auto_sort_enabled
+        needs_video_info = bool(sort_enabled or (embed_metadata and format_type in [DownloadFormat.MP3, DownloadFormat.M4A]))
+        video_info: Optional[Dict[str, Any]] = None
+        if needs_video_info:
+            try:
+                video_info = self._runner.extract_info(url)
+            except Exception as err:
+                logger.debug(f"İndirme öncesi metadata alınamadı: {err}")
+
         # Format spesifikasyonunu belirle
         format_spec = quality.value if quality != DownloadQuality.BEST else format_type.format_spec
+
+        resolved_output_dir = self._resolve_output_dir(
+            output_dir=output_dir,
+            video_info=video_info,
+            auto_sort_enabled=bool(sort_enabled),
+            auto_sort_mode=auto_sort_mode,
+        )
 
         # Ek argümanları hazırla
         extra_args = ['--merge-output-format', format_type.extension]
@@ -201,24 +391,12 @@ class YouTubeDownloader:
                 '--audio-format', format_type.extension,
                 '--audio-quality', '0'
             ])
-
-        # ID3 / metadata embedding for audio formats
-        if embed_metadata and format_type in [DownloadFormat.MP3, DownloadFormat.M4A]:
-            extra_args.extend([
-                '--add-metadata',
-                '--embed-thumbnail',
-                '--convert-thumbnails', 'jpg',
-            ])
-
-        # Auto-sort by channel/uploader name
-        filename_template = "%(title)s.%(ext)s"
-        if auto_sort:
-            filename_template = "%(uploader,channel,creator)s/%(title)s.%(ext)s"
+            extra_args.extend(self._build_audio_download_args(embed_metadata=embed_metadata, embed_lyrics=embed_lyrics))
 
         result = self._runner.download(
             url=url,
-            output_dir=output_dir,
-            filename_template=filename_template,
+            output_dir=resolved_output_dir,
+            filename_template="%(title)s.%(ext)s",
             format_spec=format_spec,
             extra_args=extra_args,
             retries=retries,
@@ -227,6 +405,10 @@ class YouTubeDownloader:
 
         if result.success:
             downloaded_files = result.metadata.get('downloaded_files', [])
+
+            if format_type in [DownloadFormat.MP3, DownloadFormat.M4A] and embed_metadata:
+                self._apply_audio_metadata(downloaded_files, video_info, embed_lyrics)
+
             logger.info(f"İndirme tamamlandı: {downloaded_files}")
             return DownloadResult(
                 success=True,

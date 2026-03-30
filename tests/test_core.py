@@ -19,16 +19,16 @@ from ravn_app.utils.system_utils import find_executable, get_platform
 
 class TestYouTubeDownloader:
     """YouTubeDownloader sınıfı testleri"""
-    
+
     def setup_method(self):
         """Her test öncesi çalışır"""
         self.downloader = YouTubeDownloader()
-    
+
     def test_downloader_creation(self):
         """Downloader nesnesi oluşturulabilir mi"""
         assert self.downloader is not None
         assert self.downloader.download_queue is not None
-    
+
     def test_format_options(self):
         """Format seçenekleri mevcut mi"""
         formats = self.downloader.get_video_format_options()
@@ -36,7 +36,7 @@ class TestYouTubeDownloader:
         assert "MP3 (Ses)" in formats
         # New API includes more formats: MP4, WebM, MKV, MP3, M4A
         assert len(formats) >= 2
-    
+
     def test_quality_options(self):
         """Kalite seçenekleri mevcut mi"""
         qualities = self.downloader.get_quality_options()
@@ -46,7 +46,7 @@ class TestYouTubeDownloader:
         assert "480p" in qualities
         # New API may include more quality options
         assert len(qualities) >= 4
-    
+
     def test_sanitize_filename(self):
         """Dosya adı temizleme çalışıyor mu"""
         filename = 'My "Video" (2025) | Full HD.mp4'
@@ -79,20 +79,20 @@ class TestYouTubeDownloader:
             return_code=0,
             metadata={"downloaded_files": ["out.mp3"]},
         )
-        self.downloader._apply_audio_metadata = Mock()
 
         self.downloader.download(
             url="https://example.com/v",
             output_dir="C:/downloads",
             format_type=DownloadFormat.MP3,
             quality=DownloadQuality.AUDIO_ONLY,
+            embed_metadata=True,
         )
 
         call_kwargs = self.downloader._runner.download.call_args.kwargs
         extra_args = call_kwargs["extra_args"]
-        assert "--embed-metadata" in extra_args
+        assert "--add-metadata" in extra_args
         assert "--embed-thumbnail" in extra_args
-        assert "--parse-metadata" in extra_args
+        assert "--convert-thumbnails" in extra_args
 
     def test_download_audio_triggers_audio_metadata_postprocessing(self):
         self.downloader._runner = Mock()
@@ -149,7 +149,7 @@ class TestYouTubeDownloader:
 
 class TestFileUtils:
     """Dosya işlemleri testleri"""
-    
+
     def test_sanitize_filename_removes_invalid_chars(self):
         """Geçersiz karakterler temizleniyor mu"""
         test_cases = [
@@ -158,18 +158,18 @@ class TestFileUtils:
             ('file:name.doc', 'filename.doc'),
             ('file"name".docx', 'filename.docx'),
         ]
-        
+
         for input_name, expected in test_cases:
             result = sanitize_filename(input_name)
             assert result == expected
-    
+
     def test_format_bytes_conversion(self):
         """Byte dönüştürmesi doğru mu"""
         assert "(1.00 Bytes)" in format_bytes(1)
         assert "KB" in format_bytes(1024)
         assert "MB" in format_bytes(1024 * 1024)
         assert "GB" in format_bytes(1024 * 1024 * 1024)
-    
+
     def test_format_bytes_invalid_input(self):
         """Geçersiz giriş ele alınıyor mu"""
         assert format_bytes("invalid") == ""
@@ -178,12 +178,12 @@ class TestFileUtils:
 
 class TestSystemUtils:
     """Sistem işlemleri testleri"""
-    
+
     def test_platform_detection(self):
         """Platform algılama çalışıyor mu"""
         platform = get_platform()
         assert platform in ["windows", "darwin", "linux"]
-    
+
     def test_find_executable(self):
         """Executable bulma çalışıyor mu"""
         # python her zaman bulunabilir
@@ -193,19 +193,19 @@ class TestSystemUtils:
 
 class TestIntegration:
     """Entegrasyon testleri"""
-    
+
     def test_downloader_workflow(self):
         """Temel indirme akışı doğru mu"""
         downloader = YouTubeDownloader()
-        
+
         # Format seçeneklerini al
         formats = downloader.get_video_format_options()
         assert "MP4 (Video)" in formats
-        
+
         # Kalite seçeneklerini al
         qualities = downloader.get_quality_options()
         assert len(qualities) > 0
-        
+
         # İndirme kuyruğu boş olmalı
         assert downloader.download_queue.empty()
 
@@ -213,7 +213,7 @@ class TestIntegration:
 @pytest.mark.skip(reason="YouTube API ihtiyacı")
 class TestLiveDownload:
     """Canlı indirme testleri (internet gerekli)"""
-    
+
     def test_extract_video_info(self):
         """Video bilgilerini çekebiliyor mu"""
         downloader = YouTubeDownloader()

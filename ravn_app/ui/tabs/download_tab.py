@@ -27,6 +27,7 @@ except ImportError:
 
 _QUALITY_MAP = {
     "En İyi": DownloadQuality.BEST,
+    "En Iyi": DownloadQuality.BEST,
     "Best": DownloadQuality.BEST,
     "1080p": DownloadQuality.HIGH_1080P,
     "720p": DownloadQuality.MEDIUM_720P,
@@ -241,14 +242,11 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         Tooltip(
             self.quality_menu,
-            "En İyi: Mevcut en yüksek kalite\n1080p: Full HD, ~1-3 GB/saat\n"
-            "720p: HD, ~500 MB/saat\n480p: SD, ~200 MB/saat\nSadece Ses: Ses dosyası (MP3/M4A)",
+            t("download.qualityTooltip"),
         )
         Tooltip(
             self.format_menu,
-            "MP4: Evrensel uyumluluk, her cihazda oynatılır\nWebM: Web için optimize, Chrome/Firefox'ta native\n"
-            "MKV: Çoklu ses/altyazı destekli konteyner, arşivleme için ideal\n"
-            "MP3: Evrensel ses formatı, maksimum uyumluluk\nM4A: Apple AAC ses, yüksek kalite küçük boyut",
+            t("download.formatTooltip"),
         )
 
         self.info_label = ctk.CTkLabel(
@@ -531,10 +529,13 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._update_playlist_summary()
         self._update_size_estimate()
 
-    def _set_url_validation_state(self, icon_text: str, color: str):
+    def _set_url_validation_state(self, icon_text: str, color):
         url_validation_icon = self.__dict__.get("url_validation_icon")
+        resolved_color = color
+        if isinstance(color, tuple):
+            resolved_color = color[0] if ctk.get_appearance_mode().lower() == "light" else color[1]
         if url_validation_icon is not None:
-            url_validation_icon.configure(text=icon_text, text_color=color)
+            url_validation_icon.configure(text=icon_text, text_color=resolved_color)
 
     def _apply_button_hover_state(self, button, is_hover: bool):
         if button is None:
@@ -686,10 +687,6 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
         format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
-        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
-        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
-        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
-        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
 
         default_path = self.config_manager.get(
             "default_download_path",
@@ -790,7 +787,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         if not hasattr(self, "_player_btn") or self._player_btn is None:
             self._player_btn = ctk.CTkButton(
                 self,
-                text=f"{Icons.PLAY if hasattr(Icons, 'PLAY') else '▶'} Oynatıcıda Aç",
+                text=f"{Icons.PLAY if hasattr(Icons, 'PLAY') else '▶'} {t('download.openInPlayer')}",
                 command=lambda: self._open_with_player(url),
                 font=Fonts.LABEL,
             )
@@ -845,6 +842,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
         format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
+        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
+        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
+        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
+        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
 
         default_path = self.config_manager.get(
             "default_download_path",
@@ -857,7 +858,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._set_button_loading_state(self.download_btn, is_loading=True)
 
         for index, url in enumerate(urls, start=1):
-            task_name = f"Toplu İndirme {index}/{len(urls)}"
+            task_name = t("download.batchTaskName", index=index, total=len(urls))
             self.task_queue.add_task(
                 task_type=TaskType.DOWNLOAD,
                 name=task_name,
@@ -890,6 +891,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         size_mb = float(size_by_quality.get(quality_label, 0) or 0)
         if size_mb <= 0:
             size_mb = float(size_by_quality.get(t("download.qualityBest"), 0) or 0)
+        if size_mb <= 0:
+            size_mb = float(size_by_quality.get("En Iyi", 0) or 0)
         if size_mb <= 0:
             size_mb = float(size_by_quality.get("En İyi", 0) or 0)
         if size_mb <= 0:

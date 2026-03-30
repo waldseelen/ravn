@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(python -m pytest tests/ -q --tb=short)",
-      "Bash(python -m pytest tests/test_animation_manager.py -v)"
+      "Bash(python -m pytest tests/test_animation_manager.py -v)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" ! -path \"*/tabs/*\" -exec grep -n \"padx\\\\|pady\" {} +)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" ! -path \"*/tabs/*\" -exec grep -n \"corner_radius\" {} +)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"padx=\\\\|pady=\" {} +)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"corner_radius=\" {} +)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"Tooltip\\\\|bind\\(\" {} +)",
+      "Bash(find /c/Users/bugra/DEV/ravn/ravn_app/ui -name \"*.py\" -type f ! -path \"*/__pycache__/*\" -exec grep -n \"wraplength=\\\\|font=Fonts\" {} +)",
+      "Bash(grep:*)",
+      "Bash(python:*)"
     ]
   }
 }

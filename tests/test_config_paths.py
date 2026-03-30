@@ -42,7 +42,7 @@ class TestConfigDirectoryPaths:
         # Reimport to pick up the patched values
         import importlib
         importlib.reload(config_paths)
-        
+
         path = config_paths.get_config_directory()
         assert 'ravn' in str(path).lower()
 
@@ -53,7 +53,7 @@ class TestConfigDirectoryPaths:
         from ravn_app.core import config_paths
         import importlib
         importlib.reload(config_paths)
-        
+
         # Clear XDG override if present
         with patch.dict(os.environ, {'XDG_CONFIG_HOME': ''}, clear=False):
             path = config_paths.get_config_directory()
@@ -65,7 +65,7 @@ class TestConfigDirectoryPaths:
         from ravn_app.core import config_paths
         import importlib
         importlib.reload(config_paths)
-        
+
         path = config_paths.get_config_directory()
         assert 'ravn' in str(path).lower()
 
@@ -116,7 +116,7 @@ class TestEnsureDirectoriesExist:
                 with patch('ravn_app.core.config_paths.get_data_directory', return_value=Path(tmpdir) / 'data'):
                     with patch('ravn_app.core.config_paths.get_cache_directory', return_value=Path(tmpdir) / 'cache'):
                         dirs = ensure_directories_exist()
-                        
+
                         assert dirs['config'].exists()
                         assert dirs['data'].exists()
                         assert dirs['cache'].exists()
@@ -156,10 +156,10 @@ class TestMigration:
             config_file = Path(tmpdir) / 'config' / 'ravn_config.json'
             config_file.parent.mkdir(parents=True)
             config_file.write_text('{}')
-            
+
             legacy_file = Path(tmpdir) / 'legacy_config.json'
             legacy_file.write_text('{"key": "value"}')
-            
+
             with patch('ravn_app.core.config_paths.find_legacy_config_file', return_value=legacy_file):
                 with patch('ravn_app.core.config_paths.get_config_file_path', return_value=config_file):
                     result = migrate_legacy_config()
@@ -170,10 +170,10 @@ class TestMigration:
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / 'config'
             config_file = config_dir / 'ravn_config.json'
-            
+
             legacy_file = Path(tmpdir) / 'legacy_config.json'
             legacy_file.write_text('{"key": "value"}')
-            
+
             with patch('ravn_app.core.config_paths.find_legacy_config_file', return_value=legacy_file):
                 with patch('ravn_app.core.config_paths.get_config_file_path', return_value=config_file):
                     with patch('ravn_app.core.config_paths.ensure_directories_exist'):
@@ -198,7 +198,7 @@ class TestDefaultConfig:
     def test_get_default_config(self):
         """Test default config contains all keys"""
         config = get_default_config()
-        
+
         assert 'default_download_path' in config
         assert 'default_format' in config
         assert 'default_quality' in config
@@ -260,21 +260,21 @@ class TestConfigValidation:
             'concurrent_downloads': 3,
             'theme': 'invalid_theme',  # This will be corrected
         }
-        
+
         validated, errors = validate_config(config)
-        
+
         assert validated['default_format'] == 'MKV'
         assert validated['concurrent_downloads'] == 3
-        assert validated['theme'] == 'nordic'  # Corrected to default
+        assert validated['theme'] == 'dark'  # Corrected to default
         assert 'default_download_path' in validated  # Missing key filled
         assert len(errors) > 0  # Should have error for invalid theme
 
     def test_validate_config_fills_missing_keys(self):
         """Test that validation fills in missing keys"""
-        config = {'theme': 'nordic'}
-        
+        config = {'theme': 'dark'}
+
         validated, errors = validate_config(config)
-        
+
         # Should have all default keys
         defaults = get_default_config()
         for key in defaults:
@@ -294,7 +294,7 @@ class TestConfigSchema:
             'concurrent_downloads',
             'language',
         ]
-        
+
         for key in required_keys:
             assert key in CONFIG_SCHEMA
 

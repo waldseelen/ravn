@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from ravn_app.core.i18n import t
-from ravn_app.ui.design_tokens import Colors, Fonts, Icons, Motion
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Motion, Sizes
 
 
 class ErrorPanel(ctk.CTkFrame):
@@ -44,10 +44,11 @@ class ErrorPanel(ctk.CTkFrame):
             text=f"{Icons.INFO} {t('errorPanel.technicalDetails')}",
             command=self.toggle_details,
             width=130,
-            height=28,
+            height=Sizes.BTN_HEIGHT_SM,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
             font=Fonts.SMALL,
+            cursor=Cursors.POINTER,
         )
         self.toggle_details_btn.pack(side="right", padx=5)
 
@@ -56,10 +57,11 @@ class ErrorPanel(ctk.CTkFrame):
             text=f"{Icons.RETRY} {t('errorPanel.retry')}",
             command=on_retry,
             width=120,
-            height=28,
+            height=Sizes.BTN_HEIGHT_SM,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
             font=Fonts.SMALL,
+            cursor=Cursors.POINTER,
         )
         self.retry_btn.pack(side="right", padx=5)
 
@@ -87,7 +89,7 @@ class ErrorPanel(ctk.CTkFrame):
         if self._raw_error_visible:
             self.raw_error_textbox.pack_forget()
             self._raw_error_visible = False
-            self.toggle_details_btn.configure(text=f"{Icons.INFO} Teknik Detaylar")
+            self.toggle_details_btn.configure(text=f"{Icons.INFO} {t('errorPanel.technicalDetails')}")
 
         self.pack(padx=15, pady=5, fill="x")
         self.animation_manager.animate_color_transition(

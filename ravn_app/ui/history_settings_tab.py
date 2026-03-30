@@ -6,10 +6,11 @@ Geçmiş ve ayarlar arayüzü
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from pathlib import Path
+import unicodedata
 from ..core.database import DatabaseManager, ConfigManager
 from ravn_app.core.i18n import t
 from .advanced_features import SearchFilter, ThemeManager
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -65,7 +66,8 @@ class HistoryTab(ctk.CTkFrame):
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
             font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_SM
+            height=Sizes.BTN_HEIGHT_SM,
+            cursor=Cursors.POINTER,
         ).pack(side="right", padx=Spacing.XS)
 
         # Temizle butonu
@@ -76,7 +78,8 @@ class HistoryTab(ctk.CTkFrame):
             fg_color=Colors.DANGER,
             hover_color=Colors.DANGER_HOVER,
             font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_SM
+            height=Sizes.BTN_HEIGHT_SM,
+            cursor=Cursors.POINTER,
         ).pack(side="right", padx=Spacing.XS)
 
         # Arama ve filtre
@@ -152,6 +155,7 @@ class HistoryTab(ctk.CTkFrame):
             font=Fonts.LABEL_BOLD,
             anchor="w",
             text_color=Colors.TEXT_PRIMARY,
+            wraplength=400,
         )
         title_label.pack(fill="x", padx=Spacing.XS, pady=2)
 
@@ -190,7 +194,7 @@ class HistoryTab(ctk.CTkFrame):
             button_frame,
             text=download.status,
             fg_color=status_colors.get(download.status, Colors.BTN_SECONDARY),
-            corner_radius=5,
+            corner_radius=Sizes.CORNER_SM,
             width=80,
             text_color=Colors.BG_PRIMARY,
         )
@@ -206,6 +210,7 @@ class HistoryTab(ctk.CTkFrame):
                 fg_color=Colors.BTN_SECONDARY,
                 hover_color=Colors.BTN_SECONDARY_HOVER,
                 text_color=Colors.TEXT_PRIMARY,
+                cursor=Cursors.POINTER,
             ).pack(pady=2)
 
     def filter_history(self):
@@ -315,6 +320,20 @@ class SettingsTab(ctk.CTkFrame):
             border_color=Colors.BORDER,
         )
 
+    @staticmethod
+    def _normalize_quality_for_storage(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", str(value or "").strip())
+        normalized = normalized.encode("ascii", "ignore").decode("ascii").strip().lower()
+        if normalized in {"best", "en iyi"}:
+            return "best"
+        return value
+
+    @staticmethod
+    def _quality_for_display(value: str) -> str:
+        if str(value or "").strip().lower() == "best":
+            return t("download.qualityBest")
+        return value
+
     def setup_ui(self):
         """UI'ı oluştur"""
         # Başlık
@@ -323,32 +342,26 @@ class SettingsTab(ctk.CTkFrame):
             text=t("settings.title"),
             font=Fonts.H1,
             text_color=Colors.TEXT_PRIMARY,
-        ).pack(pady=Spacing.LG)
+        ).pack(pady=(Spacing.SM, Spacing.XS))
 
-        # Tabview
-        self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.SM)
-        self.tabview.configure(
-            fg_color=Colors.BG_CARD,
-            segmented_button_fg_color=Colors.BG_SURFACE,
-            segmented_button_selected_color=Colors.ACCENT,
-            segmented_button_selected_hover_color=Colors.ACCENT_HOVER,
-            segmented_button_unselected_color=Colors.BG_INPUT,
-            segmented_button_unselected_hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-        )
+        ctk.CTkLabel(
+            self,
+            text=t("settings.compactHint"),
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+        ).pack(pady=(0, Spacing.SM))
 
-        # Genel sekmesi
-        general_tab = self.tabview.add(t("settings.general"))
-        self.create_general_settings(general_tab)
+        self.content_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_CARD)
+        self.content_frame.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.XS)
 
-        # İndirme sekmesi
-        download_tab = self.tabview.add(t("settings.download"))
-        self.create_download_settings(download_tab)
+        self._create_section_header(self.content_frame, t("settings.general"))
+        self.create_general_settings(self.content_frame)
 
-        # Dönüştürme sekmesi
-        conversion_tab = self.tabview.add(t("settings.conversion"))
-        self.create_conversion_settings(conversion_tab)
+        self._create_section_header(self.content_frame, t("settings.download"))
+        self.create_download_settings(self.content_frame)
+
+        self._create_section_header(self.content_frame, t("settings.conversion"))
+        self.create_conversion_settings(self.content_frame)
 
         # Alt butonlar
         button_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
@@ -393,6 +406,15 @@ class SettingsTab(ctk.CTkFrame):
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_MD
         ).pack(side="left", padx=Spacing.XS)
+
+    def _create_section_header(self, parent, text: str):
+        ctk.CTkLabel(
+            parent,
+            text=text,
+            font=Fonts.H2,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=Spacing.SM, pady=(Spacing.SM, Spacing.XS))
 
     def create_general_settings(self, parent):
         """Genel ayarlar"""
@@ -500,7 +522,7 @@ class SettingsTab(ctk.CTkFrame):
         ctk.CTkLabel(format_frame, text=t("settings.defaultQuality"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.default_quality_combo = ctk.CTkComboBox(
             format_frame,
-            values=["En İyi", "1080p", "720p", "480p"]
+            values=[t("download.qualityBest"), "1080p", "720p", "480p"]
         )
         self._style_combo(self.default_quality_combo)
         self.default_quality_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
@@ -579,19 +601,19 @@ class SettingsTab(ctk.CTkFrame):
         torrent_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
         torrent_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
-        ctk.CTkLabel(torrent_frame, text="Torrent / aria2c Ayarları:", font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+        ctk.CTkLabel(torrent_frame, text=t("settings.torrentSection"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
-        ctk.CTkLabel(torrent_frame, text="aria2c Yolu:", font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
+        ctk.CTkLabel(torrent_frame, text=t("settings.aria2Path"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.aria2c_path_entry = ctk.CTkEntry(torrent_frame)
         self._style_entry(self.aria2c_path_entry)
         self.aria2c_path_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
 
-        ctk.CTkLabel(torrent_frame, text="Seed Süresi (dakika, 0 = seed yok):", font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
+        ctk.CTkLabel(torrent_frame, text=t("settings.seedTime"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.torrent_seed_time_entry = ctk.CTkEntry(torrent_frame, width=80)
         self._style_entry(self.torrent_seed_time_entry)
         self.torrent_seed_time_entry.pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
 
-        ctk.CTkLabel(torrent_frame, text="Maksimum Bağlantı Sayısı:", font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
+        ctk.CTkLabel(torrent_frame, text=t("settings.maxConnections"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.torrent_max_connections_entry = ctk.CTkEntry(torrent_frame, width=80)
         self._style_entry(self.torrent_max_connections_entry)
         self.torrent_max_connections_entry.pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
@@ -621,14 +643,14 @@ class SettingsTab(ctk.CTkFrame):
 
     def load_settings(self):
         """Ayarları yükle"""
-        self.theme_combo.set(ThemeManager.get_theme_display_name(self.config.get('theme', 'nordic')))
+        self.theme_combo.set(ThemeManager.get_theme_display_name(self.config.get('theme', 'dark')))
         self.language_combo.set("Türkçe" if self.config.get('language') == 'tr' else "English")
         self.notifications_var.set(self.config.get('notifications_enabled', True))
         self.auto_update_var.set(self.config.get('auto_update_check', True))
 
         self.download_dir_entry.insert(0, self.config.get('default_download_path', ''))
         self.default_format_combo.set(self.config.get('default_format', 'MP4'))
-        self.default_quality_combo.set(self.config.get('default_quality', '1080p'))
+        self.default_quality_combo.set(self._quality_for_display(self.config.get('default_quality', '1080p')))
         self.concurrent_slider.set(self.config.get('concurrent_downloads', 1))
         self.concurrent_label.configure(text=str(self.config.get('concurrent_downloads', 1)))
 
@@ -643,7 +665,7 @@ class SettingsTab(ctk.CTkFrame):
         if embed_metadata_var is not None:
             embed_metadata_var.set(self.config.get('embed_metadata', False))
         if auto_sort_var is not None:
-            auto_sort_var.set(self.config.get('auto_sort_by_channel', False))
+            auto_sort_var.set(self.config.get('auto_sort_downloads', self.config.get('auto_sort_by_channel', False)))
 
         self.aria2c_path_entry.insert(0, self.config.get('aria2c_path', 'aria2c'))
         self.torrent_seed_time_entry.insert(0, str(self.config.get('torrent_seed_time', 0)))
@@ -665,7 +687,7 @@ class SettingsTab(ctk.CTkFrame):
 
         self.config.set('default_download_path', self.download_dir_entry.get())
         self.config.set('default_format', self.default_format_combo.get())
-        self.config.set('default_quality', self.default_quality_combo.get())
+        self.config.set('default_quality', self._normalize_quality_for_storage(self.default_quality_combo.get()))
         self.config.set('concurrent_downloads', int(self.concurrent_slider.get()))
 
         self.config.set('ffmpeg_path', self.ffmpeg_entry.get())

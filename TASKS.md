@@ -237,6 +237,24 @@ Cross-platform binary builds and installers. (After GUI is polished)
 5. Settings panel for advanced options
 6. UI/UX enhancements (icons, themes, accessibility)
 
+---
+
+## Phase 7 — UI Tutarlılık & Kullanılabilirlik İyileştirmeleri
+
+Tüm sekmeler arasında görsel dil, spacing, etkileşim ve hata yönetimi tutarlılığı.
+Kolay maddeler tamamlandı (bkz. plan `agile-percolating-spark.md`). Kalanlar:
+
+- [ ] **[UI-01]** `_style_combo` / `_style_entry` tekrarını gider — 3 dosyadaki statik metotları `ui_components.py`'a taşı, sekmeler import etsin (`converter_tab.py`, `subtitle_tab.py`, `history_settings_tab.py`)
+- [ ] **[UI-03]** Hardcoded tooltip metinleri i18n'e taşı — `converter_tab.py` satır 159, 175, 191, 253'teki 4 Türkçe string'i `t()` çağrısıyla değiştir, i18n dosyalarına anahtar ekle
+- [ ] **[UI-05]** Focus ring animasyonu eksik giriş alanlarına ekle — `converter_tab.py` ve `subtitle_tab.py`'deki `CTkEntry`/`CTkComboBox` widget'larına `FocusIn`/`FocusOut` → `animate_focus_ring()` bağlaması
+- [ ] **[UI-06]** Hardcoded padding değerlerini `Spacing.*` token'larıyla değiştir — `converter_tab.py`, `error_panel.py`, `playlist_item.py`, `advanced_features.py` içindeki `padx=5`, `pady=4`, `padx=20` vb.
+- [ ] **[UI-08]** Subtitle ve History sekmelerine `Tooltip` ekle — dil seçimi, format filtresi, durum filtresi, zamanlama kontrolü gibi anlamlı tüm kontroller
+- [ ] **[UI-11]** Loading state görselini tüm sekmelerde standartlaştır — `_set_button_loading_state()` yardımcısını merkezi bir yere taşı; `subtitle_tab.py` ve `converter_tab.py`'deki eksik loading göstergelerini düzelt
+- [ ] **[UI-12]** Hata gösterimini standartlaştır — `converter_tab.py` ve `subtitle_tab.py`'ye `ErrorPanel` entegrasyonu ekle, log text widget'a düşen hataları kullanıcı dostu panele taşı
+- [ ] **[UI-09]** Klavye kısayolları ekle — tüm sekmelerde `Ctrl+Enter` (indir/dönüştür), `Escape` (iptal), `Ctrl+L` (URL/yol temizle) bağlamaları
+
+---
+
 **Phase 5 (After GUI is Done) — Build & Distribution:**
 
 1. PyInstaller spec updates with FFmpeg bundling

@@ -11,6 +11,7 @@ from ravn_app.core.converter import AudioBitrate, VideoQuality
 from ravn_app.ui.converter_tab import ConverterTab
 from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
 from ravn_app.ui.main_window import YouTubeDownloaderApp
+from ravn_app.ui.components.playlist_sort_dialog import PlaylistSortDialog
 from ravn_app.ui.tabs.download_tab import DownloadTab
 from ravn_app.ui.queue_panel import QueueItemWidget
 from ravn_app.ui.subtitle_tab import SubtitleTab
@@ -108,7 +109,7 @@ class _FakeConfig:
 
     def get(self, key, default=None):
         defaults = {
-            "theme": "nordic",
+            "theme": "dark",
             "language": "tr",
             "notifications_enabled": True,
             "auto_update_check": True,
@@ -241,6 +242,11 @@ class TestSettingsAndHistoryLogic:
     def test_history_format_size(self):
         assert HistoryTab.format_size(1024) == "1.0 KB"
 
+    def test_quality_normalization_handles_legacy_labels(self):
+        assert SettingsTab._normalize_quality_for_storage("Best") == "best"
+        assert SettingsTab._normalize_quality_for_storage("En Iyi") == "best"
+        assert SettingsTab._normalize_quality_for_storage("En İyi") == "best"
+
     def test_save_settings_writes_expected_keys(self):
         tab = SettingsTab.__new__(SettingsTab)
         tab.config = _FakeConfig()
@@ -281,6 +287,13 @@ class TestSettingsAndHistoryLogic:
         assert "auto_embed_lyrics" in keys
         assert "auto_sort_downloads" in keys
         assert "auto_sort_mode" in keys
+
+
+class TestPlaylistSortDialogLogic:
+    def test_format_bytes_outputs_expected_units(self):
+        assert PlaylistSortDialog._format_bytes(0) == "0 B"
+        assert PlaylistSortDialog._format_bytes(1024) == "1.0 KB"
+        assert PlaylistSortDialog._format_bytes(1024 * 1024) == "1.0 MB"
 
 
 class TestMainWindowLogic:

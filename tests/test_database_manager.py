@@ -316,8 +316,8 @@ class TestConfigManagerBasics:
             cfg = ConfigManager(config_file=str(config_file))
             try:
                 assert config_file.exists()
-                cfg.set("theme", "nordic")
-                assert cfg.get("theme") == "nordic"
+                cfg.set("theme", "dark")
+                assert cfg.get("theme") == "dark"
             finally:
                 Path(config_file).unlink(missing_ok=True)
 
@@ -337,7 +337,7 @@ class TestConfigManagerBasics:
             "ravn_app.core.database.migrate_all_legacy_files"
         ):
             cfg = ConfigManager(config_file=str(config_file))
-            assert cfg.get("theme") == "nordic"
+            assert cfg.get("theme") == "dark"
 
     def test_export_import_config(self, tmp_path):
         config_file = tmp_path / "base.json"

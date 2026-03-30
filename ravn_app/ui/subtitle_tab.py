@@ -15,7 +15,7 @@ from ..core.subtitle_manager import (
     SubtitleFormat
 )
 from ravn_app.core.i18n import t
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -133,7 +133,8 @@ class SubtitleTab(ctk.CTkFrame):
             text=f"{Icons.BROWSE} {t('common.browse')}",
             width=80,
             command=self.select_output_dir,
-            font=Fonts.LABEL
+            font=Fonts.LABEL,
+            cursor=Cursors.POINTER,
         ).pack(side="left")
 
         # İndir butonu
@@ -144,7 +145,8 @@ class SubtitleTab(ctk.CTkFrame):
             height=Sizes.BTN_HEIGHT_MD,
             fg_color=Colors.ACCENT,
             hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.LABEL_BOLD
+            font=Fonts.LABEL_BOLD,
+            cursor=Cursors.POINTER,
         )
         self.download_subtitle_btn.pack(pady=Spacing.LG)
 
@@ -184,7 +186,8 @@ class SubtitleTab(ctk.CTkFrame):
             text=f"{Icons.BROWSE} {t('subtitle.videoSelect')}",
             command=self.select_video_file,
             width=150,
-            font=Fonts.LABEL
+            font=Fonts.LABEL,
+            cursor=Cursors.POINTER,
         ).pack(pady=Spacing.XS)
 
         self.video_label = ctk.CTkLabel(self._video_drop_zone, text=t("subtitle.videoNotSelected"), font=Fonts.LABEL)
@@ -211,7 +214,8 @@ class SubtitleTab(ctk.CTkFrame):
             text=f"{Icons.BROWSE} {t('subtitle.subtitleSelect')}",
             command=self.select_subtitle_file,
             width=150,
-            font=Fonts.LABEL
+            font=Fonts.LABEL,
+            cursor=Cursors.POINTER,
         ).pack(pady=Spacing.XS)
 
         self.subtitle_label = ctk.CTkLabel(self._subtitle_drop_zone, text=t("subtitle.subtitleNotSelected"), font=Fonts.LABEL)
@@ -233,7 +237,8 @@ class SubtitleTab(ctk.CTkFrame):
             convert_frame,
             text=f"{Icons.CONVERT_BTN} {t('subtitle.convert')}",
             command=self.convert_subtitle,
-            font=Fonts.LABEL
+            font=Fonts.LABEL,
+            cursor=Cursors.POINTER,
         ).pack(pady=Spacing.XS)
 
         # Zamanlama düzenleme
@@ -258,7 +263,8 @@ class SubtitleTab(ctk.CTkFrame):
             timing_frame,
             text=t("subtitle.adjustTiming"),
             command=self.shift_timing,
-            font=Fonts.LABEL
+            font=Fonts.LABEL,
+            cursor=Cursors.POINTER,
         ).pack(pady=Spacing.XS)
 
         # Videoya gömme
@@ -276,7 +282,8 @@ class SubtitleTab(ctk.CTkFrame):
             command=lambda: self.embed_subtitle("soft"),
             width=150,
             font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_MD
+            height=Sizes.BTN_HEIGHT_MD,
+            cursor=Cursors.POINTER,
         ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
@@ -285,7 +292,8 @@ class SubtitleTab(ctk.CTkFrame):
             command=lambda: self.embed_subtitle("hard"),
             width=150,
             font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_MD
+            height=Sizes.BTN_HEIGHT_MD,
+            cursor=Cursors.POINTER,
         ).pack(side="left", padx=Spacing.XS)
 
         # Log

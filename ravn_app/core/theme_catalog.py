@@ -6,8 +6,8 @@ from typing import Dict, List
 
 
 THEMES: Dict[str, Dict[str, str]] = {
-    "nordic": {
-        "name": "Nordic Dark",
+    "dark": {
+        "name": "Dark",
         "appearance_mode": "Dark",
         "color_theme": "dark-blue",
         "primary": "#987a4e",
@@ -16,18 +16,8 @@ THEMES: Dict[str, Dict[str, str]] = {
         "surface": "#1E1E1E",
         "text": "#E8E0D8",
     },
-    "graphite": {
-        "name": "Graphite Dark",
-        "appearance_mode": "Dark",
-        "color_theme": "blue",
-        "primary": "#5B6470",
-        "secondary": "#88919C",
-        "background": "#101214",
-        "surface": "#1A1D21",
-        "text": "#E6EAEE",
-    },
-    "paper": {
-        "name": "Paper Light",
+    "light": {
+        "name": "Light",
         "appearance_mode": "Light",
         "color_theme": "blue",
         "primary": "#8C6A4A",
@@ -36,30 +26,26 @@ THEMES: Dict[str, Dict[str, str]] = {
         "surface": "#FFFFFF",
         "text": "#221814",
     },
-    "sand": {
-        "name": "Sand Light",
-        "appearance_mode": "Light",
-        "color_theme": "green",
-        "primary": "#7B8B6F",
-        "secondary": "#B5C2A6",
-        "background": "#F3F1E8",
-        "surface": "#FFFDF7",
-        "text": "#1F1B16",
-    },
 }
 
 THEME_ALIASES = {
-    "nordic dark": "nordic",
-    "graphite dark": "graphite",
-    "paper light": "paper",
-    "sand light": "sand",
-    "forest": "sand",
-    "aurora": "graphite",
-    "dark": "graphite",
-    "light": "paper",
-    "blue": "paper",
-    "green": "sand",
-    "dark-blue": "nordic",
+    "dark": "dark",
+    "light": "light",
+    "nordic": "dark",
+    "graphite": "dark",
+    "paper": "light",
+    "sand": "light",
+    "nordic dark": "dark",
+    "graphite dark": "dark",
+    "paper light": "light",
+    "sand light": "light",
+    "forest": "light",
+    "aurora": "dark",
+    "blue": "light",
+    "green": "light",
+    "dark-blue": "dark",
+    "karanlik": "dark",
+    "aydinlik": "light",
 }
 
 
@@ -75,7 +61,7 @@ def normalize_theme_id(value: str | None) -> str:
         return normalized
     if normalized in THEME_ALIASES:
         return THEME_ALIASES[normalized]
-    return "nordic"
+    return "dark"
 
 
 def get_theme_definition(theme_id: str | None) -> Dict[str, str]:

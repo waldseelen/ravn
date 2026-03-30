@@ -28,8 +28,8 @@ class PlaylistMixin:
         best_aliases = (
             t("download.qualityBest"),
             "Best",
-            "En İyi",
             "En Iyi",
+            "En İyi",
         )
 
         if size_mb is None:

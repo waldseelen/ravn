@@ -45,7 +45,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.queue_paused = False
         self.animation_manager = get_animation_manager()
 
-        self.current_theme = self.config_manager.get("theme", "nordic")
+        self.current_theme = self.config_manager.get("theme", "dark")
         ThemeManager.apply_theme(self.current_theme)
         self.toast_manager: Optional[ToastManager] = None
         self.download_tab: Optional[DownloadTab] = None
@@ -84,7 +84,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             text_color=Colors.TEXT_MUTED,
         ).pack()
 
-        self.tabview = ctk.CTkTabview(self, anchor="nw")
+        self.tabview = ctk.CTkTabview(self, anchor="n")
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
         self.bind("<Configure>", self._on_window_resize)
         self.tabview.configure(

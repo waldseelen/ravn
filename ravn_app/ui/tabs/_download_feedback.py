@@ -29,7 +29,7 @@ class FeedbackMixin:
         self._stop_processing_feedback()
         self.download_progress.set(1.0)
         self._download_progress_value = 1.0
-        files = ", ".join(result.output_files) if result.output_files else "tamamlandı"
+        files = ", ".join(result.output_files) if result.output_files else t("download.completedFallback")
         self.download_status_label.configure(
             text=t("download.downloadComplete", files=files),
             text_color=Colors.STATUS_DONE,
@@ -69,7 +69,7 @@ class FeedbackMixin:
         self._stop_processing_feedback()
         self._hide_progress()
         self._set_button_loading_state(self.download_btn, is_loading=False)
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} İndir")
+        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
         self._show_download_error(error_message, error_message)
 
         toast_manager = self.toast_manager_getter()
@@ -96,13 +96,13 @@ class FeedbackMixin:
     def _toggle_error_details(self):
         self.error_panel.toggle_details()
 
-    def _start_processing_feedback(self, base_text: str = "Processing"):
+    def _start_processing_feedback(self, base_text: str | None = None):
         status_label = self.__dict__.get("download_status_label")
         if status_label is None:
             return
 
         self._stop_processing_feedback()
-        self._processing_text_base = base_text
+        self._processing_text_base = base_text or t("download.downloadLoading")
         self._processing_tick = 0
         self._processing_spinner_index = 0
         self._download_progress_value = 0.0

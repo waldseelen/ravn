@@ -51,7 +51,7 @@ class Colors:
     # Text (WCAG AA contrast compliant: ≥4.5:1 for normal text)
     TEXT_PRIMARY   = ("#1A1210", "#E8E0D8")   # (light, dark) primary text
     TEXT_SECONDARY = ("#4A3D35", "#B8A99A")   # (light, dark) secondary text
-    TEXT_MUTED     = ("#7A6B60", "#7A6B60")   # same for both modes
+    TEXT_MUTED     = ("#7A6B60", "#A09080")   # light/dark — darker bg needs lighter muted text
     TEXT_DISABLED  = "#4b5563"   # gray-600 (intentionally low contrast)
 
     # Borders

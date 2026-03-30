@@ -8,6 +8,9 @@ from typing import Any, Callable, Dict, List
 
 import customtkinter as ctk
 
+from ravn_app.core.i18n import t
+from ravn_app.ui.design_tokens import Colors, Fonts
+
 
 class PlaylistSortDialog(ctk.CTkToplevel):
     """Show playlist entries in a sortable table and apply selected ordering."""
@@ -23,9 +26,10 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         on_download: Callable[[List[Dict[str, Any]]], None],
     ):
         super().__init__(parent)
-        self.title("Playlist Siralama")
+        self.title(t("download.playlistSortTitle"))
         self.geometry("980x560")
         self.minsize(840, 460)
+        self.configure(fg_color=Colors.BG_PRIMARY)
 
         self._quality_label = quality_label
         self._metrics_getter = metrics_getter
@@ -42,6 +46,12 @@ class PlaylistSortDialog(ctk.CTkToplevel):
 
         self._build_ui()
         self._refresh_tree()
+
+    @staticmethod
+    def _resolve_color(token: str | tuple[str, str]) -> str:
+        if not isinstance(token, tuple):
+            return token
+        return token[0] if ctk.get_appearance_mode().lower() == "light" else token[1]
 
     def _build_rows(self, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
@@ -74,22 +84,78 @@ class PlaylistSortDialog(ctk.CTkToplevel):
     def _build_ui(self) -> None:
         info = ctk.CTkLabel(
             self,
-            text=f"Siralama kalitesi: {self._quality_label}",
+            text=t("download.playlistSortQuality", quality=self._quality_label),
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.LABEL,
             anchor="w",
         )
         info.pack(fill="x", padx=12, pady=(12, 6))
 
-        frame = ctk.CTkFrame(self, fg_color="transparent")
-        frame.pack(fill="both", expand=True, padx=12, pady=(0, 10))
+        self.selection_summary_label = ctk.CTkLabel(
+            self,
+            text="",
+            text_color=Colors.TEXT_MUTED,
+            font=Fonts.SMALL,
+            anchor="w",
+        )
+        self.selection_summary_label.pack(fill="x", padx=12, pady=(0, 8))
+
+        content_wrap = ctk.CTkFrame(self, fg_color="transparent")
+        content_wrap.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        frame = ctk.CTkFrame(content_wrap, fg_color=Colors.BG_SURFACE)
+        frame.pack(fill="both", expand=True, pady=(0, 8))
+
+        style = ttk.Style(self)
+        try:
+            # Native Windows themes ignore several custom heading colors.
+            # Clam honors explicit foreground/background so headers remain readable.
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        header_bg = self._resolve_color(Colors.BG_SURFACE)
+        header_fg = self._resolve_color(Colors.ACCENT)
+        body_bg = self._resolve_color(Colors.BG_CARD)
+        body_fg = self._resolve_color(Colors.TEXT_PRIMARY)
+        selected_bg = self._resolve_color(Colors.BTN_SECONDARY)
+
+        style.configure(
+            "Ravn.Treeview",
+            background=body_bg,
+            fieldbackground=body_bg,
+            foreground=body_fg,
+            bordercolor=self._resolve_color(Colors.BORDER),
+            borderwidth=0,
+            rowheight=26,
+        )
+        style.configure(
+            "Ravn.Treeview.Heading",
+            background=header_bg,
+            foreground=header_fg,
+            relief="flat",
+            borderwidth=0,
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "Ravn.Treeview",
+            background=[("selected", selected_bg)],
+            foreground=[("selected", body_fg)],
+        )
+        style.map(
+            "Ravn.Treeview.Heading",
+            background=[("active", selected_bg)],
+            foreground=[("active", header_fg)],
+        )
 
         columns = ("selected", "title", "size", "duration", "album", "channel")
-        self.tree = ttk.Treeview(frame, columns=columns, show="headings", height=18)
-        self.tree.heading("selected", text="Sec", command=self._toggle_all)
-        self.tree.heading("title", text="Isim", command=lambda: self._sort_by("title"))
-        self.tree.heading("size", text="Boyut", command=lambda: self._sort_by("size"))
-        self.tree.heading("duration", text="Sure", command=lambda: self._sort_by("duration"))
-        self.tree.heading("album", text="Album", command=lambda: self._sort_by("album"))
-        self.tree.heading("channel", text="Kanal", command=lambda: self._sort_by("channel"))
+        self.tree = ttk.Treeview(frame, columns=columns, show="headings", height=16, style="Ravn.Treeview")
+        self.tree.heading("selected", text=t("download.playlistSortSelect"), command=self._toggle_all)
+        self.tree.heading("title", text=t("download.playlistSortName"), command=lambda: self._sort_by("title"))
+        self.tree.heading("size", text=t("download.playlistSortSize"), command=lambda: self._sort_by("size"))
+        self.tree.heading("duration", text=t("download.playlistSortDuration"), command=lambda: self._sort_by("duration"))
+        self.tree.heading("album", text=t("download.playlistSortAlbum"), command=lambda: self._sort_by("album"))
+        self.tree.heading("channel", text=t("download.playlistSortChannel"), command=lambda: self._sort_by("channel"))
 
         self.tree.column("selected", width=56, anchor=tk.CENTER)
         self.tree.column("title", width=320, anchor=tk.W)
@@ -107,20 +173,64 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         frame.grid_rowconfigure(0, weight=1)
         self.tree.bind("<Double-1>", self._on_double_click)
 
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=12, pady=(0, 12))
+        btn_frame = ctk.CTkFrame(content_wrap, fg_color=Colors.BG_SURFACE)
+        btn_frame.pack(fill="x")
 
-        ctk.CTkButton(btn_frame, text="Tumunu Sec", command=self._select_all).pack(side="left")
-        ctk.CTkButton(btn_frame, text="Secimi Temizle", command=self._clear_selection).pack(
+        ctk.CTkButton(
+            btn_frame,
+            text=t("download.playlistSortSelectAll"),
+            command=self._select_all,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.SMALL,
+            height=34,
+        ).pack(side="left")
+        ctk.CTkButton(
+            btn_frame,
+            text=t("download.playlistSortClear"),
+            command=self._clear_selection,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.SMALL,
+            height=34,
+        ).pack(
             side="left", padx=(8, 0)
         )
-        ctk.CTkButton(btn_frame, text="Varsayilan Siraya Don", command=self._reset_order).pack(
+        ctk.CTkButton(
+            btn_frame,
+            text=t("download.playlistSortResetOrder"),
+            command=self._reset_order,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.SMALL,
+            height=34,
+        ).pack(
             side="left"
         )
-        ctk.CTkButton(btn_frame, text="Indir", command=self._download).pack(
+        ctk.CTkButton(
+            btn_frame,
+            text=t("download.downloadButton"),
+            command=self._download,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
+            font=Fonts.LABEL_BOLD,
+            height=34,
+        ).pack(
             side="right", padx=(8, 0)
         )
-        ctk.CTkButton(btn_frame, text="Kapat", command=self.destroy).pack(side="right")
+        ctk.CTkButton(
+            btn_frame,
+            text=t("common.close"),
+            command=self.destroy,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.SMALL,
+            height=34,
+        ).pack(side="right")
 
     def _sort_value(self, row: Dict[str, Any], sort_key: str) -> Any:
         if sort_key == "title":
@@ -177,6 +287,28 @@ class PlaylistSortDialog(ctk.CTkToplevel):
                     channel_text,
                 ),
             )
+        self._update_selection_summary()
+
+    @staticmethod
+    def _format_bytes(size_bytes: int) -> str:
+        value = float(max(0, size_bytes))
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if value < 1024 or unit == "TB":
+                return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} {unit}"
+            value /= 1024
+        return "0 B"
+
+    def _update_selection_summary(self) -> None:
+        selected_rows = [row for row in self._rows if row.get("selected", True)]
+        selected_count = len(selected_rows)
+        selected_size_mb = sum(float(row.get("size_mb") or 0.0) for row in selected_rows)
+        selected_size_bytes = int(selected_size_mb * 1024 * 1024)
+        summary = t(
+            "download.playlistSortSelectedTotal",
+            count=selected_count,
+            size=self._format_bytes(selected_size_bytes),
+        )
+        self.selection_summary_label.configure(text=summary)
 
     def _on_double_click(self, event) -> None:
         item_id = self.tree.identify_row(event.y)

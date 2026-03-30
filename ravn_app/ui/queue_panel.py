@@ -75,7 +75,8 @@ class QueueItemWidget(ctk.CTkFrame):
             info_frame,
             text=task.name,
             font=Fonts.LABEL_BOLD,
-            anchor="w"
+            anchor="w",
+            wraplength=300,
         )
         self.name_label.pack(anchor="w", fill="x")
 
@@ -111,7 +112,7 @@ class QueueItemWidget(ctk.CTkFrame):
                 text=f"{Icons.STOP} {t('queue.cancel')}",
                 command=lambda: on_cancel(task.id),
                 width=80,
-                height=28,
+                height=Sizes.BTN_HEIGHT_SM,
                 fg_color=Colors.ERROR,
                 hover_color=Colors.ERROR_HOVER,
                 font=Fonts.SMALL,
@@ -125,7 +126,7 @@ class QueueItemWidget(ctk.CTkFrame):
                 text=f"{Icons.FOLDER} {t('queue.folder')}",
                 command=lambda: on_open_folder(task.result.output_path),
                 width=80,
-                height=28,
+                height=Sizes.BTN_HEIGHT_SM,
                 fg_color=Colors.BTN_SECONDARY,
                 hover_color=Colors.BTN_SECONDARY_HOVER,
                 font=Fonts.SMALL,

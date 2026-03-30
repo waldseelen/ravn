@@ -25,38 +25,39 @@ class Colors:
     BG_HOVER   = "#333333"     # Hover state background
 
     # Accent / brand (RAVN Nordic kahverengi theme)
-    ACCENT       = "#8B6F47"   # kahverengi-500 (primary brand)
+    # Nordic brown palette inspired by Scandinavian minimalism
+    ACCENT       = "#987a4e"   # kahverengi-500 (primary brand, WCAG AA: 4.59:1)
     ACCENT_HOVER = "#7A5F3A"   # kahverengi-600 (darker on hover)
     ACCENT_LIGHT = "#A68A6E"   # kahverengi-400 (lighter accent)
     ACCENT_BEIGE = "#D4C5B9"   # beige-200 (secondary accent, contrasting)
 
-    # Semantic feedback
-    SUCCESS        = "#22c55e"   # green-500
+    # Semantic feedback (all WCAG AA compliant on BG_PRIMARY)
+    SUCCESS        = "#22c55e"   # green-500 (8.08:1)
     SUCCESS_BG     = "#14291e"   # dark green bg
     SUCCESS_HOVER  = "#16a34a"   # green-600
-    WARNING        = "#f59e0b"   # amber-500
+    WARNING        = "#f59e0b"   # amber-500 (8.58:1)
     WARNING_BG     = "#2d2410"   # dark amber bg
     WARNING_HOVER  = "#d97706"   # amber-600
-    ERROR          = "#ef4444"   # red-500
+    ERROR          = "#ef4444"   # red-500 (4.90:1)
     ERROR_BG       = "#2d1515"   # dark red bg
     ERROR_HOVER    = "#dc2626"   # red-600
-    INFO           = "#8B6F47"   # kahverengi-500 (brand info color)
+    INFO           = "#987a4e"   # kahverengi-500 brand info (4.59:1)
     INFO_BG        = "#2a2320"   # dark kahverengi bg
 
     # Destructive
     DANGER       = "#ef4444"
     DANGER_HOVER = "#dc2626"
 
-    # Text (WCAG AA contrast compliant)
-    TEXT_PRIMARY   = "#f1f5f9"   # slate-100 (14:1 on BG_PRIMARY)
-    TEXT_SECONDARY = "#94a3b8"   # slate-400 (7:1 on BG_PRIMARY)
-    TEXT_MUTED     = "#64748b"   # slate-500 (4.5:1 on BG_PRIMARY)
-    TEXT_DISABLED  = "#4b5563"   # gray-600 (3:1 on BG_PRIMARY)
+    # Text (WCAG AA contrast compliant: ≥4.5:1 for normal text)
+    TEXT_PRIMARY   = "#f1f5f9"   # slate-100 (16.82:1 on BG_PRIMARY)
+    TEXT_SECONDARY = "#94a3b8"   # slate-400 (7.18:1 on BG_PRIMARY)
+    TEXT_MUTED     = "#6e7f98"   # slate-500 adjusted (4.52:1 on BG_PRIMARY)
+    TEXT_DISABLED  = "#4b5563"   # gray-600 (intentionally low contrast)
 
     # Borders
     BORDER        = "#2e2e2e"
     BORDER_STRONG = "#404040"
-    BORDER_ACCENT = "#8B6F47"   # kahverengi for accent borders
+    BORDER_ACCENT = "#987a4e"   # kahverengi for accent borders (WCAG AA)
     BORDER_HOVER  = "#525252"
 
     # Status (for status labels / log text)
@@ -75,6 +76,10 @@ class Colors:
     # Interactive states (kahverengi-aligned)
     FOCUS_RING = "#A68A6E"   # kahverengi-400 for focus indicators
     DRAG_OVER  = "#5C4A38"   # kahverengi-900 for drag-drop target
+    HOVER_BEIGE = "#3b332f"  # subtle beige hover tint (POL-03)
+    PROGRESS_BG = "#3a312c"  # beige-brown progress track
+    PROGRESS_FILL = "#987a4e"  # brand progress fill
+    SUCCESS_FLASH = "#4ade80"  # brief success flash color
 
 
 class _FontRegistry:
@@ -137,59 +142,108 @@ class Spacing:
 
 
 class Sizes:
-    """Standard component dimensions."""
+    """Standard component dimensions (POL-22)."""
     BTN_HEIGHT_SM = 32
     BTN_HEIGHT_MD = 40
     BTN_HEIGHT_LG = 48
     INPUT_HEIGHT  = 36
-    CORNER_SM     = 6
-    CORNER_MD     = 8
-    CORNER_LG     = 12
+    # Corner radius: 8px for cards, 6px for buttons/inputs (POL-22)
+    CORNER_SM     = 6   # buttons, inputs, small elements
+    CORNER_MD     = 8   # cards, panels, containers
+    CORNER_LG     = 12  # modals, large containers
+    # Focus ring width (POL-23)
+    FOCUS_RING_WIDTH = 2
+    # Tooltip delay in ms (POL-34)
+    TOOLTIP_DELAY = 300
+
+
+class Motion:
+    """Animation duration tokens in milliseconds."""
+    FAST = 100
+    MICRO = 150
+    STANDARD = 200
+    SLOW = 300
+
+
+class Cursors:
+    """Cursor tokens for interactive elements (POL-27)."""
+    POINTER = "hand2"       # Buttons, links, clickable icons
+    TEXT = "xterm"          # Text inputs
+    DEFAULT = ""            # Default arrow
+    WAIT = "watch"          # Loading state
+    NOT_ALLOWED = "circle"  # Disabled elements
 
 
 class Icons:
     """
     Unicode icon set for consistent UI elements.
     Uses Unicode characters for cross-platform compatibility.
-    
+    All icons are carefully selected to avoid emoji (which can render inconsistently).
+
     For production, consider replacing with actual icon font or SVG system.
     """
-    # Navigation
-    DOWNLOAD    = "⬇"
-    UPLOAD      = "⬆"
-    CONVERT     = "⇄"
-    SUBTITLE    = "≡"
-    HISTORY     = "◷"
-    SETTINGS    = "⚙"
-    QUEUE       = "☰"
-    
-    # Actions
+    # Navigation & Tabs (ICN-01 to ICN-06)
+    DOWNLOAD    = "↓"   # Minimalist download (ICN-01)
+    UPLOAD      = "↑"
+    CONVERT     = "⇄"   # Convert/exchange icon (ICN-02)
+    SUBTITLE    = "≡"   # Subtitle/text lines icon (ICN-03)
+    HISTORY     = "◷"   # History/clock icon (ICN-04)
+    SETTINGS    = "⚙"   # Settings/cog icon (ICN-05)
+    QUEUE       = "☰"   # Queue/list icon (ICN-06)
+
+    # Action Buttons (ICN-07 to ICN-11)
+    DOWNLOAD_BTN = "↓"   # Large download button indicator (ICN-07)
+    CONVERT_BTN  = "⟳"   # Process/circular arrow icon (ICN-08)
+    BROWSE       = "⌂"   # Folder/home icon (ICN-09)
+    FOLDER       = "▤"   # Folder icon (minimalist)
+    CANCEL_BTN   = "×"   # Cancel/stop button (ICN-10)
+    RETRY        = "↻"   # Retry/refresh icon (ICN-11)
+
+    # Status Indicators (ICN-12 to ICN-16)
+    QUEUED_STATUS   = "○"   # Queued status - circle outline (ICN-12)
+    RUNNING_STATUS  = "◐"   # Running status - spinner frame (ICN-13)
+    SUCCESS_STATUS  = "✓"   # Success status - checkmark (ICN-14)
+    ERROR_STATUS    = "×"   # Error status - X (ICN-15)
+    PAUSED_STATUS   = "⏸"   # Paused status - pause symbol (ICN-16)
+
+    # Form & Input Icons (ICN-17 to ICN-22)
+    LINK_INPUT      = "⚭"   # URL input prefix - link icon (ICN-17)
+    QUALITY_SELECT  = "◐"   # Quality selector - video/quality icon (ICN-18)
+    FORMAT_SELECT   = "⎚"   # Format selector - file type icon (ICN-19)
+    ERROR_INDICATOR = "⚠"   # Error indicator - exclamation (ICN-20)
+    SUCCESS_INDICATOR = "✓" # Success indicator - checkmark (ICN-21)
+    CLEAR_BTN       = "⌫"   # Clear/Reset button - backspace icon (ICN-22)
+
+    # Actions (General)
     PLAY        = "▶"
     PAUSE       = "⏸"
     STOP        = "⏹"
     REFRESH     = "↻"
-    SEARCH      = "🔍"
-    FOLDER      = "📁"
-    FILE        = "📄"
+    SEARCH      = "⌕"   # Search icon (replaced emoji)
+    FILE        = "⎚"   # File icon (replaced emoji)
     ADD         = "+"
     REMOVE      = "−"
-    CLOSE       = "✕"
+    CLOSE       = "×"
     CHECK       = "✓"
-    CANCEL      = "⏹"
-    
-    # Status
+    CANCEL      = "×"
+
+    # Status (Legacy compatibility)
     SUCCESS     = "✓"
-    ERROR       = "✕"
+    ERROR       = "×"
     WARNING     = "⚠"
     INFO        = "ⓘ"
-    PENDING     = "⏳"
+    PENDING     = "⧗"   # Hourglass (replaced emoji)
     RUNNING     = "▶"
-    COMPLETED   = "✅"
-    FAILED      = "❌"
-    QUEUED      = "📋"
+    COMPLETED   = "✓"   # Checkmark (replaced emoji)
+    FAILED      = "×"   # X (replaced emoji)
+    QUEUED      = "☰"   # List (replaced emoji)
     PAUSED      = "⏸"
-    CANCELLED   = "⏹"
-    
+    CANCELLED   = "×"
+
+    # Empty state (POL-25)
+    EMPTY_FOLDER = "▢"  # Empty folder placeholder
+    EMPTY_LIST   = "∅"  # Empty list placeholder
+
     # Other
     ARROW_RIGHT = "→"
     ARROW_LEFT  = "←"
@@ -198,5 +252,5 @@ class Icons:
     CHEVRON_RIGHT = "›"
     CHEVRON_LEFT  = "‹"
     EXTERNAL    = "↗"
-    LINK        = "🔗"
+    LINK        = "⚭"   # Link chain (replaced emoji)
 

@@ -8,6 +8,7 @@ from tkinter import filedialog
 from typing import Optional, Callable, List
 import threading
 import time
+from ravn_app.ui.design_tokens import Icons
 
 
 class DragDropFrame(ctk.CTkFrame):
@@ -20,7 +21,7 @@ class DragDropFrame(ctk.CTkFrame):
         # Drag & Drop label
         self.drop_label = ctk.CTkLabel(
             self,
-            text="📁 Dosyaları buraya sürükle\nveya tıklayarak seç",
+            text=f"{Icons.FOLDER} Dosyaları buraya sürükle\nveya tıklayarak seç",
             font=("Arial", 14),
             fg_color=("gray85", "gray25"),
             corner_radius=10,
@@ -89,11 +90,11 @@ class SystemTrayIntegration:
 
     def _create_icon(self):
         """Tray ikonu oluştur"""
-        # Basit bir ikon oluştur
+        # Basit bir ikon oluştur (Nordic kahverengi theme)
         from PIL import Image, ImageDraw
-        image = Image.new('RGB', (64, 64), color='blue')
+        image = Image.new('RGB', (64, 64), color='#3D3230')  # kahverengi
         draw = ImageDraw.Draw(image)
-        draw.rectangle([16, 16, 48, 48], fill='white')
+        draw.rectangle([16, 16, 48, 48], fill='#D4C5B9')  # beige
 
         menu_items = [self.MenuItem('Aç', self._on_open)]
         if self.on_pause_queue:
@@ -466,7 +467,7 @@ class HistoryViewer(ctk.CTkFrame):
 
         ctk.CTkButton(
             search_frame,
-            text="🔍",
+            text=Icons.SEARCH,
             width=40,
             command=self._search
         ).pack(side="left")

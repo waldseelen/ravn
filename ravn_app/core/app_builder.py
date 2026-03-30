@@ -198,7 +198,7 @@ class AppBuilder:
 
             if not ffmpeg_path or not ffprobe_path:
                 logger.warning("⚠️ FFmpeg/FFprobe sistem yolunda bulunamadı")
-                logger.info("💡 İpucu: https://ffmpeg.org/download.html adresinden indirin")
+                logger.info("Ipucu: https://ffmpeg.org/download.html adresinden indirin")
                 return False
 
             # Dist dizinine kopyala

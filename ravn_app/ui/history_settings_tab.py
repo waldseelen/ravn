@@ -8,7 +8,7 @@ from tkinter import messagebox, filedialog
 from pathlib import Path
 from ..core.database import DatabaseManager, ConfigManager
 from .advanced_features import SearchFilter
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes
+from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -59,7 +59,7 @@ class HistoryTab(ctk.CTkFrame):
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
-            placeholder_text="🔍 Ara...",
+            placeholder_text=f"{Icons.SEARCH} Ara...",
             width=300
         )
         self.search_entry.pack(side="left", padx=Spacing.XS)
@@ -126,7 +126,7 @@ class HistoryTab(ctk.CTkFrame):
         title_label.pack(fill="x", padx=Spacing.XS, pady=2)
 
         # Detaylar
-        details = f"📁 {download.format} | 🎯 {download.quality} | 📊 {self.format_size(download.file_size)}"
+        details = f"{Icons.FOLDER} {download.format} | {Icons.INFO} {download.quality} | {Icons.INFO} {self.format_size(download.file_size)}"
         details_label = ctk.CTkLabel(
             info_frame,
             text=details,
@@ -139,7 +139,7 @@ class HistoryTab(ctk.CTkFrame):
         # Tarih
         date_label = ctk.CTkLabel(
             info_frame,
-            text=f"🕐 {download.download_date}",
+            text=f"{Icons.HISTORY} {download.download_date}",
             font=Fonts.SMALL,
             anchor="w",
             text_color=Colors.TEXT_MUTED
@@ -169,7 +169,7 @@ class HistoryTab(ctk.CTkFrame):
         if download.file_path and Path(download.file_path).exists():
             ctk.CTkButton(
                 button_frame,
-                text="📂 Aç",
+                text=f"{Icons.FOLDER} Aç",
                 width=80,
                 command=lambda: self.open_file(download.file_path)
             ).pack(pady=2)

@@ -101,10 +101,15 @@ class YouTubeDownloader:
             logger.error(f"Bilgi alınamadı: {e}")
             raise Exception(f"Bilgi alınamadı: {str(e)}")
 
-    def extract_playlist_entries(self, url: str) -> List[Dict[str, Any]]:
-        """Playlist içeriğini indirime başlamadan önce getir."""
+    def extract_playlist_entries(self, url: str, quality_label: str = "En İyi") -> List[Dict[str, Any]]:
+        """Playlist içeriğini seçili kaliteye göre detaylarıyla getir."""
         try:
-            entries = self._runner.extract_playlist_entries(url)
+            # Detaylı bilgileri al (boyut, çözünürlük, format) - kaliteye göre seç.
+            entries = self._runner.extract_playlist_entries(
+                url,
+                with_details=True,
+                quality_label=quality_label,
+            )
             return entries if entries else []
         except Exception as e:
             logger.error(f"Playlist bilgisi alınamadı: {e}")

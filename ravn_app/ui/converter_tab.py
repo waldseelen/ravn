@@ -14,7 +14,7 @@ from ravn_app.core.converter import (
     VideoCodec, AudioCodec, VideoQuality, AudioBitrate, CodecManager
 )
 from ravn_app.core.animation_manager import get_animation_manager
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -51,6 +51,7 @@ class ConverterTab(ctk.CTkFrame):
         self.notify_callback = notify_callback
         self.animation_manager = get_animation_manager()  # Animation utilities
         self._spinner_animation_id = None  # Track active spinner
+        self._progress_value = 0.0
 
         self.setup_ui()
 
@@ -93,18 +94,26 @@ class ConverterTab(ctk.CTkFrame):
         input_subframe = ctk.CTkFrame(self._dnd_drop_zone)
         input_subframe.pack(fill="x", pady=Spacing.SM)
 
-        self.input_path = ctk.CTkEntry(input_subframe, placeholder_text="Video dosyasını seç...")
-        self.input_path.pack(side="left", fill="x", expand=True, padx=(0, 5))
-
-        ctk.CTkButton(
+        self.input_path = ctk.CTkEntry(
             input_subframe,
-            text="Seç",
+            placeholder_text="Video dosyasını seç...",
+            corner_radius=Sizes.CORNER_SM,  # POL-22
+        )
+        self.input_path.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.input_path.configure(cursor=Cursors.TEXT)  # POL-27
+
+        browse_btn = ctk.CTkButton(
+            input_subframe,
+            text=f"{Icons.BROWSE} Seç",
             width=100,
-            command=self.select_input_file
-        ).pack(side="left")
+            command=self.select_input_file,
+            corner_radius=Sizes.CORNER_SM,  # POL-22
+        )
+        browse_btn.pack(side="left")
+        browse_btn.configure(cursor=Cursors.POINTER)  # POL-27
 
         # ===== Format ve Codec Seçimi =====
-        options_frame = ctk.CTkFrame(main_frame)
+        options_frame = ctk.CTkFrame(main_frame, corner_radius=Sizes.CORNER_MD)  # POL-22
         options_frame.pack(fill="x", pady=Spacing.MD)
 
         # Video Codec
@@ -115,7 +124,8 @@ class ConverterTab(ctk.CTkFrame):
         self.video_codec = ctk.CTkComboBox(
             video_frame,
             values=list(CodecManager.VIDEO_CODECS.keys()),
-            state="readonly"
+            state="readonly",
+            corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.video_codec.set("h264")
         self.video_codec.pack(fill="x", pady=Spacing.SM)
@@ -128,7 +138,8 @@ class ConverterTab(ctk.CTkFrame):
         self.audio_codec = ctk.CTkComboBox(
             audio_frame,
             values=list(CodecManager.AUDIO_CODECS.keys()),
-            state="readonly"
+            state="readonly",
+            corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.audio_codec.set("aac")
         self.audio_codec.pack(fill="x", pady=Spacing.SM)
@@ -141,7 +152,8 @@ class ConverterTab(ctk.CTkFrame):
         self.quality = ctk.CTkComboBox(
             quality_frame,
             values=["Kayıpsız", "Çok Yüksek", "Yüksek", "Orta", "Düşük", "Çok Düşük"],
-            state="readonly"
+            state="readonly",
+            corner_radius=Sizes.CORNER_SM,  # POL-22
         )
         self.quality.set("Yüksek")
         self.quality.pack(fill="x", pady=Spacing.SM)
@@ -205,7 +217,7 @@ class ConverterTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             output_subframe,
-            text="Seç",
+            text=f"{Icons.BROWSE} Seç",
             width=100,
             command=self.select_output_file
         ).pack(side="left")
@@ -218,6 +230,10 @@ class ConverterTab(ctk.CTkFrame):
         self.progress_bar = ctk.CTkProgressBar(
             progress_frame,
             variable=self.progress_var
+        )
+        self.progress_bar.configure(
+            progress_color=Colors.PROGRESS_FILL,
+            fg_color=Colors.PROGRESS_BG,
         )
         self.progress_bar.pack(fill="x", pady=Spacing.SM)
 
@@ -254,7 +270,7 @@ class ConverterTab(ctk.CTkFrame):
 
         self.convert_btn = ctk.CTkButton(
             button_frame,
-            text="▶ Dönüştür",
+            text=f"{Icons.CONVERT_BTN} Dönüştür",
             command=self.start_conversion,
             fg_color=Colors.ACCENT,
             hover_color=Colors.ACCENT_HOVER,
@@ -265,7 +281,7 @@ class ConverterTab(ctk.CTkFrame):
 
         self.stop_btn = ctk.CTkButton(
             button_frame,
-            text="⏹ Durdur",
+            text=f"{Icons.CANCEL_BTN} Durdur",
             command=self.stop_conversion,
             fg_color=Colors.DANGER,
             hover_color=Colors.DANGER_HOVER,
@@ -277,7 +293,7 @@ class ConverterTab(ctk.CTkFrame):
 
         self.clear_btn = ctk.CTkButton(
             button_frame,
-            text="🗑 Temizle",
+            text=f"{Icons.CLEAR_BTN} Temizle",
             command=self.clear_fields,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
@@ -499,7 +515,13 @@ class ConverterTab(ctk.CTkFrame):
 
     def _apply_conversion_progress(self, progress: float, status: str):
         """Main-thread: update progress bar and status label."""
-        self.progress_var.set(progress)
+        target = max(0.0, min(1.0, progress / 100.0))
+        self._progress_value = self.animation_manager.smooth_progress(
+            self._progress_value,
+            target,
+            max_step=0.08,
+        )
+        self.progress_var.set(self._progress_value * 100.0)
         if status:
             self.status_label.configure(text=status, text_color=Colors.STATUS_RUNNING)
 
@@ -522,6 +544,7 @@ class ConverterTab(ctk.CTkFrame):
         self.stop_btn.configure(state="disabled")
         self.status_label.configure(text="✓ Dönüştürme tamamlandı", text_color=Colors.STATUS_DONE)
         self.progress_var.set(100)
+        self._progress_value = 1.0
         if hasattr(self, 'db_manager') and self.db_manager:
             from ravn_app.core.database import ConversionRecord
             record = ConversionRecord(

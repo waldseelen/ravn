@@ -157,10 +157,10 @@ class TestFFmpegRunner:
             stdout=json.dumps(mock_data)
         )
         runner = FFmpegRunner()
-        
+
         with patch('os.path.exists', return_value=True):
             result = runner.probe("test.mp4")
-        
+
         assert result is not None
         assert "format" in result
         assert "streams" in result
@@ -169,10 +169,10 @@ class TestFFmpegRunner:
     def test_probe_file_not_found(self, mock_run):
         """Test FFprobe with non-existent file"""
         runner = FFmpegRunner()
-        
+
         with patch('os.path.exists', return_value=False):
             result = runner.probe("nonexistent.mp4")
-        
+
         assert result is None
 
     @patch('subprocess.run')
@@ -186,10 +186,10 @@ class TestFFmpegRunner:
             stdout=json.dumps(mock_data)
         )
         runner = FFmpegRunner()
-        
+
         with patch('os.path.exists', return_value=True):
             duration = runner.get_duration("test.mp4")
-        
+
         assert duration == 120.5
 
     @patch('subprocess.run')
@@ -218,15 +218,15 @@ class TestFFmpegRunner:
         """Test successful FFmpeg run"""
         mock_exists.return_value = True
         mock_getsize.return_value = 1000
-        
+
         mock_process = Mock()
         mock_process.communicate.return_value = ("", "")
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         runner = FFmpegRunner()
         result = runner.run("input.mp4", "output.mp4")
-        
+
         assert result.success is True
         assert result.return_code == 0
 
@@ -236,15 +236,15 @@ class TestFFmpegRunner:
     def test_run_failure(self, mock_makedirs, mock_exists, mock_popen):
         """Test failed FFmpeg run"""
         mock_exists.return_value = True
-        
+
         mock_process = Mock()
         mock_process.communicate.return_value = ("", "Conversion failed")
         mock_process.returncode = 1
         mock_popen.return_value = mock_process
-        
+
         runner = FFmpegRunner()
         result = runner.run("input.mp4", "output.mp4")
-        
+
         assert result.success is False
         assert result.return_code == 1
 
@@ -255,16 +255,16 @@ class TestFFmpegRunner:
         """Test FFmpeg run timeout"""
         import subprocess
         mock_exists.return_value = True
-        
+
         mock_process = Mock()
         mock_process.communicate.side_effect = subprocess.TimeoutExpired("cmd", 10)
         mock_process.kill = Mock()
         mock_process.wait = Mock()
         mock_popen.return_value = mock_process
-        
+
         runner = FFmpegRunner()
         result = runner.run("input.mp4", "output.mp4", timeout=10)
-        
+
         assert result.success is False
         assert "timed out" in result.error_message.lower()
 
@@ -280,16 +280,16 @@ class TestFFmpegRunner:
     def test_cancel_running_process(self, mock_makedirs, mock_exists, mock_popen):
         """Test cancel with running process"""
         mock_exists.return_value = True
-        
+
         mock_process = Mock()
         mock_process.terminate = Mock()
         mock_process.wait = Mock()
         mock_popen.return_value = mock_process
-        
+
         runner = FFmpegRunner()
         runner.current_process = mock_process
         runner.status = RunnerStatus.RUNNING
-        
+
         result = runner.cancel()
         assert result is True
         mock_process.terminate.assert_called_once()
@@ -426,7 +426,7 @@ class TestYtDlpRunner:
         )
         runner = YtDlpRunner()
         result = runner.extract_info("https://example.com/video")
-        
+
         assert result is not None
         assert result["title"] == "Test Video"
         assert result["duration"] == 120
@@ -457,7 +457,7 @@ class TestYtDlpRunner:
         )
         runner = YtDlpRunner()
         formats = runner.list_formats("https://example.com/video")
-        
+
         assert formats is not None
         assert len(formats) == 2
 
@@ -495,6 +495,159 @@ class TestYtDlpRunner:
         runner = YtDlpRunner()
         entries = runner.extract_playlist_entries("https://example.com/playlist")
         assert entries == []
+
+    @patch('subprocess.run')
+    def test_extract_playlist_entries_with_quality_specific_details(self, mock_run):
+        """Test playlist extraction picks format details based on selected quality"""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 120,
+                    "formats": [
+                        {
+                            "format_id": "18",
+                            "width": 854,
+                            "height": 480,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 30 * 1024 * 1024,
+                            "format_note": "480p"
+                        },
+                        {
+                            "format_id": "22",
+                            "width": 1280,
+                            "height": 720,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 52 * 1024 * 1024,
+                            "format_note": "720p"
+                        },
+                        {
+                            "format_id": "137+140",
+                            "width": 1920,
+                            "height": 1080,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 90 * 1024 * 1024,
+                            "format_note": "1080p"
+                        },
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="720p",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "1280x720"
+        assert entries[0]["filesize_mb"] == 52.0
+        assert entries[0]["format_note"] == "720p"
+
+    @patch('subprocess.run')
+    def test_extract_playlist_entries_with_dash_split_streams(self, mock_run):
+        """Test quality details include paired audio when only video stream matches selected quality."""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 120,
+                    "formats": [
+                        {
+                            "format_id": "137",
+                            "width": 1920,
+                            "height": 1080,
+                            "vcodec": "avc1",
+                            "acodec": "none",
+                            "filesize": 80 * 1024 * 1024,
+                            "format_note": "1080p"
+                        },
+                        {
+                            "format_id": "248",
+                            "width": 1280,
+                            "height": 720,
+                            "vcodec": "vp9",
+                            "acodec": "none",
+                            "filesize": 44 * 1024 * 1024,
+                            "format_note": "720p"
+                        },
+                        {
+                            "format_id": "140",
+                            "vcodec": "none",
+                            "acodec": "mp4a",
+                            "filesize": 9 * 1024 * 1024,
+                            "format_note": "audio"
+                        },
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="720p",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "1280x720"
+        assert entries[0]["filesize_mb"] == 53.0
+
+    @patch('subprocess.run')
+    def test_extract_playlist_entries_audio_only_prefers_pure_audio_stream(self, mock_run):
+        """Test audio-only quality avoids muxed video+audio formats when pure audio exists."""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 120,
+                    "formats": [
+                        {
+                            "format_id": "22",
+                            "width": 1280,
+                            "height": 720,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "filesize": 52 * 1024 * 1024,
+                            "format_note": "720p"
+                        },
+                        {
+                            "format_id": "140",
+                            "vcodec": "none",
+                            "acodec": "mp4a",
+                            "filesize": 8 * 1024 * 1024,
+                            "format_note": "audio"
+                        },
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="Sadece Ses",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "Audio"
+        assert entries[0]["filesize_mb"] == 8.0
 
     def test_extract_downloaded_files(self):
         """Test extracting downloaded file paths from output"""
@@ -535,13 +688,13 @@ class TestYtDlpRunner:
         )
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         runner = YtDlpRunner()
         result = runner.download(
             url="https://example.com/video",
             output_dir="output"
         )
-        
+
         assert result.success is True
         assert result.return_code == 0
 
@@ -553,14 +706,14 @@ class TestYtDlpRunner:
         mock_process.communicate.return_value = ("", "Video unavailable")
         mock_process.returncode = 1
         mock_popen.return_value = mock_process
-        
+
         runner = YtDlpRunner()
         result = runner.download(
             url="https://example.com/video",
             output_dir="output",
             retries=3
         )
-        
+
         assert result.success is False
         # Should not retry 3 times for unavailable videos
         assert mock_popen.call_count == 1

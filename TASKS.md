@@ -13,86 +13,6 @@ All development tasks organized by priority and status.
 
 ---
 
-## Summary
-
-**Completed:** Phase 1 (Stabilization & Core Rewrite), Phase 2 (High Priority Features), Phase 3 (Medium Priority Features), Phase 4A (Core GUI Completeness), and Phase 4B (UI/UX Pro Max Enhancements) — 367 tests passing, 1 skipped.
-
-**Active Backlog:** Phase 5 (Build, Package & Distribution) remains open.
-
--PHASE 1-2-3 COMPLETED- find next [] tasks
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Phase 4 — GUI Polish & Full Controllability
-
-Every function accessible and controllable via GUI. Better frontend, full control, no CLI-only features, visual enhancements.
-
-### 4A — Core GUI Completeness [x]
-
-Full UI coverage and queue management.
-
-- [x] **[GUI-01]** Audit all core features — ensure every function has UI control
-- [x] **[GUI-02]** Real-time FFmpeg progress bar (parse `-progress pipe:1`)
-- [x] **[GUI-03]** Download queue panel — show queued, active, completed jobs
-- [x] **[GUI-04]** Per-job cancel button in queue panel
-- [x] **[GUI-05]** Batch download — accept multiple URLs
-- [x] **[GUI-06]** Batch convert — select multiple files with one profile
-- [x] **[GUI-07]** Settings panel for advanced FFmpeg options (CRF, preset, bitrate)
-- [x] **[GUI-08]** Output directory selector with "remember last used"
-- [x] **[GUI-09]** Keyboard shortcuts (Ctrl+D, Ctrl+O, Ctrl+Q, etc.)
-- [x] **[GUI-10]** "Open output folder" button after successful operation
-
-### 4B — UI/UX Pro Max Enhancements [x]
-
-Design system, accessibility, and visual polish. (Design tokens and colors defined; micro-interactions implemented via AnimationManager.)
-
-- [x] **[UX-01]** Visual Design & Theme — consistent corner radius, dark mode colors, semantic palette
-- [x] **[UX-02]** Icons — replace emojis with vector icons (Lucide or similar)
-- [x] **[UX-03]** Interaction & Feedback — disabled buttons during operations, spinner animations
-- [x] **[UX-04]** Drag & Drop Visualization — dashed borders, color changes on hover
-- [x] **[UX-05]** Layout & Spacing — standardize padding/margin to 4px or 8px rhythm
-- [x] **[UX-06]** Forms & Accessibility — persistent labels (not placeholders), proper labeling
-- [x] **[UX-07]** Error Placement — show errors near problematic inputs (not pop-ups)
-- [x] **[UX-08]** Typography Hierarchy — consistent sizing and color contrast (≥4.5:1)
-- [x] **[UX-09]** Navigation — tab icons + text, clear active state
-
-**Dependencies:** Core GUI completeness (4A).
-
----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -101,128 +21,244 @@ Design system, accessibility, and visual polish. (Design tokens and colors defin
 
 Smooth transitions, micro-interactions, real-time feedback, and RAVN brand-consistent visual polish. Minimal animations that enhance usability without being distracting. Theme: Nordic kahverengi/beige minimalism with accent highlights.
 
-### 4C.1 — Brand Color Palette Update [  ]
+**Implementation Order:** 1 → 3 → 4 → 2 → 5 → 6 → 7 (dependencies-first approach)
+
+### 4C.1 — Brand Color Palette Update [x]
+
+**Priority:** FOUNDATION — Required before all other sections.
 
 Align design system with RAVN brand (Nordic kahverengi + minimal beige).
 
-- [ ] **[BRD-01]** Update `design_tokens.py` — Add brand-primary kahverengi (#3D3230 or similar) as accent
-- [ ] **[BRD-02]** Define secondary accent — light beige (#D4C5B9 or warm gray)
-- [ ] **[BRD-03]** Replace blue accent (#3b82f6) → kahverengi for consistency
-- [ ] **[BRD-04]** Dark mode backgrounds — Keep #141414 but adjust surface colors for kahverengi harmony
-- [ ] **[BRD-05]** Success/error/warning — Maintain semantic colors but test contrast with new palette
-- [ ] **[BRD-06]** Hover state color — Use kahverengi-derived lighter shade for hover (not blue)
+- [x] **[BRD-01]** Update `design_tokens.py` — Add brand-primary kahverengi (#3D3230 or similar) as accent
+- [x] **[BRD-02]** Define secondary accent — light beige (#D4C5B9 or warm gray)
+- [x] **[BRD-03]** Replace blue accent (#3b82f6) → kahverengi for consistency
+- [x] **[BRD-04]** Dark mode backgrounds — Keep #141414 but adjust surface colors for kahverengi harmony
+- [x] **[BRD-05]** Success/error/warning — Maintain semantic colors but test contrast with new palette
+- [x] **[BRD-06]** Hover state color — Use kahverengi-derived lighter shade for hover (not blue)
 
 **Output:** Updated `design_tokens.py` with Nordic theme fully integrated.
 
-### 4C.2 — Icon System & Placement [  ]
+**Dependencies:** None. Start immediately.
+
+---
+### 4C.2 — Icon System & Placement [x]
+
+**Priority:** MEDIUM — Visual consistency (depends on color palette being set).
 
 Strategically place vector icons (not emojis) for clarity and brand consistency.
 
 **Navigation & Tabs:**
-- [ ] **[ICN-01]** Download tab — ⬇ → minimize icon or custom raven icon (top-left tab)
-- [ ] **[ICN-02]** Converter tab — ⇄ → gear/convert icon (second tab)
-- [ ] **[ICN-03]** Subtitle tab — ≡ → subtitle/speech icon (third tab)
-- [ ] **[ICN-04]** History tab — ◷ → history/clock icon (fourth tab)
-- [ ] **[ICN-05]** Settings tab — ⚙ → settings/cog icon (fifth tab)
-- [ ] **[ICN-06]** Queue panel — ☰ → queue/list icon (header or left sidebar)
+- [x] **[ICN-01]** Download tab — ⬇ → minimize icon or custom raven icon (top-left tab)
+- [x] **[ICN-02]** Converter tab — ⇄ → gear/convert icon (second tab)
+- [x] **[ICN-03]** Subtitle tab — ≡ → subtitle/speech icon (third tab)
+- [x] **[ICN-04]** History tab — ◷ → history/clock icon (fourth tab)
+- [x] **[ICN-05]** Settings tab — ⚙ → settings/cog icon (fifth tab)
+- [x] **[ICN-06]** Queue panel — ☰ → queue/list icon (header or left sidebar)
 
 **Action Buttons:**
-- [ ] **[ICN-07]** Download button — Large + kahverengi icon indicator
-- [ ] **[ICN-08]** Convert button — Process/arrow icon
-- [ ] **[ICN-09]** Browse/Select button — Folder icon
-- [ ] **[ICN-10]** Cancel/Stop button — X or stop icon in red/error color
-- [ ] **[ICN-11]** Retry button — Clockwise arrow/refresh icon
+- [x] **[ICN-07]** Download button — Large + kahverengi icon indicator
+- [x] **[ICN-08]** Convert button — Process/arrow icon
+- [x] **[ICN-09]** Browse/Select button — Folder icon
+- [x] **[ICN-10]** Cancel/Stop button — X or stop icon in red/error color
+- [x] **[ICN-11]** Retry button — Clockwise arrow/refresh icon
 
 **Status Indicators:**
-- [ ] **[ICN-12]** Queued status — Purple hourglass or circle outline
-- [ ] **[ICN-13]** Running status — Animated spinner (2-3 rot/sec)
-- [ ] **[ICN-14]** Success status — Green checkmark (static, 150ms slide-in)
-- [ ] **[ICN-15]** Error status — Red X or exclamation (pulsing red)
-- [ ] **[ICN-16]** Paused status — Pause symbol (gray)
+- [x] **[ICN-12]** Queued status — Purple hourglass or circle outline
+- [x] **[ICN-13]** Running status — Animated spinner (2-3 rot/sec)
+- [x] **[ICN-14]** Success status — Green checkmark (static, 150ms slide-in)
+- [x] **[ICN-15]** Error status — Red X or exclamation (pulsing red)
+- [x] **[ICN-16]** Paused status — Pause symbol (gray)
 
 **Form & Input:**
-- [ ] **[ICN-17]** URL input prefix icon — Link/chain icon (left of input)
-- [ ] **[ICN-18]** Quality selector prefix — Video/quality icon
-- [ ] **[ICN-19]** Format selector prefix — File type icon
-- [ ] **[ICN-20]** Error indicator — Exclamation triangle (red, right of field)
-- [ ] **[ICN-21]** Success indicator — Green checkmark (right of field, animated)
-- [ ] **[ICN-22]** Clear/Reset button — Trash or X icon (muted gray)
+- [x] **[ICN-17]** URL input prefix icon — Link/chain icon (left of input)
+- [x] **[ICN-18]** Quality selector prefix — Video/quality icon
+- [x] **[ICN-19]** Format selector prefix — File type icon
+- [x] **[ICN-20]** Error indicator — Exclamation triangle (red, right of field)
+- [x] **[ICN-21]** Success indicator — Green checkmark (right of field, animated)
+- [x] **[ICN-22]** Clear/Reset button — Trash or X icon (muted gray)
 
 **Implementation:** Use Lucide icon library (SVG) or custom Raven vector assets.
 
-### 4C.3 — Smooth State Transitions [  ]
+**Dependencies:** 4C.1 (colors). Can start once BRD-01 to BRD-06 complete.
 
-Smooth visual feedback for all interactive elements (150-250ms easing).
+---
 
-- [ ] **[POL-01]** Button press states — scale (0.95–1.0) + kahverengi glow on click
-- [ ] **[POL-02]** Input field focus ring — animated kahverengi border (gray → brand kahverengi, 150ms)
-- [ ] **[POL-03]** Hover states — subtle beige background shift + opacity (100ms ease-out)
-- [ ] **[POL-04]** Tab switching — crossfade between tab content (150ms, no flicker)
-- [ ] **[POL-05]** Modal open/close — scale + fade animation (150-200ms, centered)
-- [ ] **[POL-06]** Dropdown expand/collapse — smooth height transition + kahverengi accent line
-- [ ] **[POL-07]** Progress bar fill — smooth linear fill (no jumps) + color pulse on 100%
-- [ ] **[POL-08]** Disabled state clarity — reduced opacity (0.5) + desaturated kahverengi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 4C.3 — Smooth State Transitions [x]
+
+**Priority:** HIGH — Core animations foundation (POL-01, POL-02 already implemented via AnimationManager).
+
+Smooth visual feedback for all interactive elements (150-250ms easing). Uses centralized AnimationManager with cubic easing curves.
+
+- [x] **[POL-01]** Button press states — scale (0.95–1.0) + kahverengi glow on click
+- [x] **[POL-02]** Input field focus ring — animated kahverengi border (gray → brand kahverengi, 150ms)
+- [x] **[POL-03]** Hover states — subtle beige background shift + opacity (100ms ease-out)
+- [x] **[POL-04]** Tab switching — crossfade between tab content (150ms, no flicker)
+- [x] **[POL-05]** Modal open/close — scale + fade animation (150-200ms, centered)
+- [x] **[POL-06]** Dropdown expand/collapse — smooth height transition + kahverengi accent line
+- [x] **[POL-07]** Progress bar fill — smooth linear fill (no jumps) + color pulse on 100%
+- [x] **[POL-08]** Disabled state clarity — reduced opacity (0.5) + desaturated kahverengi
 
 **Implementation:** CustomTkinter animation loop using `after()` and easing functions. All transitions use kahverengi accent color.
 
-### 4C.4 — Loading & Operational Feedback [  ]
+**Dependencies:** 4C.1 (colors must be defined). POL-01 and POL-02 partially done via AnimationManager.
 
-Real-time visual feedback during async operations with brand consistency.
+---
 
-- [ ] **[POL-09]** Animated spinner — kahverengi rotating icon (2-3 rotations/sec) during download/convert
-- [ ] **[POL-10]** Progress bar — kahverengi fill color + beige background (smooth 60fps updates)
-- [ ] **[POL-11]** Queue item entrance — slide-in from top + kahverengi accent bar (150ms)
-- [ ] **[POL-12]** Job status badges — color-coded icons (purple queued, orange running, green done)
-- [ ] **[POL-13]** "Processing..." — animated kahverengi icon + "Downloading..." text with ellipsis
-- [ ] **[POL-14]** Success feedback — brief green flash + checkmark animation (300ms total)
-- [ ] **[POL-15]** Completion sound/visual — Subtle kahverengi pulse + success checkmark
+### 4C.4 — Loading & Operational Feedback [x]
 
-**Implementation:** Use `ctk.CTkProgressBar` with kahverengi color; custom spinner widget.
+**Priority:** HIGH — User-facing feedback during async operations.
 
-### 4C.5 — Error & Form Feedback [  ]
+Real-time visual feedback during async operations with brand consistency. Spinner animation already available via AnimationManager.
+
+- [x] **[POL-09]** Animated spinner — kahverengi rotating icon (2-3 rotations/sec) during download/convert
+- [x] **[POL-10]** Progress bar — kahverengi fill color + beige background (smooth 60fps updates)
+- [x] **[POL-11]** Queue item entrance — slide-in from top + kahverengi accent bar (150ms)
+- [x] **[POL-12]** Job status badges — color-coded icons (purple queued, orange running, green done)
+- [x] **[POL-13]** "Processing..." — animated kahverengi icon + "Downloading..." text with ellipsis
+- [x] **[POL-14]** Success feedback — brief green flash + checkmark animation (300ms total)
+- [x] **[POL-15]** Completion sound/visual — Subtle kahverengi pulse + success checkmark
+
+**Implementation:** Use `AnimationManager.start_spinner_loop()` and `ctk.CTkProgressBar` with kahverengi color.
+
+**Dependencies:** 4C.1 (colors), 4C.3 (animations). POL-09 spinner already works via AnimationManager.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 4C.5 — Error & Form Feedback [x]
+
+**Priority:** MEDIUM — User feedback on actions.
 
 Inline, contextual feedback without disruption. Brand-consistent error messaging.
 
-- [ ] **[POL-16]** Inline error messages — red icon + text below input (color fade-in, 150ms)
-- [ ] **[POL-17]** Input validation feedback — real-time (on blur, not keystroke)
-- [ ] **[POL-18]** Error recovery affordance — "Retry" or "Edit" hint with icon near error
-- [ ] **[POL-19]** Form field error state — red left border indicator + icon (no full red)
-- [ ] **[POL-20]** Success toast — slide-in from top-right, green checkmark + "Success" text (3s auto-dismiss)
-- [ ] **[POL-21]** Warning toast — amber/orange warning icon + clear message (4s auto-dismiss)
+- [x] **[POL-16]** Inline error messages — red icon + text below input (color fade-in, 150ms)
+- [x] **[POL-17]** Input validation feedback — real-time (on blur, not keystroke)
+- [x] **[POL-18]** Error recovery affordance — "Retry" or "Edit" hint with icon near error
+- [x] **[POL-19]** Form field error state — red left border indicator + icon (no full red)
+- [x] **[POL-20]** Success toast — slide-in from top-right, green checkmark + "Success" text (3s auto-dismiss)
+- [x] **[POL-21]** Warning toast — amber/orange warning icon + clear message (4s auto-dismiss)
 
 **Implementation:** Inline `ctk.CTkLabel` with icon + color animation; custom toast widget.
 
-### 4C.6 — Visual Polish & Consistency [  ]
+**Dependencies:** 4C.3 (animations), 4C.1 (colors).
+
+---
+
+### 4C.6 — Visual Polish & Consistency [x]
+
+**Priority:** LOW-MEDIUM — Refinement and details.
 
 Refinements that improve perceived quality and brand alignment.
 
-- [ ] **[POL-22]** Consistent corner radius — 8px for cards, 6px for buttons/inputs (soft Nordic feel)
-- [ ] **[POL-23]** Focus ring visibility — 2px kahverengi ring on all interactive elements
-- [ ] **[POL-24]** Smooth color transitions — all state changes use easing (not instant)
-- [ ] **[POL-25]** Empty state messaging — clear text + action icon (e.g., folder icon for "No files")
-- [ ] **[POL-26]** Loading skeleton — beige placeholder cards with subtle shimmer
-- [ ] **[POL-27]** Cursor feedback — pointer cursor on buttons + icons, text cursor on inputs
-- [ ] **[POL-28]** Drag & drop refinement — animated kahverengi dashed border on target zone
-- [ ] **[POL-29]** Scroll smoothness — smooth scrolling, no jank in queue/history
-- [ ] **[POL-30]** Brand consistency check — all UI elements use kahverengi/beige (not blue)
+- [x] **[POL-22]** Consistent corner radius — 8px for cards, 6px for buttons/inputs (soft Nordic feel)
+- [x] **[POL-23]** Focus ring visibility — 2px kahverengi ring on all interactive elements
+- [x] **[POL-24]** Smooth color transitions — all state changes use easing (not instant)
+- [x] **[POL-25]** Empty state messaging — clear text + action icon (e.g., folder icon for "No files")
+- [x] **[POL-26]** Loading skeleton — beige placeholder cards with subtle shimmer
+- [x] **[POL-27]** Cursor feedback — pointer cursor on buttons + icons, text cursor on inputs
+- [x] **[POL-28]** Drag & drop refinement — animated kahverengi dashed border on target zone
+- [x] **[POL-29]** Scroll smoothness — smooth scrolling, no jank in queue/history
+- [x] **[POL-30]** Brand consistency check — all UI elements use kahverengi/beige (not blue)
 
 **Implementation:** `ctk.CTkCanvas` for custom effects; frame-based animation loop.
 
-### 4C.7 — Accessibility & Motor Control [  ]
+**Dependencies:** 4C.1 (colors), 4C.3 (animations).
+
+---
+
+### 4C.7 — Accessibility & Motor Control [x]
+
+**Priority:** CRITICAL (Final Pass) — Ensure micro-interactions don't harm accessibility.
 
 Ensure micro-interactions don't harm accessibility.
 
-- [ ] **[POL-31]** Respect reduced-motion — disable animations if system preference detected
-- [ ] **[POL-32]** Keyboard navigation — all animations preserve tab order + focus visibility
-- [ ] **[POL-33]** Animation cancellation — allow user to interrupt long operations (click to stop)
-- [ ] **[POL-34]** Tooltip on hover — explain button actions with icons (300ms delay)
-- [ ] **[POL-35]** Screen reader support — icon labels + descriptive aria-labels
+- [x] **[POL-31]** Respect reduced-motion — disable animations if system preference detected
+- [x] **[POL-32]** Keyboard navigation — all animations preserve tab order + focus visibility
+- [x] **[POL-33]** Animation cancellation — allow user to interrupt long operations (click to stop)
+- [x] **[POL-34]** Tooltip on hover — explain button actions with icons (300ms delay)
+- [x] **[POL-35]** Screen reader support — icon labels + descriptive aria-labels
 
 **Implementation:** Platform detection for reduced-motion; focus management during transitions.
 
-**Dependencies:** Phase 4B (design tokens, colors, icons). Requires BRD-01 to BRD-06 complete before POL-* items.
+**Dependencies:** All other 4C sections (final accessibility pass after implementation).
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Phase 5 — Build, Package & Distribution
 

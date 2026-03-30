@@ -4,8 +4,11 @@ Unit tests for AnimationManager easing functions and animation utilities.
 Tests verify that easing functions produce correct curves for smooth transitions.
 """
 
+import os
 import unittest
-from ravn_app.core.animation_manager import EasingFunction, AnimationManager
+from ravn_app.core.animation_manager import (
+    EasingFunction, AnimationManager, detect_reduced_motion
+)
 
 
 class TestEasingFunction(unittest.TestCase):
@@ -72,6 +75,38 @@ class TestEasingFunction(unittest.TestCase):
         self.assertGreater(ease_out, ease_in)
 
 
+class TestReducedMotion(unittest.TestCase):
+    """Tests for reduced motion detection (POL-31)."""
+
+    def test_env_var_true(self):
+        """RAVN_REDUCED_MOTION=1 should return True."""
+        old_val = os.environ.get("RAVN_REDUCED_MOTION")
+        try:
+            os.environ["RAVN_REDUCED_MOTION"] = "1"
+            self.assertTrue(detect_reduced_motion())
+            os.environ["RAVN_REDUCED_MOTION"] = "true"
+            self.assertTrue(detect_reduced_motion())
+        finally:
+            if old_val is None:
+                os.environ.pop("RAVN_REDUCED_MOTION", None)
+            else:
+                os.environ["RAVN_REDUCED_MOTION"] = old_val
+
+    def test_env_var_false(self):
+        """RAVN_REDUCED_MOTION=0 should return False."""
+        old_val = os.environ.get("RAVN_REDUCED_MOTION")
+        try:
+            os.environ["RAVN_REDUCED_MOTION"] = "0"
+            self.assertFalse(detect_reduced_motion())
+            os.environ["RAVN_REDUCED_MOTION"] = "false"
+            self.assertFalse(detect_reduced_motion())
+        finally:
+            if old_val is None:
+                os.environ.pop("RAVN_REDUCED_MOTION", None)
+            else:
+                os.environ["RAVN_REDUCED_MOTION"] = old_val
+
+
 class TestAnimationManager(unittest.TestCase):
     """Tests for AnimationManager utility methods."""
 
@@ -126,6 +161,43 @@ class TestAnimationManager(unittest.TestCase):
             mid = ease_func(0.5)
             self.assertGreater(mid, 0.0)
             self.assertLess(mid, 1.0)
+
+    def test_smooth_progress_moves_towards_target(self):
+        """Smooth progress should advance gradually without overshooting target."""
+        self.assertAlmostEqual(self.manager.smooth_progress(0.0, 1.0, max_step=0.2), 0.2)
+        self.assertAlmostEqual(self.manager.smooth_progress(0.85, 1.0, max_step=0.2), 1.0)
+
+    def test_smooth_progress_clamps_inputs(self):
+        """Out-of-range current/target values should be clamped to [0, 1]."""
+        value = self.manager.smooth_progress(-0.5, 1.5, max_step=0.25)
+        self.assertGreaterEqual(value, 0.0)
+        self.assertLessEqual(value, 1.0)
+
+    def test_format_processing_text_cycles_ellipsis(self):
+        """Processing text should cycle through one to three dots."""
+        expected = [
+            "İndiriliyor.",
+            "İndiriliyor..",
+            "İndiriliyor...",
+            "İndiriliyor.",
+        ]
+        actual = [self.manager.format_processing_text("İndiriliyor", tick) for tick in range(4)]
+        self.assertEqual(actual, expected)
+
+    def test_reduced_motion_property(self):
+        """Reduced motion property should return a boolean."""
+        result = self.manager.reduced_motion
+        self.assertIsInstance(result, bool)
+
+    def test_set_reduced_motion(self):
+        """set_reduced_motion should override detection."""
+        self.manager.set_reduced_motion(True)
+        self.assertTrue(self.manager.reduced_motion)
+        self.assertFalse(self.manager.should_animate())
+
+        self.manager.set_reduced_motion(False)
+        self.assertFalse(self.manager.reduced_motion)
+        self.assertTrue(self.manager.should_animate())
 
 
 if __name__ == "__main__":

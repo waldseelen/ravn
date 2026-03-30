@@ -14,7 +14,7 @@ from ..core.subtitle_manager import (
     SubtitleEmbedder,
     SubtitleFormat
 )
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes
+from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Icons
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -104,7 +104,7 @@ class SubtitleTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             dir_frame,
-            text="Gözat",
+            text=f"{Icons.BROWSE} Gözat",
             width=80,
             command=self.select_output_dir,
             font=Fonts.LABEL
@@ -154,7 +154,7 @@ class SubtitleTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             self._video_drop_zone,
-            text="Video Seç",
+            text=f"{Icons.BROWSE} Video Seç",
             command=self.select_video_file,
             width=150,
             font=Fonts.LABEL
@@ -181,7 +181,7 @@ class SubtitleTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             self._subtitle_drop_zone,
-            text="Altyazı Seç",
+            text=f"{Icons.BROWSE} Altyazı Seç",
             command=self.select_subtitle_file,
             width=150,
             font=Fonts.LABEL
@@ -203,7 +203,7 @@ class SubtitleTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             convert_frame,
-            text="Dönüştür",
+            text=f"{Icons.CONVERT_BTN} Dönüştür",
             command=self.convert_subtitle,
             font=Fonts.LABEL
         ).pack(pady=Spacing.XS)

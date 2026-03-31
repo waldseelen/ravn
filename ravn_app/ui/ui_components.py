@@ -68,8 +68,8 @@ class Toast(ctk.CTkFrame):
         close_btn = ctk.CTkButton(
             content,
             text=Icons.CLOSE,
-            width=24,
-            height=24,
+            width=Sizes.BTN_HEIGHT_SM,
+            height=Sizes.BTN_HEIGHT_SM,
             fg_color="transparent",
             hover_color=config["hover"],
             text_color=Colors.TEXT_MUTED,
@@ -728,6 +728,7 @@ def set_button_loading_state(button, is_loading: bool, loading_text: str = None,
                 text=loading_text or f"{Icons.SPINNER} ...",
                 state="disabled",
                 fg_color=Colors.BTN_DISABLED,
+                text_color=Colors.TEXT_MUTED,
             )
         else:
             text = original_text or getattr(button, '_original_text', button.cget("text"))
@@ -735,6 +736,7 @@ def set_button_loading_state(button, is_loading: bool, loading_text: str = None,
                 text=text,
                 state="normal",
                 fg_color=Colors.ACCENT,
+                text_color=Colors.TEXT_PRIMARY,
             )
     except Exception:
         pass

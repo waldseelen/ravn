@@ -12,7 +12,7 @@ from ..core.database import DatabaseManager, ConfigManager
 from ravn_app.core.i18n import t
 from .advanced_features import SearchFilter, ThemeManager
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
-from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
+from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip, EmptyStateWidget
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -116,12 +116,11 @@ class HistoryTab(ctk.CTkFrame):
         downloads = self.db.get_downloads(limit=100)
 
         if not downloads:
-            ctk.CTkLabel(
+            EmptyStateWidget(
                 self.scrollable_frame,
-                text=t("history.noHistory"),
-                font=Fonts.LABEL,
-                text_color=Colors.TEXT_MUTED
-            ).pack(pady=Spacing.XL)
+                icon=Icons.EMPTY_FOLDER,
+                message=t("history.noHistory"),
+            ).pack(fill="both", expand=True, pady=Spacing.XL)
             return
 
         for download in downloads:
@@ -201,6 +200,25 @@ class HistoryTab(ctk.CTkFrame):
                 cursor=Cursors.POINTER,
             ).pack(pady=2)
 
+        # MIC-02: Satır hover highlight — Enter/Leave ile BG_HOVER / BG_SURFACE geçişi
+        def _on_row_enter(event, frame=item_frame):
+            try:
+                frame.configure(fg_color=Colors.BG_HOVER)
+            except Exception:
+                pass
+
+        def _on_row_leave(event, frame=item_frame):
+            try:
+                frame.configure(fg_color=Colors.BG_SURFACE)
+            except Exception:
+                pass
+
+        # item_frame + tüm direkt/indirect child'lar hover'ı alır
+        for widget in (item_frame, info_frame, button_frame,
+                       title_label, details_label, date_label, status_label):
+            widget.bind("<Enter>", _on_row_enter, add="+")
+            widget.bind("<Leave>", _on_row_leave, add="+")
+
     def filter_history(self):
         """Geçmişi filtrele"""
         search_term = self.search_entry.get()
@@ -226,6 +244,13 @@ class HistoryTab(ctk.CTkFrame):
             from ..core.database import DownloadRecord
             download = DownloadRecord(**download_dict)
             self.create_history_item(download)
+
+        if not filtered:
+            EmptyStateWidget(
+                self.scrollable_frame,
+                icon=Icons.EMPTY_FOLDER,
+                message=t("history.noHistory"),
+            ).pack(fill="both", expand=True, pady=Spacing.XL)
 
     def show_statistics(self):
         """İstatistikleri göster"""

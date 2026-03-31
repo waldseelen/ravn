@@ -12,6 +12,7 @@ from ravn_app.core.animation_manager import get_animation_manager
 from ravn_app.core.i18n import t
 from ravn_app.core.task_manager import Task, TaskStatus, TaskType, get_task_queue
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.ui_components import EmptyStateWidget
 
 
 class QueueItemWidget(ctk.CTkFrame):
@@ -357,15 +358,13 @@ class QueuePanel(ctk.CTkFrame):
         )
         self.task_list.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
-        # Placeholder when empty
-        self.empty_label = ctk.CTkLabel(
+        # MIC-05: Empty state widget
+        self.empty_state = EmptyStateWidget(
             self.task_list,
-            text=t("queue.empty"),
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_MUTED,
-            justify="center"
+            icon=Icons.EMPTY_LIST,
+            message=t("queue.empty"),
         )
-        self.empty_label.pack(pady=40)
+        self.empty_state.pack(fill="both", expand=True, pady=40)
 
         # Start auto-refresh
         self._refresh_tasks()
@@ -383,10 +382,10 @@ class QueuePanel(ctk.CTkFrame):
             self.stats_label.configure(
                 text=t("queue.stats", active=active, queued=queued, completed=completed)
             )
-            self.empty_label.pack_forget()
+            self.empty_state.pack_forget()
         else:
             self.stats_label.configure(text="")
-            self.empty_label.pack(pady=40)
+            self.empty_state.pack(fill="both", expand=True, pady=40)
 
         # Update existing widgets or create new ones
         current_task_ids = {t.id for t in tasks}

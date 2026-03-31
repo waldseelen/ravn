@@ -72,6 +72,7 @@ class Colors:
     # Secondary buttons
     BTN_SECONDARY       = ("#D4C5B9", "#3A3330")   # (light, dark)
     BTN_SECONDARY_HOVER = ("#C4B0A0", "#4A4340")   # (light, dark)
+    BTN_DISABLED        = ("#C8BFB8", "#303030")   # (light, dark) disabled button bg (MIC-07)
 
     # Interactive states (kahverengi-aligned)
     FOCUS_RING = "#A68A6E"   # kahverengi-400 for focus indicators

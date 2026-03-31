@@ -241,6 +241,7 @@ class TorrentTab(ctk.CTkFrame):
             fg_color=Colors.DANGER,
             hover_color=Colors.DANGER_HOVER,
             state="disabled",
+            text_color=Colors.TEXT_MUTED,
             cursor=Cursors.POINTER,
         )
         self._cancel_btn.pack(side="left", padx=(0, Spacing.XS))
@@ -254,6 +255,7 @@ class TorrentTab(ctk.CTkFrame):
             fg_color=Colors.SUCCESS,
             hover_color=Colors.SUCCESS_HOVER,
             state="disabled",
+            text_color=Colors.TEXT_MUTED,
             cursor=Cursors.POINTER,
         )
         self._open_player_btn.pack(side="left")
@@ -473,12 +475,12 @@ class TorrentTab(ctk.CTkFrame):
 
     def _set_downloading_state(self, is_downloading: bool):
         if is_downloading:
-            self._download_btn.configure(state="disabled")
-            self._cancel_btn.configure(state="normal")
+            self._download_btn.configure(state="disabled", text_color=Colors.TEXT_MUTED)
+            self._cancel_btn.configure(state="normal", text_color=Colors.TEXT_PRIMARY)
             self._set_status(t("torrent.downloading"), Colors.STATUS_RUNNING)
         else:
-            self._download_btn.configure(state="normal")
-            self._cancel_btn.configure(state="disabled")
+            self._download_btn.configure(state="normal", text_color=Colors.TEXT_PRIMARY)
+            self._cancel_btn.configure(state="disabled", text_color=Colors.TEXT_MUTED)
 
     def _set_status(self, text: str, color: str = Colors.TEXT_MUTED):
         self._status_label.configure(text=text, text_color=color)

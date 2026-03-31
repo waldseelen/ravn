@@ -117,6 +117,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             segmented_button_unselected_color=Colors.BG_CARD,
             segmented_button_unselected_hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
+            text_color_disabled=Colors.TEXT_MUTED,
         )
 
         download_tab_container = self.tabview.add(f"{Icons.DOWNLOAD}  {t('tabs.download')}")
@@ -254,7 +255,32 @@ class YouTubeDownloaderApp(ctk.CTk):
                 ),
             )
 
+            # MIC-04: aktif sekme metnini bold yap
+            self._update_active_tab_font(tab_name)
+
         segmented.configure(command=wrapped_command)
+
+        # MIC-04: İlk yüklemede de aktif sekmeyi bold yap
+        try:
+            initial_tab = self.tabview.get()
+            if initial_tab:
+                self.after(100, lambda: self._update_active_tab_font(initial_tab))
+        except Exception:
+            pass
+
+    def _update_active_tab_font(self, active_tab_name: str):
+        """MIC-04: Aktif sekme etiketini bold, diğerlerini normal yap."""
+        segmented = getattr(self.tabview, "_segmented_button", None)
+        if segmented is None:
+            return
+        try:
+            for btn_name, btn_widget in segmented._buttons_dict.items():
+                if btn_name == active_tab_name:
+                    btn_widget.configure(font=Fonts.H2)
+                else:
+                    btn_widget.configure(font=Fonts.LABEL)
+        except Exception:
+            pass
 
     def _update_status_text(self, text: str):
         download_tab = self.__dict__.get("download_tab")

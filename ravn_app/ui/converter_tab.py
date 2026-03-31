@@ -115,6 +115,8 @@ class ConverterTab(ctk.CTkFrame):
             width=100,
             command=self.select_input_file,
             corner_radius=Sizes.CORNER_SM,  # POL-22
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         )
         browse_btn.pack(side="left")
         browse_btn.configure(cursor=Cursors.POINTER)  # POL-27
@@ -244,7 +246,9 @@ class ConverterTab(ctk.CTkFrame):
             output_subframe,
             text=f"{Icons.BROWSE} {t('common.select')}",
             width=100,
-            command=self.select_output_file
+            command=self.select_output_file,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(side="left")
 
         # ===== Progress Bar =====
@@ -257,7 +261,7 @@ class ConverterTab(ctk.CTkFrame):
             variable=self.progress_var
         )
         self.progress_bar.configure(
-            progress_color=Colors.PROGRESS_FILL,
+            progress_color=Colors.ACCENT,
             fg_color=Colors.PROGRESS_BG,
         )
         self.progress_bar.pack(fill="x", pady=Spacing.SM)

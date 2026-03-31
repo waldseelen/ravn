@@ -43,15 +43,13 @@ Kolay maddeler tamamlandı (bkz. plan `agile-percolating-spark.md`). Kalanlar:
 
 ---
 
-
-
 ## Phase 1.1 — Micro-interaction & Polish
 
 UI/UX Pro Max analizi (Flat Design + Micro-interactions profili) çıktısına göre görsel kalite iyileştirmeleri.
 
-- [ ] **[MIC-01]** Tüm `CTkButton` widget'larına hover rengi ekle — `hover_color=Colors.ACCENT_HOVER` token kullanılsın, manuel hex yasak
-- [ ] **[MIC-02]** Treeview (Queue, History) satırlarına hover highlight ekle — `tag_configure("hover", background=BG_HOVER)` + `<Motion>` bağlaması
-- [ ] **[MIC-03]** Progress bar rengini `ACCENT` token'ına çek — varsayılan mavi yerine `Colors.ACCENT` kullanılsın; tüm sekmelerde tutarlı olsun
+- [x] **[MIC-01]** Tüm `CTkButton` widget'larına hover rengi ekle — `hover_color=Colors.ACCENT_HOVER` token kullanılsın, manuel hex yasak
+- [x] **[MIC-02]** Treeview (Queue, History) satırlarına hover highlight ekle — `tag_configure("hover", background=BG_HOVER)` + `<Motion>` bağlaması
+- [x] **[MIC-03]** Progress bar rengini `ACCENT` token'ına çek — varsayılan mavi yerine `Colors.ACCENT` kullanılsın; tüm sekmelerde tutarlı olsun
 - [ ] **[MIC-04]** Active tab göstergesini belirginleştir — aktif sekme etiketini `font=Fonts.H2` (bold) yap veya accent renkli alt çizgi ekle (`main_window.py`)
 - [ ] **[MIC-05]** Queue ve History sekmeleri için boş durum (empty state) ekle — içerik yokken ikon + açıklayıcı metin + aksiyon butonu göster
 - [ ] **[MIC-06]** Başarı bildirimi (toast) otomatik kapanmasını standartlaştır — `3000 ms` after() ile dismiss; mevcut toast'ların hepsinin bu kurala uyduğunu doğrula
@@ -70,7 +68,6 @@ WCAG AA uyumluluğu ve klavye erişilebilirliği.
 - [ ] **[ACC-05]** Minimum tıklama alanı — tüm ikon butonları (kare olanlar dahil) en az `32×32 px` görünür boyuta sahip olsun; `BTN_HEIGHT_SM=32` token'ı baz alınsın
 
 ---
-
 
 **(After GUI is Done) — Build & Distribution:**
 

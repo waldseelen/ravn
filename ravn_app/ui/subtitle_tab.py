@@ -127,6 +127,8 @@ class SubtitleTab(ctk.CTkFrame):
             command=self.select_output_dir,
             font=Fonts.LABEL,
             cursor=Cursors.POINTER,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(side="left")
 
         # İndir butonu
@@ -180,6 +182,8 @@ class SubtitleTab(ctk.CTkFrame):
             width=150,
             font=Fonts.LABEL,
             cursor=Cursors.POINTER,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(pady=Spacing.XS)
 
         self.video_label = ctk.CTkLabel(self._video_drop_zone, text=t("subtitle.videoNotSelected"), font=Fonts.LABEL)
@@ -208,6 +212,8 @@ class SubtitleTab(ctk.CTkFrame):
             width=150,
             font=Fonts.LABEL,
             cursor=Cursors.POINTER,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(pady=Spacing.XS)
 
         self.subtitle_label = ctk.CTkLabel(self._subtitle_drop_zone, text=t("subtitle.subtitleNotSelected"), font=Fonts.LABEL)
@@ -233,6 +239,8 @@ class SubtitleTab(ctk.CTkFrame):
             command=self.convert_subtitle,
             font=Fonts.LABEL,
             cursor=Cursors.POINTER,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
         ).pack(pady=Spacing.XS)
 
         # Zamanlama düzenleme

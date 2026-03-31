@@ -94,7 +94,7 @@ class QueueItemWidget(ctk.CTkFrame):
         if task.status == TaskStatus.RUNNING:
             self.progress_bar = ctk.CTkProgressBar(info_frame, height=4)
             self.progress_bar.configure(
-                progress_color=Colors.PROGRESS_FILL,
+                progress_color=Colors.ACCENT,
                 fg_color=Colors.PROGRESS_BG,
             )
             self.progress_bar.set(task.progress / 100.0)
@@ -287,7 +287,7 @@ class QueueItemWidget(ctk.CTkFrame):
                 info_frame = self.status_text_label.master
                 self.progress_bar = ctk.CTkProgressBar(info_frame, height=4)
                 self.progress_bar.configure(
-                    progress_color=Colors.PROGRESS_FILL,
+                    progress_color=Colors.ACCENT,
                     fg_color=Colors.PROGRESS_BG,
                 )
                 self.progress_bar.pack(fill="x", pady=(4, 0))

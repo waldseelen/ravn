@@ -349,13 +349,17 @@ class AdvancedSettingsDialog(ctk.CTkToplevel):
         ctk.CTkButton(
             button_frame,
             text="Kaydet",
-            command=self._save_settings
+            command=self._save_settings,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
         ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
             button_frame,
             text="İptal",
-            command=self.destroy
+            command=self.destroy,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(side="left", padx=Spacing.XS)
 
     def _create_general_settings(self, parent):
@@ -444,7 +448,9 @@ class HistoryViewer(ctk.CTkFrame):
             search_frame,
             text=Icons.SEARCH,
             width=40,
-            command=self._search
+            command=self._search,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
         ).pack(side="left")
 
         # Filtreler

@@ -83,7 +83,7 @@ class FeedbackMixin:
         self.download_progress.configure(progress_color=Colors.SUCCESS_FLASH)
         self.after(
             Motion.SLOW,
-            lambda: self.download_progress.configure(progress_color=Colors.PROGRESS_FILL),
+            lambda: self.download_progress.configure(progress_color=Colors.ACCENT),
         )
 
     def _hide_progress(self):

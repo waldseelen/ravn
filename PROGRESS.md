@@ -65,6 +65,7 @@ Verified on 2026-03-30.
 - Last known full-suite baseline: `pytest -q` -> `472 passed, 1 skipped` (473 collected).
 - Latest refactor-session validation (2026-03-31):
   - Full suite after Phase 1 UI consistency tasks: `472 passed, 1 skipped`
+  - Full suite after Phase 1.1 micro-interaction tasks (MIC-01, MIC-02, MIC-03): `472 passed, 1 skipped`
 
 ## Functional Highlights
 
@@ -78,6 +79,7 @@ Verified on 2026-03-30.
 - `ErrorPanel` integrated into converter and subtitle tabs for user-friendly error display.
 - Focus ring animation active on all input fields.
 - `Spacing.*` design tokens applied consistently across UI components.
+- **Phase 1.1 Micro-interactions**: All `CTkButton` widgets have `hover_color` token applied; Treeview rows highlight on mouse motion; progress bars use `Colors.ACCENT` for visual consistency.
 
 ## Documentation Sync
 

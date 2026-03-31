@@ -264,7 +264,7 @@ class TorrentTab(ctk.CTkFrame):
 
         self._progress_bar = ctk.CTkProgressBar(progress_frame)
         self._progress_bar.configure(
-            progress_color=Colors.PROGRESS_FILL,
+            progress_color=Colors.ACCENT,
             fg_color=Colors.PROGRESS_BG,
         )
         self._progress_bar.set(0)

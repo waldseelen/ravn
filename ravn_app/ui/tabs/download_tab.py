@@ -347,7 +347,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         self._video_progress = ctk.CTkProgressBar(video_col)
         self._video_progress.configure(
-            progress_color=Colors.PROGRESS_FILL,
+            progress_color=Colors.ACCENT,
             fg_color=Colors.PROGRESS_BG,
         )
         self._video_progress.set(0)
@@ -451,7 +451,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         self._music_progress = ctk.CTkProgressBar(music_col)
         self._music_progress.configure(
-            progress_color=Colors.PROGRESS_FILL,
+            progress_color=Colors.ACCENT,
             fg_color=Colors.PROGRESS_BG,
         )
         self._music_progress.set(0)
@@ -1071,6 +1071,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                 text=f"{Icons.PLAY if hasattr(Icons, 'PLAY') else '▶'} {t('download.openInPlayer')}",
                 command=lambda: self._open_with_player(url),
                 font=Fonts.LABEL,
+                fg_color=Colors.ACCENT,
+                hover_color=Colors.ACCENT_HOVER,
             )
         else:
             self._player_btn.configure(command=lambda: self._open_with_player(url))

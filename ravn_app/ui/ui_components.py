@@ -666,3 +666,75 @@ class LoadingSkeleton(ctk.CTkFrame):
             except Exception:
                 pass
         super().destroy()
+
+
+def style_combo(combo):
+    """Apply standard RAVN styling to a CTkComboBox."""
+    combo.configure(
+        fg_color=Colors.BG_INPUT,
+        button_color=Colors.ACCENT,
+        button_hover_color=Colors.ACCENT_HOVER,
+        dropdown_fg_color=Colors.BG_SURFACE,
+        text_color=Colors.TEXT_PRIMARY,
+        dropdown_text_color=Colors.TEXT_PRIMARY,
+        border_color=Colors.BORDER,
+    )
+
+
+def style_entry(entry):
+    """Apply standard RAVN styling to a CTkEntry."""
+    entry.configure(
+        fg_color=Colors.BG_INPUT,
+        text_color=Colors.TEXT_PRIMARY,
+        placeholder_text_color=Colors.TEXT_MUTED,
+        border_color=Colors.BORDER,
+    )
+
+
+def bind_focus_ring(widget):
+    """Bind focus-in/out events to animate the border color."""
+    def on_focus_in(event=None):
+        try:
+            widget.configure(border_color=Colors.ACCENT)
+        except Exception:
+            pass
+
+    def on_focus_out(event=None):
+        try:
+            widget.configure(border_color=Colors.BORDER)
+        except Exception:
+            pass
+
+    widget.bind("<FocusIn>", on_focus_in)
+    widget.bind("<FocusOut>", on_focus_out)
+
+
+def set_button_loading_state(button, is_loading: bool, loading_text: str = None, original_text: str = None):
+    """
+    Set a button to loading or normal state.
+
+    Args:
+        button: CTkButton widget
+        is_loading: True to show loading state, False to restore
+        loading_text: Text to show during loading (optional, defaults to spinner + "...")
+        original_text: Text to restore when not loading (required if is_loading=False)
+    """
+    if button is None:
+        return
+    try:
+        if is_loading:
+            button._original_text = button.cget("text") if not hasattr(button, '_original_text') else button._original_text
+            button.configure(
+                text=loading_text or f"{Icons.SPINNER} ...",
+                state="disabled",
+                fg_color=Colors.BTN_DISABLED,
+            )
+        else:
+            text = original_text or getattr(button, '_original_text', button.cget("text"))
+            button.configure(
+                text=text,
+                state="normal",
+                fg_color=Colors.ACCENT,
+            )
+    except Exception:
+        pass

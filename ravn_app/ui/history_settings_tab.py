@@ -12,6 +12,7 @@ from ..core.database import DatabaseManager, ConfigManager
 from ravn_app.core.i18n import t
 from .advanced_features import SearchFilter, ThemeManager
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -24,27 +25,6 @@ class HistoryTab(ctk.CTkFrame):
 
         self.setup_ui()
         self.load_history()
-
-    @staticmethod
-    def _style_combo(combo):
-        combo.configure(
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.ACCENT,
-            button_hover_color=Colors.ACCENT_HOVER,
-            dropdown_fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_PRIMARY,
-            dropdown_text_color=Colors.TEXT_PRIMARY,
-            border_color=Colors.BORDER,
-        )
-
-    @staticmethod
-    def _style_entry(entry):
-        entry.configure(
-            fg_color=Colors.BG_INPUT,
-            text_color=Colors.TEXT_PRIMARY,
-            placeholder_text_color=Colors.TEXT_MUTED,
-            border_color=Colors.BORDER,
-        )
 
     def setup_ui(self):
         """UI'ı oluştur"""
@@ -60,7 +40,7 @@ class HistoryTab(ctk.CTkFrame):
         ).pack(side="left", padx=Spacing.SM)
 
         # İstatistikler butonu
-        ctk.CTkButton(
+        self.stats_btn = ctk.CTkButton(
             header_frame,
             text=t("history.statistics"),
             command=self.show_statistics,
@@ -69,10 +49,12 @@ class HistoryTab(ctk.CTkFrame):
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_SM,
             cursor=Cursors.POINTER,
-        ).pack(side="right", padx=Spacing.XS)
+        )
+        self.stats_btn.pack(side="right", padx=Spacing.XS)
+        Tooltip(self.stats_btn, t("history.statisticsTooltip"))
 
         # Temizle butonu
-        ctk.CTkButton(
+        self.clear_btn = ctk.CTkButton(
             header_frame,
             text=t("history.clear"),
             command=self.clear_history,
@@ -81,7 +63,9 @@ class HistoryTab(ctk.CTkFrame):
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_SM,
             cursor=Cursors.POINTER,
-        ).pack(side="right", padx=Spacing.XS)
+        )
+        self.clear_btn.pack(side="right", padx=Spacing.XS)
+        Tooltip(self.clear_btn, t("history.clearTooltip"))
 
         # Arama ve filtre
         search_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
@@ -92,9 +76,10 @@ class HistoryTab(ctk.CTkFrame):
             placeholder_text=f"{Icons.SEARCH} {t('history.search')}",
             width=300
         )
-        self._style_entry(self.search_entry)
+        style_entry(self.search_entry)
         self.search_entry.pack(side="left", padx=Spacing.XS)
         self.search_entry.bind("<KeyRelease>", lambda e: self.filter_history())
+        Tooltip(self.search_entry, t("history.searchTooltip"))
 
         ctk.CTkLabel(search_frame, text=t("history.format"), font=Fonts.LABEL, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=Spacing.XS)
         self.format_filter = ctk.CTkComboBox(
@@ -103,8 +88,9 @@ class HistoryTab(ctk.CTkFrame):
             command=lambda v: self.filter_history(),
             width=100
         )
-        self._style_combo(self.format_filter)
+        style_combo(self.format_filter)
         self.format_filter.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.format_filter, t("history.formatFilterTooltip"))
 
         ctk.CTkLabel(search_frame, text=t("history.status"), font=Fonts.LABEL, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=Spacing.XS)
         self.status_filter = ctk.CTkComboBox(
@@ -113,8 +99,9 @@ class HistoryTab(ctk.CTkFrame):
             command=lambda v: self.filter_history(),
             width=120
         )
-        self._style_combo(self.status_filter)
+        style_combo(self.status_filter)
         self.status_filter.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.status_filter, t("history.statusFilterTooltip"))
 
         # Scrollable liste
         self.scrollable_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_CARD)
@@ -301,27 +288,6 @@ class SettingsTab(ctk.CTkFrame):
         self.load_settings()
 
     @staticmethod
-    def _style_combo(combo):
-        combo.configure(
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.ACCENT,
-            button_hover_color=Colors.ACCENT_HOVER,
-            dropdown_fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_PRIMARY,
-            dropdown_text_color=Colors.TEXT_PRIMARY,
-            border_color=Colors.BORDER,
-        )
-
-    @staticmethod
-    def _style_entry(entry):
-        entry.configure(
-            fg_color=Colors.BG_INPUT,
-            text_color=Colors.TEXT_PRIMARY,
-            placeholder_text_color=Colors.TEXT_MUTED,
-            border_color=Colors.BORDER,
-        )
-
-    @staticmethod
     def _normalize_quality_for_storage(value: str) -> str:
         normalized = unicodedata.normalize("NFKD", str(value or "").strip())
         normalized = normalized.encode("ascii", "ignore").decode("ascii").strip().lower()
@@ -429,7 +395,7 @@ class SettingsTab(ctk.CTkFrame):
             values=ThemeManager.get_theme_names(),
             command=lambda _value: self._preview_theme_selection(),
         )
-        self._style_combo(self.theme_combo)
+        style_combo(self.theme_combo)
         self.theme_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Dil
@@ -441,7 +407,7 @@ class SettingsTab(ctk.CTkFrame):
             lang_frame,
             values=["Türkçe", "English"]
         )
-        self._style_combo(self.language_combo)
+        style_combo(self.language_combo)
         self.language_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Bildirimler
@@ -474,7 +440,7 @@ class SettingsTab(ctk.CTkFrame):
             values=[t("settings.closeToTray"), t("settings.closeFully")],
             state="readonly"
         )
-        self._style_combo(self.close_behavior_combo)
+        style_combo(self.close_behavior_combo)
         self.close_behavior_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
         ctk.CTkLabel(
             tray_frame,
@@ -495,7 +461,7 @@ class SettingsTab(ctk.CTkFrame):
         dir_select_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         self.download_dir_entry = ctk.CTkEntry(dir_select_frame)
-        self._style_entry(self.download_dir_entry)
+        style_entry(self.download_dir_entry)
         self.download_dir_entry.pack(side="left", fill="x", expand=True, padx=Spacing.XS)
 
         ctk.CTkButton(
@@ -517,7 +483,7 @@ class SettingsTab(ctk.CTkFrame):
             format_frame,
             values=["MP4", "MP3", "MKV"]
         )
-        self._style_combo(self.default_format_combo)
+        style_combo(self.default_format_combo)
         self.default_format_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         ctk.CTkLabel(format_frame, text=t("settings.defaultQuality"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
@@ -525,7 +491,7 @@ class SettingsTab(ctk.CTkFrame):
             format_frame,
             values=[t("download.qualityBest"), "1080p", "720p", "480p"]
         )
-        self._style_combo(self.default_quality_combo)
+        style_combo(self.default_quality_combo)
         self.default_quality_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Eşzamanlı indirme
@@ -553,7 +519,7 @@ class SettingsTab(ctk.CTkFrame):
 
         ctk.CTkLabel(history_frame, text=t("settings.historyLimit"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.history_limit_entry = ctk.CTkEntry(history_frame)
-        self._style_entry(self.history_limit_entry)
+        style_entry(self.history_limit_entry)
         self.history_limit_entry.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Altyazı ayarları
@@ -573,7 +539,7 @@ class SettingsTab(ctk.CTkFrame):
             subtitle_frame,
             values=["tr", "en", "de", "fr", "es"]
         )
-        self._style_combo(self.subtitle_lang_combo)
+        style_combo(self.subtitle_lang_combo)
         self.subtitle_lang_combo.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Metadata ve dosya düzenleme ayarları
@@ -606,17 +572,17 @@ class SettingsTab(ctk.CTkFrame):
 
         ctk.CTkLabel(torrent_frame, text=t("settings.aria2Path"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.aria2c_path_entry = ctk.CTkEntry(torrent_frame)
-        self._style_entry(self.aria2c_path_entry)
+        style_entry(self.aria2c_path_entry)
         self.aria2c_path_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
 
         ctk.CTkLabel(torrent_frame, text=t("settings.seedTime"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.torrent_seed_time_entry = ctk.CTkEntry(torrent_frame, width=80)
-        self._style_entry(self.torrent_seed_time_entry)
+        style_entry(self.torrent_seed_time_entry)
         self.torrent_seed_time_entry.pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
 
         ctk.CTkLabel(torrent_frame, text=t("settings.maxConnections"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS)
         self.torrent_max_connections_entry = ctk.CTkEntry(torrent_frame, width=80)
-        self._style_entry(self.torrent_max_connections_entry)
+        style_entry(self.torrent_max_connections_entry)
         self.torrent_max_connections_entry.pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
 
     def create_conversion_settings(self, parent):
@@ -627,7 +593,7 @@ class SettingsTab(ctk.CTkFrame):
 
         ctk.CTkLabel(ffmpeg_frame, text=t("settings.ffmpegPath"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
         self.ffmpeg_entry = ctk.CTkEntry(ffmpeg_frame)
-        self._style_entry(self.ffmpeg_entry)
+        style_entry(self.ffmpeg_entry)
         self.ffmpeg_entry.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
         # Otomatik temizlik

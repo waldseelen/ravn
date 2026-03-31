@@ -16,7 +16,7 @@ from ravn_app.core.theme_catalog import (
     get_theme_display_names,
     normalize_theme_id,
 )
-from ravn_app.ui.design_tokens import Icons
+from ravn_app.ui.design_tokens import Icons, Spacing
 
 
 class DragDropFrame(ctk.CTkFrame):
@@ -35,7 +35,7 @@ class DragDropFrame(ctk.CTkFrame):
             corner_radius=10,
             height=150
         )
-        self.drop_label.pack(fill="both", expand=True, padx=20, pady=20)
+        self.drop_label.pack(fill="both", expand=True, padx=Spacing.MD, pady=Spacing.MD)
 
         # Click to select
         self.drop_label.bind("<Button-1>", self._on_click)
@@ -328,7 +328,7 @@ class AdvancedSettingsDialog(ctk.CTkToplevel):
 
         # Sekme sistemi
         self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
+        self.tabview.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
 
         # Genel ayarlar sekmesi
         general_tab = self.tabview.add("Genel")
@@ -344,37 +344,37 @@ class AdvancedSettingsDialog(ctk.CTkToplevel):
 
         # Butonlar
         button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=10, pady=10)
+        button_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         ctk.CTkButton(
             button_frame,
             text="Kaydet",
             command=self._save_settings
-        ).pack(side="left", padx=5)
+        ).pack(side="left", padx=Spacing.XS)
 
         ctk.CTkButton(
             button_frame,
             text="İptal",
             command=self.destroy
-        ).pack(side="left", padx=5)
+        ).pack(side="left", padx=Spacing.XS)
 
     def _create_general_settings(self, parent):
         """Genel ayarlar"""
         # Tema seçimi
-        ctk.CTkLabel(parent, text="Tema:").pack(pady=5)
+        ctk.CTkLabel(parent, text="Tema:").pack(pady=Spacing.XS)
         self.theme_combo = ctk.CTkComboBox(
             parent,
             values=ThemeManager.get_theme_names()
         )
-        self.theme_combo.pack(pady=5)
+        self.theme_combo.pack(pady=Spacing.XS)
 
         # Dil seçimi
-        ctk.CTkLabel(parent, text="Dil:").pack(pady=5)
+        ctk.CTkLabel(parent, text="Dil:").pack(pady=Spacing.XS)
         self.language_combo = ctk.CTkComboBox(
             parent,
             values=["Türkçe", "English"]
         )
-        self.language_combo.pack(pady=5)
+        self.language_combo.pack(pady=Spacing.XS)
 
         # Bildirimler
         self.notifications_var = ctk.BooleanVar(
@@ -384,37 +384,37 @@ class AdvancedSettingsDialog(ctk.CTkToplevel):
             parent,
             text="Bildirimleri etkinleştir",
             variable=self.notifications_var
-        ).pack(pady=5)
+        ).pack(pady=Spacing.XS)
 
     def _create_download_settings(self, parent):
         """İndirme ayarları"""
         # Varsayılan kalite
-        ctk.CTkLabel(parent, text="Varsayılan Kalite:").pack(pady=5)
+        ctk.CTkLabel(parent, text="Varsayılan Kalite:").pack(pady=Spacing.XS)
         self.quality_combo = ctk.CTkComboBox(
             parent,
             values=["En İyi", "1080p", "720p", "480p"]
         )
-        self.quality_combo.pack(pady=5)
+        self.quality_combo.pack(pady=Spacing.XS)
 
         # Eşzamanlı indirme
-        ctk.CTkLabel(parent, text="Eşzamanlı İndirme:").pack(pady=5)
+        ctk.CTkLabel(parent, text="Eşzamanlı İndirme:").pack(pady=Spacing.XS)
         self.concurrent_slider = ctk.CTkSlider(
             parent,
             from_=1,
             to=5,
             number_of_steps=4
         )
-        self.concurrent_slider.pack(pady=5)
+        self.concurrent_slider.pack(pady=Spacing.XS)
 
     def _create_conversion_settings(self, parent):
         """Dönüştürme ayarları"""
         # Varsayılan codec
-        ctk.CTkLabel(parent, text="Varsayılan Video Codec:").pack(pady=5)
+        ctk.CTkLabel(parent, text="Varsayılan Video Codec:").pack(pady=Spacing.XS)
         self.video_codec_combo = ctk.CTkComboBox(
             parent,
             values=["H.264", "H.265", "VP9"]
         )
-        self.video_codec_combo.pack(pady=5)
+        self.video_codec_combo.pack(pady=Spacing.XS)
 
     def _save_settings(self):
         """Ayarları kaydet"""
@@ -432,7 +432,7 @@ class HistoryViewer(ctk.CTkFrame):
 
         # Arama çubuğu
         search_frame = ctk.CTkFrame(self)
-        search_frame.pack(fill="x", padx=10, pady=10)
+        search_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
 
         self.search_entry = ctk.CTkEntry(
             search_frame,
@@ -449,18 +449,18 @@ class HistoryViewer(ctk.CTkFrame):
 
         # Filtreler
         filter_frame = ctk.CTkFrame(self)
-        filter_frame.pack(fill="x", padx=10, pady=5)
+        filter_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.XS)
 
         self.format_filter = ctk.CTkComboBox(
             filter_frame,
             values=["Tümü", "MP4", "MP3", "MKV"],
             command=self._apply_filters
         )
-        self.format_filter.pack(side="left", padx=5)
+        self.format_filter.pack(side="left", padx=Spacing.XS)
 
         # Tablo (scrollable frame)
         self.scrollable_frame = ctk.CTkScrollableFrame(self)
-        self.scrollable_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.scrollable_frame.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
 
         self._load_history()
 
@@ -476,13 +476,13 @@ class HistoryViewer(ctk.CTkFrame):
                 item_frame,
                 text=download.title,
                 anchor="w"
-            ).pack(side="left", fill="x", expand=True, padx=5)
+            ).pack(side="left", fill="x", expand=True, padx=Spacing.XS)
 
             ctk.CTkLabel(
                 item_frame,
                 text=download.format,
                 width=60
-            ).pack(side="left", padx=5)
+            ).pack(side="left", padx=Spacing.XS)
 
     def _search(self):
         """Arama yap"""

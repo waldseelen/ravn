@@ -34,15 +34,36 @@ _QUALITY_MAP = {
     "480p": DownloadQuality.LOW_480P,
     "Sadece Ses": DownloadQuality.AUDIO_ONLY,
     "Audio Only": DownloadQuality.AUDIO_ONLY,
+    # Audio mode — bitrate seçenekleri: hepsi AUDIO_ONLY kalite spec'i kullanır
+    "320k": DownloadQuality.AUDIO_ONLY,
+    "192k": DownloadQuality.AUDIO_ONLY,
+    "128k": DownloadQuality.AUDIO_ONLY,
+}
+
+# Bitrate label → yt-dlp --audio-quality arg
+_AUDIO_BITRATE_MAP = {
+    "Best": "0",
+    "En İyi": "0",
+    "En Iyi": "0",
+    "320k": "320K",
+    "192k": "192K",
+    "128k": "128K",
 }
 
 _FORMAT_MAP = {
-    "MP4": DownloadFormat.MP4,
+    "MP4":  DownloadFormat.MP4,
     "WebM": DownloadFormat.WEBM,
-    "MKV": DownloadFormat.MKV,
-    "MP3": DownloadFormat.MP3,
-    "M4A": DownloadFormat.M4A,
+    "MKV":  DownloadFormat.MKV,
+    "MP3":  DownloadFormat.MP3,
+    "M4A":  DownloadFormat.M4A,
+    "FLAC": DownloadFormat.FLAC,
+    "OPUS": DownloadFormat.OPUS,
+    "WAV":  DownloadFormat.WAV,
+    "AAC":  DownloadFormat.AAC,
 }
+
+_VIDEO_FORMATS  = ["MP4", "WebM", "MKV"]
+_AUDIO_FORMATS  = ["MP3", "AAC", "FLAC", "OPUS", "WAV", "M4A"]
 
 
 class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
@@ -63,6 +84,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     ):
         kwargs.setdefault("fg_color", "transparent")
         super().__init__(parent, **kwargs)
+        self.configure(fg_color=Colors.BG_PRIMARY)
 
         self.downloader = downloader
         self.config_manager = config_manager
@@ -74,6 +96,21 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.queue_paused_getter = queue_paused_getter
         self.show_queue_tab_callback = show_queue_tab_callback
 
+        # Video column playlist state
+        self._video_playlist_entries: List[Dict[str, Any]] = []
+        self._video_playlist_selection_vars: List[ctk.BooleanVar] = []
+        self._video_playlist_source_url = ""
+        self._video_playlist_detail_rows: List[Tuple[Any, Dict[str, Any]]] = []
+        self._video_is_playlist_fetching = False
+        
+        # Music column playlist state
+        self._music_playlist_entries: List[Dict[str, Any]] = []
+        self._music_playlist_selection_vars: List[ctk.BooleanVar] = []
+        self._music_playlist_source_url = ""
+        self._music_playlist_detail_rows: List[Tuple[Any, Dict[str, Any]]] = []
+        self._music_is_playlist_fetching = False
+        
+        # Active column pointers (will be set by _activate_video_side/_activate_music_side)
         self.playlist_entries: List[Dict[str, Any]] = []
         self.playlist_selection_vars: List[ctk.BooleanVar] = []
         self.playlist_source_url = ""
@@ -106,7 +143,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             text=f"{Icons.DOWNLOAD} {t('download.title')}",
             font=Fonts.H1,
         )
-        title.pack(anchor="w")
+        title.pack(anchor="w", side="left")
 
         platform_frame = ctk.CTkFrame(self, fg_color="transparent")
         platform_frame.pack(fill="x", padx=15, pady=10)
@@ -208,47 +245,6 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         )
         self.batch_url_text.pack(fill="x", padx=5)
 
-        options_frame = ctk.CTkFrame(self, fg_color="transparent")
-        options_frame.pack(fill="x", padx=15, pady=5)
-
-        ctk.CTkLabel(options_frame, text=f"{Icons.QUALITY_SELECT} {t('download.qualityLabel')}", font=Fonts.LABEL).pack(side="left", padx=5)
-
-        self.quality_menu = ctk.CTkOptionMenu(
-            options_frame,
-            values=[t("download.qualityBest"), "1080p", "720p", "480p", t("download.qualityAudioOnly")],
-            command=lambda _value: self._on_quality_changed(),
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.ACCENT,
-            button_hover_color=Colors.ACCENT_HOVER,
-            dropdown_fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_PRIMARY,
-            dropdown_text_color=Colors.TEXT_PRIMARY,
-        )
-        self.quality_menu.pack(side="left", padx=5)
-
-        ctk.CTkLabel(options_frame, text=f"{Icons.FORMAT_SELECT} {t('download.formatLabel')}", font=Fonts.LABEL).pack(side="left", padx=15)
-
-        self.format_menu = ctk.CTkOptionMenu(
-            options_frame,
-            values=["MP4", "WebM", "MKV", "MP3", "M4A"],
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.ACCENT,
-            button_hover_color=Colors.ACCENT_HOVER,
-            dropdown_fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_PRIMARY,
-            dropdown_text_color=Colors.TEXT_PRIMARY,
-        )
-        self.format_menu.pack(side="left", padx=5)
-
-        Tooltip(
-            self.quality_menu,
-            t("download.qualityTooltip"),
-        )
-        Tooltip(
-            self.format_menu,
-            t("download.formatTooltip"),
-        )
-
         self.info_label = ctk.CTkLabel(
             self,
             text=self._build_default_info_text(platforms),
@@ -256,125 +252,395 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             font=Fonts.SMALL,
             justify="left",
         )
-        self.info_label.pack(fill="x", padx=15, pady=(6, 10))
+        self.info_label.pack(fill="x", padx=15, pady=(6, 4))
 
-        self.playlist_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
+        # ── Two-column layout: Video | Music ─────────────────────────────
+        self._columns_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._columns_frame.pack(fill="x", padx=15, pady=(0, 10))
+        self._columns_frame.grid_columnconfigure(0, weight=1)
+        self._columns_frame.grid_columnconfigure(1, weight=1)
+
+        # ── Video column ──────────────────────────────────────────────────
+        video_col = ctk.CTkFrame(
+            self._columns_frame,
+            fg_color=Colors.BG_SURFACE,
+            corner_radius=8,
+        )
+        video_col.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+
         ctk.CTkLabel(
-            self.playlist_frame,
-            text=f"{Icons.QUEUE} {t('download.playlistTitle')}",
-            font=Fonts.LABEL_BOLD,
-        ).pack(anchor="w", padx=10, pady=(10, 4))
+            video_col,
+            text=f"▶  {t('download.modeVideo')}",
+            font=Fonts.H2,
+        ).pack(anchor="w", padx=12, pady=(10, 6))
 
-        self.playlist_summary_label = ctk.CTkLabel(
-            self.playlist_frame,
-            text="",
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
+        vq_frame = ctk.CTkFrame(video_col, fg_color="transparent")
+        vq_frame.pack(fill="x", padx=8, pady=2)
+        self.quality_label = ctk.CTkLabel(
+            vq_frame,
+            text=f"{Icons.QUALITY_SELECT} {t('download.qualityLabel')}",
+            font=Fonts.LABEL,
         )
-        self.playlist_summary_label.pack(anchor="w", padx=10, pady=(0, 6))
-
-        controls_row = ctk.CTkFrame(self.playlist_frame, fg_color="transparent")
-        controls_row.pack(fill="x", padx=10, pady=(0, 6))
-
-        self.playlist_select_all_btn = ctk.CTkButton(
-            controls_row,
-            text=f"{Icons.CHECK} {t('download.playlistSelectAll')}",
-            width=120,
-            height=30,
-            command=self._select_all_playlist_items,
-            fg_color=Colors.BTN_SECONDARY,
-            hover_color=Colors.BTN_SECONDARY_HOVER,
-            font=Fonts.SMALL,
+        self.quality_label.pack(side="left", padx=4)
+        self.quality_menu = ctk.CTkOptionMenu(
+            vq_frame,
+            values=[t("download.qualityBest"), "1080p", "720p", "480p"],
+            command=lambda _v: self._on_quality_changed(),
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
         )
-        self.playlist_select_all_btn.pack(side="left")
+        self.quality_menu.pack(side="left", padx=4, fill="x", expand=True)
 
-        self.playlist_clear_btn = ctk.CTkButton(
-            controls_row,
-            text=f"{Icons.CLEAR_BTN} {t('download.playlistClear')}",
-            width=120,
-            height=30,
-            command=self._clear_all_playlist_items,
-            fg_color=Colors.BTN_SECONDARY,
-            hover_color=Colors.BTN_SECONDARY_HOVER,
-            font=Fonts.SMALL,
+        vf_frame = ctk.CTkFrame(video_col, fg_color="transparent")
+        vf_frame.pack(fill="x", padx=8, pady=2)
+        ctk.CTkLabel(
+            vf_frame,
+            text=f"{Icons.FORMAT_SELECT} {t('download.formatLabel')}",
+            font=Fonts.LABEL,
+        ).pack(side="left", padx=4)
+        self.format_menu = ctk.CTkOptionMenu(
+            vf_frame,
+            values=_VIDEO_FORMATS,
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
         )
-        self.playlist_clear_btn.pack(side="left", padx=(8, 0))
+        self.format_menu.pack(side="left", padx=4, fill="x", expand=True)
 
-        self.playlist_approve_btn = ctk.CTkButton(
-            controls_row,
-            text=f"{Icons.DOWNLOAD_BTN} {t('download.playlistApprove')}",
-            width=200,
-            height=30,
-            command=self._download_video,
-            fg_color=Colors.ACCENT,
-            hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.LABEL_BOLD,
-        )
-        self.playlist_approve_btn.pack(side="right", padx=(8, 0))
+        Tooltip(self.quality_menu, t("download.qualityTooltip"))
+        Tooltip(self.format_menu, t("download.formatTooltip"))
 
-        self.playlist_list_frame = ctk.CTkScrollableFrame(
-            self.playlist_frame,
-            height=500,
-            fg_color=Colors.BG_CARD,
-        )
-        self.playlist_list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        self.playlist_frame.pack_forget()
-
-        self.fetch_data_btn = ctk.CTkButton(
-            self,
+        self._video_fetch_btn = ctk.CTkButton(
+            video_col,
             text=f"{Icons.SEARCH} {t('download.fetchData')}",
-            command=self._fetch_download_data,
+            command=self._fetch_video_data,
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_MD,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,
+            cursor=Cursors.POINTER,
         )
-        self.fetch_data_btn.pack(padx=15, pady=(0, 8), fill="x")
+        self._video_fetch_btn.pack(padx=8, pady=(8, 4), fill="x")
 
-        self.download_btn = ctk.CTkButton(
-            self,
-            text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}",
+        # Video playlist panel
+        self._video_playlist_widgets = self._create_playlist_panel(video_col, self._download_video)
+        self._video_playlist_widgets['frame'].pack(padx=8, pady=(4, 4), fill="both", expand=True)
+
+        self._video_download_btn = ctk.CTkButton(
+            video_col,
+            text=f"{Icons.DOWNLOAD_BTN} {t('download.videoDownloadBtn')}",
             command=self._download_video,
             font=Fonts.LABEL_BOLD,
-            height=Sizes.BTN_HEIGHT_LG,
+            height=Sizes.BTN_HEIGHT_MD,
             fg_color=Colors.ACCENT,
             hover_color=Colors.ACCENT_HOVER,
+            cursor=Cursors.POINTER,
         )
-        self.download_btn.pack(padx=15, pady=(0, 10), fill="x")
+        self._video_download_btn.pack(padx=8, pady=(4, 4), fill="x")
 
-        self.download_progress = ctk.CTkProgressBar(self)
-        self.download_progress.configure(
+        self._video_progress = ctk.CTkProgressBar(video_col)
+        self._video_progress.configure(
             progress_color=Colors.PROGRESS_FILL,
             fg_color=Colors.PROGRESS_BG,
         )
-        self.download_progress.set(0)
-        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
-        self.download_progress.pack_forget()
+        self._video_progress.set(0)
+        self._video_progress.pack(padx=8, pady=2, fill="x")
+        self._video_progress.pack_forget()
 
-        self.download_status_label = ctk.CTkLabel(
-            self,
+        self._video_status_label = ctk.CTkLabel(
+            video_col,
             text="",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_SECONDARY,
         )
-        self.download_status_label.pack(pady=5)
+        self._video_status_label.pack(padx=8, pady=(2, 6))
 
-        for button in (self.fetch_data_btn, self.download_btn):
+        self._video_error_panel = ErrorPanel(
+            video_col,
+            animation_manager=self.animation_manager,
+            on_retry=self._retry_last_action,
+        )
+
+        # ── Music column ──────────────────────────────────────────────────
+        music_col = ctk.CTkFrame(
+            self._columns_frame,
+            fg_color=Colors.BG_SURFACE,
+            corner_radius=8,
+        )
+        music_col.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+
+        ctk.CTkLabel(
+            music_col,
+            text=f"♪  {t('download.modeAudio')}",
+            font=Fonts.H2,
+        ).pack(anchor="w", padx=12, pady=(10, 6))
+
+        mf_frame = ctk.CTkFrame(music_col, fg_color="transparent")
+        mf_frame.pack(fill="x", padx=8, pady=2)
+        ctk.CTkLabel(
+            mf_frame,
+            text=f"{Icons.FORMAT_SELECT} {t('download.formatLabel')}",
+            font=Fonts.LABEL,
+        ).pack(side="left", padx=4)
+        self.music_format_menu = ctk.CTkOptionMenu(
+            mf_frame,
+            values=_AUDIO_FORMATS,
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
+        )
+        self.music_format_menu.set("MP3")
+        self.music_format_menu.pack(side="left", padx=4, fill="x", expand=True)
+
+        mb_frame = ctk.CTkFrame(music_col, fg_color="transparent")
+        mb_frame.pack(fill="x", padx=8, pady=2)
+        ctk.CTkLabel(
+            mb_frame,
+            text=f"{Icons.QUALITY_SELECT} {t('download.bitrateLabel')}",
+            font=Fonts.LABEL,
+        ).pack(side="left", padx=4)
+        self.music_bitrate_menu = ctk.CTkOptionMenu(
+            mb_frame,
+            values=[t("download.qualityBest"), "320k", "192k", "128k"],
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
+        )
+        self.music_bitrate_menu.pack(side="left", padx=4, fill="x", expand=True)
+
+        self._music_fetch_btn = ctk.CTkButton(
+            music_col,
+            text=f"{Icons.SEARCH} {t('download.fetchData')}",
+            command=self._fetch_music_data,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            cursor=Cursors.POINTER,
+        )
+        self._music_fetch_btn.pack(padx=8, pady=(8, 4), fill="x")
+
+        # Music playlist panel
+        self._music_playlist_widgets = self._create_playlist_panel(music_col, self._download_music)
+        self._music_playlist_widgets['frame'].pack(padx=8, pady=(4, 4), fill="both", expand=True)
+
+        self._music_download_btn = ctk.CTkButton(
+            music_col,
+            text=f"♪ {t('download.musicDownloadBtn')}",
+            command=self._download_music,
+            font=Fonts.LABEL_BOLD,
+            height=Sizes.BTN_HEIGHT_MD,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
+            cursor=Cursors.POINTER,
+        )
+        self._music_download_btn.pack(padx=8, pady=(4, 4), fill="x")
+
+        self._music_progress = ctk.CTkProgressBar(music_col)
+        self._music_progress.configure(
+            progress_color=Colors.PROGRESS_FILL,
+            fg_color=Colors.PROGRESS_BG,
+        )
+        self._music_progress.set(0)
+        self._music_progress.pack(padx=8, pady=2, fill="x")
+        self._music_progress.pack_forget()
+
+        self._music_status_label = ctk.CTkLabel(
+            music_col,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_SECONDARY,
+        )
+        self._music_status_label.pack(padx=8, pady=(2, 6))
+
+        self._music_error_panel = ErrorPanel(
+            music_col,
+            animation_manager=self.animation_manager,
+            on_retry=self._retry_last_action,
+        )
+
+        # Initialize active-side pointers to video (default)
+        self._active_btn_restore_text = f"{Icons.DOWNLOAD_BTN} {t('download.videoDownloadBtn')}"
+        self._activate_video_side()
+
+        # Shared button bindings and tooltips
+        for button in (self._video_fetch_btn, self._video_download_btn, 
+                      self._music_fetch_btn, self._music_download_btn):
             button.bind("<ButtonPress-1>", lambda _e, btn=button: self._apply_button_press_state(btn))
             button.bind("<ButtonRelease-1>", lambda _e, btn=button: self._apply_button_release_state(btn))
             button.bind("<Enter>", lambda _e, btn=button: self._apply_button_hover_state(btn, is_hover=True))
             button.bind("<Leave>", lambda _e, btn=button: self._apply_button_hover_state(btn, is_hover=False))
-            button.configure(cursor=Cursors.POINTER)
 
-        Tooltip(self.fetch_data_btn, t("download.fetchData"))
-        Tooltip(self.download_btn, t("download.downloadButton"))
+        Tooltip(self._video_fetch_btn, t("download.fetchData"))
+        Tooltip(self._video_download_btn, t("download.videoDownloadBtn"))
+        Tooltip(self._music_fetch_btn, t("download.fetchData"))
+        Tooltip(self._music_download_btn, t("download.musicDownloadBtn"))
 
-        self.error_panel = ErrorPanel(
-            self,
-            animation_manager=self.animation_manager,
-            on_retry=self._retry_last_action,
-        )
         self.error_frame = self.error_panel
+
+    def _activate_video_side(self) -> None:
+        """Point shared mixin attributes to the video column widgets and sync state."""
+        # Save current state back to appropriate column if any
+        if hasattr(self, '_save_active_playlist_state'):
+            self._save_active_playlist_state()
+
+        if hasattr(self, '_video_download_btn'):
+            self.download_btn = self._video_download_btn
+        if hasattr(self, '_video_progress'):
+            self.download_progress = self._video_progress
+        if hasattr(self, '_video_status_label'):
+            self.download_status_label = self._video_status_label
+        if hasattr(self, '_video_error_panel'):
+            self.error_panel = self._video_error_panel
+            self.error_frame = self.error_panel
+        self._active_btn_restore_text = f"{Icons.DOWNLOAD_BTN} {t('download.videoDownloadBtn')}"
+
+        # Point playlist widgets to video column
+        if hasattr(self, '_video_playlist_widgets'):
+            self.playlist_frame = self._video_playlist_widgets['frame']
+            self.playlist_list_frame = self._video_playlist_widgets['list_frame']
+            self.playlist_summary_label = self._video_playlist_widgets['summary_label']
+            self.playlist_select_all_btn = self._video_playlist_widgets['select_all_btn']
+            self.playlist_clear_btn = self._video_playlist_widgets['clear_btn']
+            self.playlist_approve_btn = self._video_playlist_widgets['approve_btn']
+
+        # Load video column state
+        self._active_column = 'video'
+        if hasattr(self, '_video_playlist_entries'):
+            self.playlist_entries = self._video_playlist_entries
+        if hasattr(self, '_video_playlist_selection_vars'):
+            self.playlist_selection_vars = self._video_playlist_selection_vars
+        if hasattr(self, '_video_playlist_source_url'):
+            self.playlist_source_url = self._video_playlist_source_url
+        if hasattr(self, '_video_playlist_detail_rows'):
+            self.playlist_detail_rows = self._video_playlist_detail_rows
+        if hasattr(self, '_video_is_playlist_fetching'):
+            self.is_playlist_fetching = self._video_is_playlist_fetching
+
+    def _activate_music_side(self) -> None:
+        """Point shared mixin attributes to the music column widgets and sync state."""
+        # Save current state back to appropriate column if any
+        if hasattr(self, '_save_active_playlist_state'):
+            self._save_active_playlist_state()
+
+        if hasattr(self, '_music_download_btn'):
+            self.download_btn = self._music_download_btn
+        if hasattr(self, '_music_progress'):
+            self.download_progress = self._music_progress
+        if hasattr(self, '_music_status_label'):
+            self.download_status_label = self._music_status_label
+        if hasattr(self, '_music_error_panel'):
+            self.error_panel = self._music_error_panel
+            self.error_frame = self.error_panel
+        self._active_btn_restore_text = f"♪ {t('download.musicDownloadBtn')}"
+        
+        # Point playlist widgets to music column
+        self.playlist_frame = self._music_playlist_widgets['frame']
+        self.playlist_list_frame = self._music_playlist_widgets['list_frame']
+        self.playlist_summary_label = self._music_playlist_widgets['summary_label']
+        self.playlist_select_all_btn = self._music_playlist_widgets['select_all_btn']
+        self.playlist_clear_btn = self._music_playlist_widgets['clear_btn']
+        self.playlist_approve_btn = self._music_playlist_widgets['approve_btn']
+        
+        # Load music column state
+        self._active_column = 'music'
+        self.playlist_entries = self._music_playlist_entries
+        self.playlist_selection_vars = self._music_playlist_selection_vars
+        self.playlist_source_url = self._music_playlist_source_url
+        self.playlist_detail_rows = self._music_playlist_detail_rows
+        self.is_playlist_fetching = self._music_is_playlist_fetching
+    
+    def _save_active_playlist_state(self) -> None:
+        """Save current playlist state back to the appropriate column."""
+        if not hasattr(self, '_active_column'):
+            self._active_column = 'video'  # Default
+            return
+            
+        if self._active_column == 'video':
+            self._video_playlist_entries = self.playlist_entries
+            self._video_playlist_selection_vars = self.playlist_selection_vars
+            self._video_playlist_source_url = self.playlist_source_url
+            self._video_playlist_detail_rows = self.playlist_detail_rows
+            self._video_is_playlist_fetching = self.is_playlist_fetching
+        elif self._active_column == 'music':
+            self._music_playlist_entries = self.playlist_entries
+            self._music_playlist_selection_vars = self.playlist_selection_vars
+            self._music_playlist_source_url = self.playlist_source_url
+            self._music_playlist_detail_rows = self.playlist_detail_rows
+            self._music_is_playlist_fetching = self.is_playlist_fetching
+
+    def _download_music(self) -> None:
+        """Start a music download from the music column."""
+        if self.queue_paused_getter():
+            self._activate_music_side()
+            self._show_download_error(t("download.queuePaused"), "")
+            return
+
+        url = self.url_entry.get().strip()
+        if not url:
+            self._activate_music_side()
+            self._show_download_error(t("download.urlRequired"), "")
+            return
+
+        self._activate_music_side()
+
+        format_type = _FORMAT_MAP.get(self.music_format_menu.get(), DownloadFormat.MP3)
+        bitrate_str = self.music_bitrate_menu.get()
+        audio_bitrate = _AUDIO_BITRATE_MAP.get(bitrate_str, "0")
+        quality = DownloadQuality.AUDIO_ONLY
+
+        default_path = self.config_manager.get(
+            "default_download_path",
+            str(Path.home() / "Downloads" / "RAVN"),
+        )
+        output_dir = str(Path(default_path))
+        self._start_single_download(url, output_dir, format_type, quality, audio_bitrate)
+
+    # _on_mode_changed kept for backward compat with any external callers
+    def _on_mode_changed(self, value: str) -> None:
+        pass
+
+    def _is_audio_mode(self) -> bool:
+        return False
+
+    def _on_ctrl_enter(self, event=None):
+        """Handle Ctrl+Enter - trigger primary download action."""
+        if not self.winfo_viewable():
+            return
+        self._download_video()
+
+    def _on_escape(self, event=None):
+        """Handle Escape - cancel fetching if in progress."""
+        if not self.winfo_viewable():
+            return
+        # Download tab uses task queue; Escape clears any fetch spinners
+        if self.is_playlist_fetching or self.is_info_fetching:
+            self._stop_processing_feedback()
+            self.is_playlist_fetching = False
+            self.is_info_fetching = False
+
+    def _on_ctrl_l(self, event=None):
+        """Handle Ctrl+L - clear URL input."""
+        if not self.winfo_viewable():
+            return
+        if self.batch_mode_var.get():
+            self.batch_url_text.delete("1.0", "end")
+        else:
+            self.url_entry.delete(0, "end")
+        return "break"
 
     def _build_default_info_text(self, platforms: List[str]) -> str:
         return (
@@ -609,6 +875,16 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._update_size_estimate()
         self._set_url_validation_state(Icons.SUCCESS_INDICATOR, Colors.SUCCESS)
 
+    def _fetch_video_data(self):
+        """Fetch playlist/video info from the video column."""
+        self._activate_video_side()
+        self._fetch_download_data()
+
+    def _fetch_music_data(self):
+        """Fetch playlist/video info from the music column."""
+        self._activate_music_side()
+        self._fetch_download_data()
+
     def _fetch_download_data(self):
         url = self.url_entry.get().strip()
         if not url:
@@ -629,6 +905,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         output_dir: str,
         format_type: DownloadFormat,
         quality: DownloadQuality,
+        audio_bitrate: Optional[str] = None,
     ):
         self.error_panel.hide_error()
         self.download_progress.set(0)
@@ -655,6 +932,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     embed_lyrics=embed_lyrics,
                     auto_sort_enabled=auto_sort_enabled,
                     auto_sort_mode=auto_sort_mode,
+                    audio_bitrate=audio_bitrate,
                 )
                 if result.success:
                     self.after(0, self._on_download_success, result)
@@ -666,6 +944,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         threading.Thread(target=run_download, daemon=True).start()
 
     def _download_video(self):
+        self._activate_video_side()
         if self.queue_paused_getter():
             self._show_download_error(t("download.queuePaused"), "")
             return
@@ -685,8 +964,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._show_download_error(t("download.urlRequired"), "")
             return
 
-        quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
+        quality_str = self.quality_menu.get()
+        quality = _QUALITY_MAP.get(quality_str, DownloadQuality.BEST)
         format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
+        audio_bitrate = None
 
         default_path = self.config_manager.get(
             "default_download_path",
@@ -715,7 +996,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._start_torrent_download(url, output_dir)
             return
 
-        self._start_single_download(url, output_dir, format_type, quality)
+        self._start_single_download(url, output_dir, format_type, quality, audio_bitrate)
 
     def _start_torrent_download(self, source: str, output_dir: str):
         """Start a torrent/magnet download via TorrentDownloader."""
@@ -764,7 +1045,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Handle torrent download success (legacy, kept for compatibility)."""
         self._stop_processing_feedback()
         self._set_button_loading_state(self.download_btn, is_loading=False)
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=self._active_btn_restore_text)
         toast = self.toast_manager_getter()
         if toast:
             toast.show(t("download.torrentDownloaded", outputDir=output_dir), level="success")
@@ -773,7 +1054,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Handle torrent download success with optional stream URL."""
         self._stop_processing_feedback()
         self._set_button_loading_state(self.download_btn, is_loading=False)
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=self._active_btn_restore_text)
 
         toast = self.toast_manager_getter()
         if toast:
@@ -913,3 +1194,90 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     def set_status_text(self, text: str):
         """Public bridge for main window level status updates."""
         self.download_status_label.configure(text=text)
+
+    def _create_playlist_panel(self, parent, download_command):
+        """Create a playlist panel for a column.
+        
+        Args:
+            parent: Parent frame (video_col or music_col)
+            download_command: Command for approve button (_download_video or _download_music)
+            
+        Returns:
+            Dictionary with playlist widgets: {
+                'frame', 'summary_label', 'list_frame', 
+                'select_all_btn', 'clear_btn', 'approve_btn'
+            }
+        """
+        playlist_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_CARD, corner_radius=6)
+        
+        ctk.CTkLabel(
+            playlist_frame,
+            text=f"{Icons.QUEUE} {t('download.playlistTitle')}",
+            font=Fonts.LABEL_BOLD,
+        ).pack(anchor="w", padx=8, pady=(8, 4))
+        
+        summary_label = ctk.CTkLabel(
+            playlist_frame,
+            text="",
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+        )
+        summary_label.pack(anchor="w", padx=8, pady=(0, 4))
+        
+        controls_row = ctk.CTkFrame(playlist_frame, fg_color="transparent")
+        controls_row.pack(fill="x", padx=8, pady=(0, 4))
+        
+        select_all_btn = ctk.CTkButton(
+            controls_row,
+            text=f"{Icons.CHECK} {t('download.playlistSelectAll')}",
+            width=100,
+            height=28,
+            command=self._select_all_playlist_items,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.SMALL,
+        )
+        select_all_btn.pack(side="left")
+        
+        clear_btn = ctk.CTkButton(
+            controls_row,
+            text=f"{Icons.CLEAR_BTN} {t('download.playlistClear')}",
+            width=100,
+            height=28,
+            command=self._clear_all_playlist_items,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.SMALL,
+        )
+        clear_btn.pack(side="left", padx=(6, 0))
+        
+        approve_btn = ctk.CTkButton(
+            controls_row,
+            text=f"{Icons.DOWNLOAD_BTN} {t('download.playlistApprove')}",
+            width=150,
+            height=28,
+            command=download_command,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
+            font=Fonts.LABEL_BOLD,
+        )
+        approve_btn.pack(side="right", padx=(6, 0))
+        
+        list_frame = ctk.CTkScrollableFrame(
+            playlist_frame,
+            height=300,
+            fg_color=Colors.BG_SURFACE,
+        )
+        list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        
+        # Start hidden
+        playlist_frame.pack_forget()
+        
+        return {
+            'frame': playlist_frame,
+            'summary_label': summary_label,
+            'list_frame': list_frame,
+            'select_all_btn': select_all_btn,
+            'clear_btn': clear_btn,
+            'approve_btn': approve_btn,
+        }

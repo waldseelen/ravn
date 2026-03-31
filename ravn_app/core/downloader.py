@@ -30,15 +30,26 @@ class DownloadQuality(Enum):
 
 class DownloadFormat(Enum):
     """İndirme format seçenekleri"""
-    MP4 = ("mp4", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best")
+    MP4  = ("mp4",  "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best")
     WEBM = ("webm", "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]")
-    MKV = ("mkv", "bestvideo+bestaudio/best")
-    MP3 = ("mp3", "bestaudio/best")
-    M4A = ("m4a", "bestaudio[ext=m4a]/bestaudio")
+    MKV  = ("mkv",  "bestvideo+bestaudio/best")
+    MP3  = ("mp3",  "bestaudio/best")
+    M4A  = ("m4a",  "bestaudio[ext=m4a]/bestaudio")
+    FLAC = ("flac", "bestaudio/best")
+    OPUS = ("opus", "bestaudio/best")
+    WAV  = ("wav",  "bestaudio/best")
+    AAC  = ("aac",  "bestaudio/best")
 
     def __init__(self, extension: str, format_spec: str):
         self.extension = extension
         self.format_spec = format_spec
+
+
+_AUDIO_FORMATS = {
+    DownloadFormat.MP3, DownloadFormat.M4A,
+    DownloadFormat.FLAC, DownloadFormat.OPUS,
+    DownloadFormat.WAV, DownloadFormat.AAC,
+}
 
 
 @dataclass
@@ -341,6 +352,7 @@ class YouTubeDownloader:
         auto_sort: bool = False,
         auto_sort_enabled: Optional[bool] = None,
         auto_sort_mode: str = "artist",
+        audio_bitrate: Optional[str] = None,
     ) -> DownloadResult:
         """
         Video indir
@@ -385,11 +397,11 @@ class YouTubeDownloader:
         # Ek argümanları hazırla
         extra_args = ['--merge-output-format', format_type.extension]
 
-        if format_type in [DownloadFormat.MP3, DownloadFormat.M4A]:
+        if format_type in _AUDIO_FORMATS:
             extra_args.extend([
                 '-x',  # Extract audio
                 '--audio-format', format_type.extension,
-                '--audio-quality', '0'
+                '--audio-quality', audio_bitrate or '0',
             ])
             extra_args.extend(self._build_audio_download_args(embed_metadata=embed_metadata, embed_lyrics=embed_lyrics))
 
@@ -406,7 +418,7 @@ class YouTubeDownloader:
         if result.success:
             downloaded_files = result.metadata.get('downloaded_files', [])
 
-            if format_type in [DownloadFormat.MP3, DownloadFormat.M4A] and embed_metadata:
+            if format_type in _AUDIO_FORMATS and embed_metadata:
                 self._apply_audio_metadata(downloaded_files, video_info, embed_lyrics)
 
             logger.info(f"İndirme tamamlandı: {downloaded_files}")

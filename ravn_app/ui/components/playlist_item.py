@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict
 import customtkinter as ctk
 
 from ravn_app.core.i18n import t
-from ravn_app.ui.design_tokens import Colors, Fonts
+from ravn_app.ui.design_tokens import Colors, Fonts, Spacing
 
 
 class PlaylistItemRow(ctk.CTkFrame):
@@ -25,7 +25,7 @@ class PlaylistItemRow(ctk.CTkFrame):
         super().__init__(parent, **kwargs)
 
         top_row = ctk.CTkFrame(self, fg_color="transparent")
-        top_row.pack(fill="x", padx=8, pady=(3, 2))
+        top_row.pack(fill="x", padx=Spacing.SM, pady=(3, 2))
 
         checkbox = ctk.CTkCheckBox(
             top_row,

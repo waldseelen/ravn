@@ -4,6 +4,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
+from ravn_app.ui.design_tokens import Colors
 from ravn_app.ui.queue_panel import QueuePanel
 
 
@@ -19,6 +20,7 @@ class QueueTab(ctk.CTkFrame):
     ):
         kwargs.setdefault("fg_color", "transparent")
         super().__init__(parent, **kwargs)
+        self.configure(fg_color=Colors.BG_PRIMARY)
 
         queue_panel = QueuePanel(
             self,

@@ -94,7 +94,8 @@ class PlaylistMixin:
             child.destroy()
 
         self.playlist_frame.pack_forget()
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}", state="normal")
+        restore_text = getattr(self, "_active_btn_restore_text", f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=restore_text, state="normal")
 
     def _update_playlist_summary(self):
         if not self.playlist_entries or not self.playlist_selection_vars:
@@ -139,6 +140,10 @@ class PlaylistMixin:
     def _start_playlist_fetch(self, url: str):
         if self.is_playlist_fetching or self.is_info_fetching:
             return
+
+        # Playlists always use the video side (format menus, quality menus, etc.)
+        if hasattr(self, "_activate_video_side"):
+            self._activate_video_side()
 
         self.is_playlist_fetching = True
         self.error_panel.hide_error()
@@ -222,7 +227,11 @@ class PlaylistMixin:
             self.playlist_detail_rows.append((item_widget, entry))
 
         self._update_playlist_summary()
-        self.playlist_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.download_btn)
+        columns_frame = getattr(self, "_columns_frame", None)
+        pack_kwargs = {"fill": "x", "padx": 15, "pady": (0, 10)}
+        if columns_frame is not None:
+            pack_kwargs["before"] = columns_frame
+        self.playlist_frame.pack(**pack_kwargs)
         self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadSelected')}")
 
     def _open_playlist_sort_dialog(self, entries: List[Dict[str, Any]], quality_label: str):

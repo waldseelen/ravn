@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from ravn_app.core.i18n import t
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Motion, Sizes
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Motion, Sizes, Spacing
 
 
 class ErrorPanel(ctk.CTkFrame):
@@ -27,7 +27,7 @@ class ErrorPanel(ctk.CTkFrame):
         self._raw_error_visible = False
 
         top_row = ctk.CTkFrame(self, fg_color="transparent")
-        top_row.pack(fill="x", padx=10, pady=5)
+        top_row.pack(fill="x", padx=Spacing.SM, pady=Spacing.XS)
 
         self.error_message_label = ctk.CTkLabel(
             top_row,
@@ -50,7 +50,7 @@ class ErrorPanel(ctk.CTkFrame):
             font=Fonts.SMALL,
             cursor=Cursors.POINTER,
         )
-        self.toggle_details_btn.pack(side="right", padx=5)
+        self.toggle_details_btn.pack(side="right", padx=Spacing.XS)
 
         self.retry_btn = ctk.CTkButton(
             top_row,
@@ -63,7 +63,7 @@ class ErrorPanel(ctk.CTkFrame):
             font=Fonts.SMALL,
             cursor=Cursors.POINTER,
         )
-        self.retry_btn.pack(side="right", padx=5)
+        self.retry_btn.pack(side="right", padx=Spacing.XS)
 
         self.raw_error_textbox = ctk.CTkTextbox(
             self,
@@ -91,7 +91,7 @@ class ErrorPanel(ctk.CTkFrame):
             self._raw_error_visible = False
             self.toggle_details_btn.configure(text=f"{Icons.INFO} {t('errorPanel.technicalDetails')}")
 
-        self.pack(padx=15, pady=5, fill="x")
+        self.pack(padx=Spacing.MD, pady=Spacing.XS, fill="x")
         self.animation_manager.animate_color_transition(
             self,
             "fg_color",
@@ -123,7 +123,7 @@ class ErrorPanel(ctk.CTkFrame):
             self._animate_error_details_height(0, on_done=hide_box)
             return
 
-        self.raw_error_textbox.pack(padx=10, pady=(0, 10), fill="x")
+        self.raw_error_textbox.pack(padx=Spacing.SM, pady=(0, Spacing.SM), fill="x")
         self.raw_error_textbox.configure(height=1)
         self._raw_error_visible = True
         self.toggle_details_btn.configure(text=f"{Icons.CLOSE} {t('errorPanel.hide')}")

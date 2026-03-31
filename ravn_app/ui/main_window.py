@@ -35,6 +35,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.title(t("common.appTitle"))
         self.geometry("1400x900")
         self.minsize(1200, 800)
+        self._apply_window_icon()
 
         self.db_manager = DatabaseManager()
         self.config_manager = ConfigManager()
@@ -49,9 +50,12 @@ class YouTubeDownloaderApp(ctk.CTk):
         ThemeManager.apply_theme(self.current_theme)
         self.toast_manager: Optional[ToastManager] = None
         self.download_tab: Optional[DownloadTab] = None
+        self.converter_tab = None
+        self.subtitle_tab = None
         self.tray = None
 
         self._setup_ui()
+        self._setup_global_shortcuts()
         self.toast_manager = ToastManager(self)
         self._setup_tray_integration()
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
@@ -60,6 +64,25 @@ class YouTubeDownloaderApp(ctk.CTk):
         db_manager = self.__dict__.get("db_manager")
         if db_manager:
             db_manager.close()
+
+    def _apply_window_icon(self) -> None:
+        """Set window icon from assets/ravn.ico (Windows) or ravn-icon-256.png."""
+        assets = Path(__file__).parent.parent.parent / "assets"
+        try:
+            if platform.system() == "Windows":
+                ico = assets / "ravn.ico"
+                if ico.exists():
+                    self.iconbitmap(str(ico))
+                    return
+            png = assets / "ravn-icon-256.png"
+            if png.exists():
+                from PIL import Image, ImageTk
+                img = Image.open(png)
+                photo = ImageTk.PhotoImage(img)
+                self.iconphoto(True, photo)
+                self._icon_ref = photo  # prevent GC
+        except Exception:
+            pass  # icon is cosmetic; never crash on failure
 
     def _setup_ui(self):
         for child in list(self.winfo_children()):
@@ -112,15 +135,17 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.download_tab.pack(fill="both", expand=True)
 
         converter_tab = self.tabview.add(f"{Icons.CONVERT}  {t('tabs.convert')}")
-        ConverterTab(
+        self.converter_tab = ConverterTab(
             converter_tab,
             db_manager=self.db_manager,
             notify_callback=self._notify_conversion_complete,
             fg_color="transparent",
-        ).pack(fill="both", expand=True)
+        )
+        self.converter_tab.pack(fill="both", expand=True)
 
         subtitle_tab = self.tabview.add(f"{Icons.SUBTITLE}  {t('tabs.subtitle')}")
-        SubtitleTab(subtitle_tab, fg_color="transparent").pack(fill="both", expand=True)
+        self.subtitle_tab = SubtitleTab(subtitle_tab, fg_color="transparent")
+        self.subtitle_tab.pack(fill="both", expand=True)
 
         torrent_tab = self.tabview.add(f"{Icons.TORRENT}  {t('tabs.torrent')}")
         TorrentTab(
@@ -160,6 +185,40 @@ class YouTubeDownloaderApp(ctk.CTk):
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
         ).pack(pady=5)
+
+    def _setup_global_shortcuts(self):
+        """Set up global keyboard shortcuts for the entire application."""
+        self.bind("<Control-Return>", self._on_ctrl_enter)
+        self.bind("<Escape>", self._on_escape)
+        self.bind("<Control-l>", self._on_ctrl_l)
+
+    def _on_ctrl_enter(self, event=None):
+        """Handle Ctrl+Enter - delegate to active tab."""
+        # Delegate to the active tab's handler if it exists and is viewable
+        if self.download_tab and self.download_tab.winfo_viewable():
+            self.download_tab._on_ctrl_enter(event)
+        elif self.converter_tab and self.converter_tab.winfo_viewable():
+            self.converter_tab._on_ctrl_enter(event)
+        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
+            self.subtitle_tab._on_ctrl_enter(event)
+
+    def _on_escape(self, event=None):
+        """Handle Escape - delegate to active tab."""
+        if self.download_tab and self.download_tab.winfo_viewable():
+            self.download_tab._on_escape(event)
+        elif self.converter_tab and self.converter_tab.winfo_viewable():
+            self.converter_tab._on_escape(event)
+        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
+            self.subtitle_tab._on_escape(event)
+
+    def _on_ctrl_l(self, event=None):
+        """Handle Ctrl+L - delegate to active tab."""
+        if self.download_tab and self.download_tab.winfo_viewable():
+            return self.download_tab._on_ctrl_l(event)
+        elif self.converter_tab and self.converter_tab.winfo_viewable():
+            return self.converter_tab._on_ctrl_l(event)
+        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
+            return self.subtitle_tab._on_ctrl_l(event)
 
     def _setup_tab_switch_transition(self):
         segmented = getattr(self.tabview, "_segmented_button", None)

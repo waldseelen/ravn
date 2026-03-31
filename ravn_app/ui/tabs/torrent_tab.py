@@ -35,6 +35,7 @@ class TorrentTab(ctk.CTkFrame):
     ):
         kwargs.setdefault("fg_color", "transparent")
         super().__init__(parent, **kwargs)
+        self.configure(fg_color=Colors.BG_PRIMARY)
 
         self.config_manager = config_manager
         self.toast_manager_getter = toast_manager_getter

@@ -40,6 +40,7 @@ Use these files in order before substantial changes:
 
 ## Current Reality
 
+- Phase 1 UI consistency tasks complete (UI-01 through UI-12).
 - Phases 1-4C and Phase 6 are complete.
 - Phase 5 (build/packaging/distribution) remains open.
 - Primary media flows run through shared runners (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
@@ -49,6 +50,7 @@ Use these files in order before substantial changes:
 - Settings UI is compact single-page and scrollable (not nested sub-tabs).
 - Theme system is strict two-theme: `dark` and `light` (legacy aliases normalized).
 - Playlist fetch/sort dialog includes selected count, selected total size, high-contrast table headers, and stable action bar.
+- ErrorPanel integrated into converter and subtitle tabs for inline error display.
 
 ## Verified Facts
 
@@ -57,8 +59,9 @@ Use these files in order before substantial changes:
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
 - FFmpeg realtime progress parsing is active.
 - Queue panel supports queued/running/completed states and cancel/open-folder actions.
-- Last full-suite baseline (2026-03-30): 417 passed, 1 skipped.
-- Latest targeted regression checks during refactor sessions: 85 passed.
+- Last full-suite baseline (2026-03-31): 472 passed, 1 skipped.
+- Shared UI helpers in `ui_components.py`: `style_combo`, `style_entry`, `bind_focus_ring`, `set_button_loading_state`.
+- Keyboard shortcuts active: `Ctrl+Enter`, `Escape`, `Ctrl+L` across all tabs.
 
 ## Working Rules
 

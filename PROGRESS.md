@@ -62,11 +62,9 @@ Verified on 2026-03-30.
 
 ## Validation Status
 
-- Last known full-suite baseline: `pytest -q` -> `417 passed, 1 skipped` (418 collected).
-- Latest refactor-session validation:
-  - `pytest -q tests/test_ui_logic.py` -> `27 passed`
-  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py` -> `37 passed`
-  - Targeted regression bundle during refactor: `85 passed`
+- Last known full-suite baseline: `pytest -q` -> `472 passed, 1 skipped` (473 collected).
+- Latest refactor-session validation (2026-03-31):
+  - Full suite after Phase 1 UI consistency tasks: `472 passed, 1 skipped`
 
 ## Functional Highlights
 
@@ -75,6 +73,11 @@ Verified on 2026-03-30.
 - Auto-sort by channel/uploader structure is supported in download output templates.
 - Playlist selection/sorting supports clearer metrics and visibility-focused table styling.
 - Torrent mode handling remains stable (`FULL`, `SEQUENTIAL`, `STREAM`).
+- Shared `style_combo`/`style_entry` helpers centralized in `ui_components.py`.
+- Keyboard shortcuts active: `Ctrl+Enter` (action), `Escape` (cancel), `Ctrl+L` (clear).
+- `ErrorPanel` integrated into converter and subtitle tabs for user-friendly error display.
+- Focus ring animation active on all input fields.
+- `Spacing.*` design tokens applied consistently across UI components.
 
 ## Documentation Sync
 

@@ -14,8 +14,11 @@ from ..core.subtitle_manager import (
     SubtitleEmbedder,
     SubtitleFormat
 )
+from ravn_app.core.animation_manager import get_animation_manager
 from ravn_app.core.i18n import t
+from ravn_app.ui.components.error_panel import ErrorPanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
+from ravn_app.ui.ui_components import style_combo, style_entry, bind_focus_ring, Tooltip, set_button_loading_state
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -53,32 +56,12 @@ class SubtitleTab(ctk.CTkFrame):
         self.subtitle_converter = SubtitleConverter()
         self.subtitle_editor = SubtitleEditor()
         self.subtitle_embedder = SubtitleEmbedder()
+        self.animation_manager = get_animation_manager()
 
         self.current_video_file = None
         self.current_subtitle_file = None
 
         self.setup_ui()
-
-    @staticmethod
-    def _style_combo(combo):
-        combo.configure(
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.ACCENT,
-            button_hover_color=Colors.ACCENT_HOVER,
-            dropdown_fg_color=Colors.BG_SURFACE,
-            text_color=Colors.TEXT_PRIMARY,
-            dropdown_text_color=Colors.TEXT_PRIMARY,
-            border_color=Colors.BORDER,
-        )
-
-    @staticmethod
-    def _style_entry(entry):
-        entry.configure(
-            fg_color=Colors.BG_INPUT,
-            text_color=Colors.TEXT_PRIMARY,
-            placeholder_text_color=Colors.TEXT_MUTED,
-            border_color=Colors.BORDER,
-        )
 
     def setup_ui(self):
         """UI'ı oluştur"""
@@ -96,7 +79,8 @@ class SubtitleTab(ctk.CTkFrame):
         # Video URL
         ctk.CTkLabel(download_frame, text=t("subtitle.url"), font=Fonts.LABEL).pack(pady=Spacing.XS)
         self.url_entry = ctk.CTkEntry(download_frame, width=400)
-        self._style_entry(self.url_entry)
+        style_entry(self.url_entry)
+        bind_focus_ring(self.url_entry)
         self.url_entry.pack(pady=Spacing.XS)
 
         # Dil seçimi
@@ -107,16 +91,23 @@ class SubtitleTab(ctk.CTkFrame):
         self.lang_tr_var = ctk.BooleanVar(value=True)
         self.lang_en_var = ctk.BooleanVar(value=True)
 
-        ctk.CTkCheckBox(lang_frame, text=t("subtitle.turkish"), variable=self.lang_tr_var).pack(side="left", padx=Spacing.XS)
-        ctk.CTkCheckBox(lang_frame, text=t("subtitle.english"), variable=self.lang_en_var).pack(side="left", padx=Spacing.XS)
+        self.lang_tr_cb = ctk.CTkCheckBox(lang_frame, text=t("subtitle.turkish"), variable=self.lang_tr_var)
+        self.lang_tr_cb.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.lang_tr_cb, t("subtitle.languageTooltip"))
+
+        self.lang_en_cb = ctk.CTkCheckBox(lang_frame, text=t("subtitle.english"), variable=self.lang_en_var)
+        self.lang_en_cb.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.lang_en_cb, t("subtitle.languageTooltip"))
 
         # Otomatik altyazı
         self.auto_sub_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(
+        self.auto_sub_cb = ctk.CTkCheckBox(
             download_frame,
             text=t("subtitle.autoSubtitles"),
             variable=self.auto_sub_var
-        ).pack(pady=Spacing.XS)
+        )
+        self.auto_sub_cb.pack(pady=Spacing.XS)
+        Tooltip(self.auto_sub_cb, t("subtitle.autoSubtitlesTooltip"))
 
         # Çıkış dizini
         ctk.CTkLabel(download_frame, text=t("subtitle.outputDir"), font=Fonts.LABEL).pack(pady=Spacing.XS)
@@ -124,7 +115,8 @@ class SubtitleTab(ctk.CTkFrame):
         dir_frame.pack(pady=Spacing.XS, fill="x", padx=Spacing.SM)
 
         self.output_dir_entry = ctk.CTkEntry(dir_frame, width=300)
-        self._style_entry(self.output_dir_entry)
+        style_entry(self.output_dir_entry)
+        bind_focus_ring(self.output_dir_entry)
         self.output_dir_entry.pack(side="left", padx=Spacing.XS)
         self.output_dir_entry.insert(0, str(Path.home() / "Downloads"))
 
@@ -230,8 +222,10 @@ class SubtitleTab(ctk.CTkFrame):
             convert_frame,
             values=["SRT", "VTT", "ASS", "SSA"]
         )
-        self._style_combo(self.format_combo)
+        style_combo(self.format_combo)
+        bind_focus_ring(self.format_combo)
         self.format_combo.pack(pady=Spacing.XS)
+        Tooltip(self.format_combo, t("subtitle.formatConvertTooltip"))
 
         ctk.CTkButton(
             convert_frame,
@@ -254,6 +248,7 @@ class SubtitleTab(ctk.CTkFrame):
         )
         self.shift_slider.pack(pady=Spacing.XS, fill="x", padx=20)
         self.shift_slider.set(0)
+        Tooltip(self.shift_slider, t("subtitle.timingShiftTooltip"))
 
         self.shift_label = ctk.CTkLabel(timing_frame, text="0.0s", font=Fonts.LABEL)
         self.shift_label.pack(pady=Spacing.XS)
@@ -276,7 +271,7 @@ class SubtitleTab(ctk.CTkFrame):
         embed_type_frame = ctk.CTkFrame(embed_frame, fg_color="transparent")
         embed_type_frame.pack(pady=Spacing.XS)
 
-        ctk.CTkButton(
+        self.soft_subtitle_btn = ctk.CTkButton(
             embed_type_frame,
             text=t("subtitle.softSubtitle"),
             command=lambda: self.embed_subtitle("soft"),
@@ -284,9 +279,11 @@ class SubtitleTab(ctk.CTkFrame):
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_MD,
             cursor=Cursors.POINTER,
-        ).pack(side="left", padx=Spacing.XS)
+        )
+        self.soft_subtitle_btn.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.soft_subtitle_btn, t("subtitle.softSubtitleTooltip"))
 
-        ctk.CTkButton(
+        self.hard_subtitle_btn = ctk.CTkButton(
             embed_type_frame,
             text=t("subtitle.hardSubtitle"),
             command=lambda: self.embed_subtitle("hard"),
@@ -294,7 +291,9 @@ class SubtitleTab(ctk.CTkFrame):
             font=Fonts.LABEL,
             height=Sizes.BTN_HEIGHT_MD,
             cursor=Cursors.POINTER,
-        ).pack(side="left", padx=Spacing.XS)
+        )
+        self.hard_subtitle_btn.pack(side="left", padx=Spacing.XS)
+        Tooltip(self.hard_subtitle_btn, t("subtitle.hardSubtitleTooltip"))
 
         # Log
         log_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
@@ -311,6 +310,12 @@ class SubtitleTab(ctk.CTkFrame):
         )
         self.log_text.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
 
+        # ===== Error Panel (hidden by default) =====
+        self.error_panel = ErrorPanel(
+            log_frame,
+            animation_manager=self.animation_manager,
+        )
+
         # Register drop zones for drag & drop
         _setup_dnd(
             self._video_drop_zone,
@@ -324,6 +329,27 @@ class SubtitleTab(ctk.CTkFrame):
             enter_callback=lambda e: self._highlight_zone(self._subtitle_drop_zone, self._subtitle_dnd_hint, True),
             leave_callback=lambda e: self._highlight_zone(self._subtitle_drop_zone, self._subtitle_dnd_hint, False),
         )
+
+    def _on_ctrl_enter(self, event=None):
+        """Handle Ctrl+Enter - download subtitles."""
+        if not self.winfo_viewable():
+            return
+        # Only trigger if button is not disabled (not already downloading)
+        if self.download_subtitle_btn.cget("state") != "disabled":
+            self.download_subtitles()
+
+    def _on_escape(self, event=None):
+        """Handle Escape - no cancellation available for subtitle downloads."""
+        if not self.winfo_viewable():
+            return
+        # Subtitle downloads run in a simple thread without cancellation support
+
+    def _on_ctrl_l(self, event=None):
+        """Handle Ctrl+L - clear URL entry."""
+        if not self.winfo_viewable():
+            return
+        self.url_entry.delete(0, "end")
+        return "break"
 
     def _parse_drop_path(self, event) -> Path:
         """Extract a Path from a tkinterdnd2 drop event."""
@@ -438,7 +464,8 @@ class SubtitleTab(ctk.CTkFrame):
             return
 
         self.log(t("subtitle.subtitlesDownloading", url=url))
-        self.download_subtitle_btn.configure(state="disabled", text=t("subtitle.downloadingBtn"))
+        self.error_panel.hide_error()
+        set_button_loading_state(self.download_subtitle_btn, True, loading_text=t("subtitle.downloadingBtn"))
 
         def download_thread():
             try:
@@ -457,10 +484,15 @@ class SubtitleTab(ctk.CTkFrame):
                     self.log(t("subtitle.subtitleNotFound"))
 
             except Exception as e:
-                self.log(t("subtitle.errorLine", error=str(e)))
+                error_msg = str(e)
+                self.log(t("subtitle.errorLine", error=error_msg))
+                self.after(0, lambda: self.error_panel.show_error(
+                    message=t("subtitle.downloadError"),
+                    raw_text=error_msg,
+                ))
 
             finally:
-                self.after(0, lambda: self.download_subtitle_btn.configure(state="normal", text=t("subtitle.downloadBtn")))
+                self.after(0, lambda: set_button_loading_state(self.download_subtitle_btn, False, original_text=t("subtitle.downloadBtn")))
 
         threading.Thread(target=download_thread, daemon=True).start()
 
@@ -474,6 +506,7 @@ class SubtitleTab(ctk.CTkFrame):
         output_file = str(Path(self.current_subtitle_file).with_suffix(f".{target_format}"))
 
         self.log(t("subtitle.converting", format=target_format.upper()))
+        self.error_panel.hide_error()
 
         success = self.subtitle_converter.convert(
             self.current_subtitle_file,
@@ -487,6 +520,10 @@ class SubtitleTab(ctk.CTkFrame):
             self.subtitle_label.configure(text=Path(output_file).name)
         else:
             self.log(t("subtitle.convertFailed"))
+            self.error_panel.show_error(
+                message=t("subtitle.convertError"),
+                raw_text=t("subtitle.convertFailed"),
+            )
 
     def shift_timing(self):
         """Altyazı zamanlamasını kaydır"""
@@ -502,6 +539,7 @@ class SubtitleTab(ctk.CTkFrame):
         ))
 
         self.log(t("subtitle.timingShiftRunning", seconds=f"{shift_seconds:.1f}"))
+        self.error_panel.hide_error()
 
         success = self.subtitle_editor.shift_timing(
             self.current_subtitle_file,
@@ -515,6 +553,10 @@ class SubtitleTab(ctk.CTkFrame):
             self.subtitle_label.configure(text=Path(output_file).name)
         else:
             self.log(t("subtitle.timingShiftFailed"))
+            self.error_panel.show_error(
+                message=t("subtitle.timingError"),
+                raw_text=t("subtitle.timingShiftFailed"),
+            )
 
     def embed_subtitle(self, embed_type: str):
         """Altyazıyı videoya göm"""
@@ -527,6 +569,7 @@ class SubtitleTab(ctk.CTkFrame):
         ))
 
         self.log(t("subtitle.embedding", mode=embed_type))
+        self.error_panel.hide_error()
 
         def embed_thread():
             try:
@@ -547,8 +590,17 @@ class SubtitleTab(ctk.CTkFrame):
                     self.log(t("subtitle.embedDone", name=Path(output_file).name))
                 else:
                     self.log(t("subtitle.embedFailed"))
+                    self.after(0, lambda: self.error_panel.show_error(
+                        message=t("subtitle.embedError"),
+                        raw_text=t("subtitle.embedFailed"),
+                    ))
 
             except Exception as e:
-                self.log(t("subtitle.errorLine", error=str(e)))
+                error_msg = str(e)
+                self.log(t("subtitle.errorLine", error=error_msg))
+                self.after(0, lambda: self.error_panel.show_error(
+                    message=t("subtitle.embedError"),
+                    raw_text=error_msg,
+                ))
 
         threading.Thread(target=embed_thread, daemon=True).start()

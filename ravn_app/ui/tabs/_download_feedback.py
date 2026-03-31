@@ -56,7 +56,8 @@ class FeedbackMixin:
             toast_manager.show_success(t("download.downloadComplete", files=filename))
 
         self._set_button_loading_state(self.download_btn, is_loading=False)
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        restore_text = getattr(self, "_active_btn_restore_text", f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=restore_text)
         self.after(
             3000,
             lambda: (
@@ -69,7 +70,8 @@ class FeedbackMixin:
         self._stop_processing_feedback()
         self._hide_progress()
         self._set_button_loading_state(self.download_btn, is_loading=False)
-        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        restore_text = getattr(self, "_active_btn_restore_text", f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=restore_text)
         self._show_download_error(error_message, error_message)
 
         toast_manager = self.toast_manager_getter()

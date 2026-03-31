@@ -6,13 +6,13 @@ requests>=2.31.0
 click>=8.0.0
 
 # Torrent / magnet support
-# aria2c is an external binary and must be installed on system PATH.
+# aria2c binary: install via `winget install aria2` (Windows), `brew install aria2` (macOS), `apt install aria2` (Linux)
 aria2p>=0.12.1
 
 # Desktop App & Auto-Update
 pyinstaller>=5.0
 
-# FAZ 5: Gelişmiş UI Özellikleri (Opsiyonel)
+# Phase 5: Advanced UI Features (Optional)
 tkinterdnd2>=0.3.0  # Drag & Drop (Windows)
-pystray>=0.19.0     # Sistem tray
-# win10toast>=0.9     # Windows bildirimleri
+pystray>=0.19.0     # System tray
+# win10toast>=0.9     # Windows notifications (currently unused)

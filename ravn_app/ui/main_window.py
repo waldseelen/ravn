@@ -3,9 +3,11 @@ Ana uygulama penceresi - CustomTkinter arayüzü (Sekmeli)
 """
 
 import platform
+import queue
 import subprocess
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import customtkinter as ctk
 
@@ -14,11 +16,23 @@ from ravn_app.core.database import ConfigManager, DatabaseManager
 from ravn_app.core.downloader import YouTubeDownloader
 from ravn_app.core.i18n import get_i18n, t
 from ravn_app.core.logging_config import get_logger
+from ravn_app.core.persistence import MediaLibraryAutoAdder
 from ravn_app.core.platform_support import PlatformManager
 from ravn_app.core.task_manager import get_task_queue
 from ravn_app.ui.advanced_features import NotificationManager, SystemTrayIntegration, ThemeManager
-from ravn_app.ui.design_tokens import Colors, Fonts, Icons
-from ravn_app.ui.tabs import ConverterTab, DownloadTab, HistoryTab, QueueTab, SettingsTab, SubtitleTab, TorrentTab
+from ravn_app.ui.design_tokens import Colors, Fonts, Icons, Spacing
+from ravn_app.ui.tabs import (
+    ConverterTab,
+    DownloadTab,
+    FiltersTab,
+    HistoryTab,
+    LibraryTab,
+    MixerTab,
+    QueueTab,
+    SettingsTab,
+    SubtitleTab,
+    TorrentTab,
+)
 from ravn_app.ui.ui_components import ToastManager
 
 
@@ -45,6 +59,10 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.task_queue = get_task_queue()
         self.queue_paused = False
         self.animation_manager = get_animation_manager()
+        self.media_library_auto_adder = MediaLibraryAutoAdder(
+            config_manager=self.config_manager,
+            ffmpeg_path=self.config_manager.get("ffmpeg_path", "ffmpeg"),
+        )
 
         self.current_theme = self.config_manager.get("theme", "dark")
         ThemeManager.apply_theme(self.current_theme)
@@ -52,12 +70,19 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.download_tab: Optional[DownloadTab] = None
         self.converter_tab = None
         self.subtitle_tab = None
+        self.mixer_tab = None
+        self.library_tab = None
+        self.filters_tab = None
+        self._task_callback_after_id = None
+        self._ui_callback_queue: queue.Queue = queue.Queue()
         self.tray = None
 
         self._setup_ui()
+        self.after(100, self._center_window)
         self._setup_global_shortcuts()
         self.toast_manager = ToastManager(self)
         self._setup_tray_integration()
+        self._schedule_task_queue_callback_pump()
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
 
     def __del__(self):
@@ -92,7 +117,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         header_frame.pack(fill="x", padx=0, pady=0)
 
         header_inner = ctk.CTkFrame(header_frame, fg_color="transparent")
-        header_inner.pack(pady=(12, 10))
+        header_inner.pack(pady=(Spacing.SM, Spacing.XS))
 
         ctk.CTkLabel(
             header_inner,
@@ -108,7 +133,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         ).pack()
 
         self.tabview = ctk.CTkTabview(self, anchor="n")
-        self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
+        self.tabview.pack(fill="both", expand=True, padx=Spacing.XS, pady=(0, Spacing.XS))
         self.bind("<Configure>", self._on_window_resize)
         self.tabview.configure(
             segmented_button_fg_color=Colors.BG_SURFACE,
@@ -131,6 +156,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             toast_manager_getter=lambda: self.toast_manager,
             queue_paused_getter=lambda: self.queue_paused,
             show_queue_tab_callback=lambda: self.tabview.set(f"{Icons.QUEUE}  {t('tabs.queue')}"),
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
             fg_color="transparent",
         )
         self.download_tab.pack(fill="both", expand=True)
@@ -140,6 +166,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             converter_tab,
             db_manager=self.db_manager,
             notify_callback=self._notify_conversion_complete,
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
             fg_color="transparent",
         )
         self.converter_tab.pack(fill="both", expand=True)
@@ -155,6 +182,47 @@ class YouTubeDownloaderApp(ctk.CTk):
             toast_manager_getter=lambda: self.toast_manager,
             fg_color="transparent",
         ).pack(fill="both", expand=True)
+
+        mixer_tab = self.tabview.add(f"{Icons.MIXER}  {t('tabs.mixer')}")
+        self.mixer_tab = MixerTab(
+            mixer_tab,
+            config_manager=self.config_manager,
+            db_manager=self.db_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            show_queue_tab_callback=lambda: self.tabview.set(f"{Icons.QUEUE}  {t('tabs.queue')}"),
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
+            fg_color="transparent",
+        )
+        self.mixer_tab.pack(fill="both", expand=True)
+
+        filters_tab = self.tabview.add(f"{Icons.FILTERS}  {t('tabs.filters')}")
+        self.filters_tab = FiltersTab(
+            filters_tab,
+            config_manager=self.config_manager,
+            db_manager=self.db_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            show_queue_tab_callback=lambda: self.tabview.set(f"{Icons.QUEUE}  {t('tabs.queue')}"),
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
+            fg_color="transparent",
+        )
+        self.filters_tab.pack(fill="both", expand=True)
+
+        library_tab = self.tabview.add(f"{Icons.LIBRARY}  {t('tabs.library')}")
+        self.library_tab = LibraryTab(
+            library_tab,
+            config_manager=self.config_manager,
+            db_manager=self.db_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            show_queue_tab_callback=lambda: self.tabview.set(f"{Icons.QUEUE}  {t('tabs.queue')}"),
+            fg_color="transparent",
+        )
+        self.library_tab.pack(fill="both", expand=True)
 
         queue_tab = self.tabview.add(f"{Icons.QUEUE}  {t('tabs.queue')}")
         QueueTab(
@@ -185,7 +253,21 @@ class YouTubeDownloaderApp(ctk.CTk):
             text=t("common.appReady"),
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
-        ).pack(pady=5)
+        ).pack(pady=(0, Spacing.XS))
+
+    def _center_window(self):
+        """Center the main window on the active display."""
+        try:
+            self.update_idletasks()
+            width = self.winfo_width() or 1400
+            height = self.winfo_height() or 900
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            x = max((screen_width - width) // 2, 0)
+            y = max((screen_height - height) // 2, 0)
+            self.geometry(f"{width}x{height}+{x}+{y}")
+        except Exception:
+            pass
 
     def _setup_global_shortcuts(self):
         """Set up global keyboard shortcuts for the entire application."""
@@ -193,33 +275,40 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.bind("<Escape>", self._on_escape)
         self.bind("<Control-l>", self._on_ctrl_l)
 
+    def _get_active_shortcut_tab(self):
+        """Return the currently visible tab widget that supports global shortcuts."""
+        for tab in (
+            getattr(self, "download_tab", None),
+            getattr(self, "converter_tab", None),
+            getattr(self, "subtitle_tab", None),
+            getattr(self, "mixer_tab", None),
+            getattr(self, "filters_tab", None),
+            getattr(self, "library_tab", None),
+        ):
+            if tab and getattr(tab, "winfo_viewable", lambda: False)():
+                return tab
+        return None
+
     def _on_ctrl_enter(self, event=None):
         """Handle Ctrl+Enter - delegate to active tab."""
-        # Delegate to the active tab's handler if it exists and is viewable
-        if self.download_tab and self.download_tab.winfo_viewable():
-            self.download_tab._on_ctrl_enter(event)
-        elif self.converter_tab and self.converter_tab.winfo_viewable():
-            self.converter_tab._on_ctrl_enter(event)
-        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
-            self.subtitle_tab._on_ctrl_enter(event)
+        tab = self._get_active_shortcut_tab()
+        handler = getattr(tab, "_on_ctrl_enter", None) if tab else None
+        if callable(handler):
+            return handler(event)
 
     def _on_escape(self, event=None):
         """Handle Escape - delegate to active tab."""
-        if self.download_tab and self.download_tab.winfo_viewable():
-            self.download_tab._on_escape(event)
-        elif self.converter_tab and self.converter_tab.winfo_viewable():
-            self.converter_tab._on_escape(event)
-        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
-            self.subtitle_tab._on_escape(event)
+        tab = self._get_active_shortcut_tab()
+        handler = getattr(tab, "_on_escape", None) if tab else None
+        if callable(handler):
+            return handler(event)
 
     def _on_ctrl_l(self, event=None):
         """Handle Ctrl+L - delegate to active tab."""
-        if self.download_tab and self.download_tab.winfo_viewable():
-            return self.download_tab._on_ctrl_l(event)
-        elif self.converter_tab and self.converter_tab.winfo_viewable():
-            return self.converter_tab._on_ctrl_l(event)
-        elif self.subtitle_tab and self.subtitle_tab.winfo_viewable():
-            return self.subtitle_tab._on_ctrl_l(event)
+        tab = self._get_active_shortcut_tab()
+        handler = getattr(tab, "_on_ctrl_l", None) if tab else None
+        if callable(handler):
+            return handler(event)
 
     def _setup_tab_switch_transition(self):
         segmented = getattr(self.tabview, "_segmented_button", None)
@@ -312,6 +401,81 @@ class YouTubeDownloaderApp(ctk.CTk):
     def _notify_conversion_complete(self, output_file: str):
         NotificationManager.show_conversion_complete(Path(output_file).name)
 
+    def _auto_add_outputs_to_library(
+        self,
+        file_paths: Any,
+        *,
+        source_type: str,
+        title: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Register generated outputs in the media library without blocking the UI thread."""
+        auto_adder = getattr(self, "media_library_auto_adder", None)
+        if auto_adder is None:
+            return
+
+        def worker() -> None:
+            self._register_outputs_with_library(
+                file_paths,
+                source_type=source_type,
+                title=title,
+                tags=tags,
+                metadata=metadata,
+            )
+
+        threading.Thread(target=worker, daemon=True, name="MediaLibraryAutoAdd").start()
+
+    def _register_outputs_with_library(
+        self,
+        file_paths: Any,
+        *,
+        source_type: str,
+        title: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ):
+        """Synchronous helper used by the background auto-add worker and tests."""
+        auto_adder = getattr(self, "media_library_auto_adder", None)
+        if auto_adder is None:
+            return []
+
+        results = auto_adder.register_outputs(
+            file_paths,
+            source_type=source_type,
+            title=title,
+            tags=tags,
+            metadata=metadata,
+        )
+        if any(result.added for result in results):
+            self._schedule_library_refresh()
+        return results
+
+    def _schedule_library_refresh(self) -> None:
+        library_tab = getattr(self, "library_tab", None)
+        if library_tab is None or not hasattr(library_tab, "refresh_dashboard"):
+            return
+
+        callback_queue = self.__dict__.get("_ui_callback_queue")
+        if callback_queue is None:
+            return
+
+        callback_queue.put((library_tab.refresh_dashboard, (), {}))
+
+    def _process_ui_callbacks(self) -> None:
+        callback_queue = self.__dict__.get("_ui_callback_queue")
+        if callback_queue is None:
+            return
+        while True:
+            try:
+                callback, args, kwargs = callback_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                callback(*args, **kwargs)
+            except Exception as exc:
+                logger.debug("UI callback failed: %s", exc)
+
     def _setup_tray_integration(self):
         self.tray = SystemTrayIntegration(
             app_name="RAVN",
@@ -350,6 +514,14 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.title(t("common.appTitle"))
         self._setup_ui()
 
+    def _schedule_task_queue_callback_pump(self):
+        """Poll task queue callbacks so worker-thread UI updates land on the main thread."""
+        try:
+            self.task_queue.process_callbacks()
+            self._process_ui_callbacks()
+        finally:
+            self._task_callback_after_id = self.after(120, self._schedule_task_queue_callback_pump)
+
     def _quit_from_tray(self):
         self.after(0, self._quit_app)
 
@@ -366,6 +538,12 @@ class YouTubeDownloaderApp(ctk.CTk):
             return
 
     def _quit_app(self):
+        if self._task_callback_after_id is not None:
+            try:
+                self.after_cancel(self._task_callback_after_id)
+            except Exception:
+                pass
+            self._task_callback_after_id = None
         if self.tray:
             self.tray.stop()
         self.destroy()

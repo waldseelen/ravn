@@ -5,14 +5,13 @@ Altyazı indirme, dönüştürme ve yönetim sistemi
 
 import os
 import re
-import json
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Callable
+from typing import Any, List, Dict, Optional
 from enum import Enum
 from dataclasses import dataclass
 import logging
 
-from ravn_app.core.runners import FFmpegRunner, YtDlpRunner, RunnerResult
+from ravn_app.core.runners import FFmpegRunner, YtDlpRunner
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +35,143 @@ class SubtitleInfo:
     line_count: int = 0
 
 
+@dataclass(frozen=True)
+class SubtitleDownloadPlan:
+    """Resolved downloader-side subtitle acquisition plan."""
+
+    requested_languages: List[str]
+    preferred_language: str = ""
+    fallback_language: str = ""
+    use_auto_generated: bool = False
+
+
+def _normalize_language_code(value: Any) -> str:
+    code = str(value or "").strip().lower().replace("_", "-")
+    if code in {"", "none", "off", "disabled"}:
+        return ""
+    return code
+
+
+def _unique_language_order(*values: Any) -> List[str]:
+    ordered: List[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = _normalize_language_code(value)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            ordered.append(normalized)
+    return ordered
+
+
+def _match_language_code(preferred_code: str, available_codes: Dict[str, str]) -> Optional[str]:
+    preferred = _normalize_language_code(preferred_code)
+    if not preferred:
+        return None
+
+    if preferred in available_codes:
+        return available_codes[preferred]
+
+    for normalized, original in available_codes.items():
+        if normalized.startswith(f"{preferred}-") or preferred.startswith(f"{normalized}-"):
+            return original
+    return None
+
+
 class SubtitleDownloader:
     """YouTube ve diğer platformlardan altyazı indirir"""
+
+    SUPPORTED_LANGUAGE_CODES = ("tr", "en", "de", "fr", "es")
 
     def __init__(self, yt_dlp_path: str = "yt-dlp"):
         self.yt_dlp_path = yt_dlp_path
         self._runner = YtDlpRunner(yt_dlp_path)
+
+    @staticmethod
+    def resolve_download_plan(
+        video_info: Optional[Dict[str, Any]],
+        preferred_language: str = "tr",
+        fallback_language: str = "en",
+        include_auto_generated: bool = True,
+    ) -> SubtitleDownloadPlan:
+        """Choose the best subtitle language to request using preferred/fallback rules."""
+        preferred = _normalize_language_code(preferred_language)
+        fallback = _normalize_language_code(fallback_language)
+        requested_defaults = _unique_language_order(preferred, fallback)
+
+        if not isinstance(video_info, dict):
+            return SubtitleDownloadPlan(
+                requested_languages=requested_defaults,
+                preferred_language=preferred,
+                fallback_language=fallback,
+                use_auto_generated=bool(include_auto_generated and requested_defaults),
+            )
+
+        manual_available = {
+            _normalize_language_code(code): str(code)
+            for code in (video_info.get("subtitles") or {}).keys()
+            if _normalize_language_code(code)
+        }
+        automatic_available = {
+            _normalize_language_code(code): str(code)
+            for code in (video_info.get("automatic_captions") or {}).keys()
+            if _normalize_language_code(code)
+        }
+
+        for desired_language in requested_defaults:
+            manual_match = _match_language_code(desired_language, manual_available)
+            if manual_match:
+                return SubtitleDownloadPlan(
+                    requested_languages=[manual_match],
+                    preferred_language=preferred,
+                    fallback_language=fallback,
+                    use_auto_generated=False,
+                )
+
+            if include_auto_generated:
+                auto_match = _match_language_code(desired_language, automatic_available)
+                if auto_match:
+                    return SubtitleDownloadPlan(
+                        requested_languages=[auto_match],
+                        preferred_language=preferred,
+                        fallback_language=fallback,
+                        use_auto_generated=True,
+                    )
+
+        return SubtitleDownloadPlan(
+            requested_languages=[],
+            preferred_language=preferred,
+            fallback_language=fallback,
+            use_auto_generated=False,
+        )
+
+    @classmethod
+    def build_download_args(
+        cls,
+        video_info: Optional[Dict[str, Any]],
+        preferred_language: str = "tr",
+        fallback_language: str = "en",
+        include_auto_generated: bool = True,
+        embed_subtitles: bool = False,
+    ) -> List[str]:
+        """Build yt-dlp subtitle arguments using preferred/fallback language resolution."""
+        plan = cls.resolve_download_plan(
+            video_info,
+            preferred_language=preferred_language,
+            fallback_language=fallback_language,
+            include_auto_generated=include_auto_generated,
+        )
+        if not plan.requested_languages:
+            return []
+
+        args = [
+            '--write-subs',
+            '--sub-langs', ','.join(plan.requested_languages),
+        ]
+        if plan.use_auto_generated:
+            args.append('--write-auto-subs')
+        if embed_subtitles:
+            args.append('--embed-subs')
+        return args
 
     def download_subtitles(
         self,
@@ -67,29 +197,27 @@ class SubtitleDownloader:
 
         languages = languages or ['tr', 'en']
 
-        # yt-dlp args for subtitle-only download
         args = [
             '--write-subs',
             '--sub-langs', ','.join(languages),
             '--skip-download',
-            '-o', os.path.join(output_dir, '%(title)s.%(ext)s'),
             '--quiet',
         ]
-        
         if auto_sub:
             args.append('--write-auto-subs')
 
-        # Run using YtDlpRunner
-        result = self._runner.download(video_url, output_dir, extra_args=args)
-        
+        result = self._runner.download(
+            video_url,
+            output_dir,
+            filename_template='%(title)s.%(ext)s',
+            extra_args=args,
+        )
         if not result.success:
             logger.error(f"Altyazı indirme hatası: {result.error_message}")
             return []
 
-        # Find downloaded subtitle files
         downloaded_subs = []
         for lang in languages:
-            # Look for subtitle files with various extensions
             for ext in ['vtt', 'srt', 'ass', 'ssa']:
                 pattern = os.path.join(output_dir, f"*.{lang}.{ext}")
                 import glob
@@ -98,29 +226,26 @@ class SubtitleDownloader:
                         fmt = SubtitleFormat(ext)
                     except ValueError:
                         fmt = SubtitleFormat.VTT
-                    
+
                     downloaded_subs.append(SubtitleInfo(
                         language=lang,
                         format=fmt,
                         file_path=sub_file,
                         is_auto_generated='auto' in sub_file.lower()
                     ))
-        
+
         return downloaded_subs
 
     def list_available_subtitles(self, video_url: str) -> Dict[str, List[str]]:
         """Video için mevcut altyazıları listele"""
-        result = self._runner.extract_info(video_url)
-        
-        if not result.success:
-            logger.error(f"Altyazı listeleme hatası: {result.error_message}")
+        info = self._runner.extract_info(video_url)
+        if not isinstance(info, dict):
+            logger.error("Altyazı listeleme hatası: video bilgileri alınamadı")
             return {'manual': [], 'automatic': []}
 
-        info = result.metadata.get('info', {})
-        
         return {
-            'manual': list(info.get('subtitles', {}).keys()),
-            'automatic': list(info.get('automatic_captions', {}).keys())
+            'manual': list((info.get('subtitles') or {}).keys()),
+            'automatic': list((info.get('automatic_captions') or {}).keys())
         }
 
 

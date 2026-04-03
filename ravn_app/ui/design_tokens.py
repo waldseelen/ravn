@@ -118,6 +118,11 @@ class _FontRegistry:
         return ctk.CTkFont(size=13, weight="bold")
 
     @functools.cached_property
+    def BTN(self):
+        """13 bold — legacy button label alias"""
+        return self.LABEL_BOLD
+
+    @functools.cached_property
     def SMALL(self):
         """11 normal — helper text, captions"""
         return ctk.CTkFont(size=11)
@@ -207,6 +212,7 @@ class Icons:
     # Status Indicators (ICN-12 to ICN-16)
     QUEUED_STATUS   = "○"   # Queued status - circle outline (ICN-12)
     RUNNING_STATUS  = "◐"   # Running status - spinner frame (ICN-13)
+    SPINNER         = "◐"   # Generic spinner alias for loading button text
     SUCCESS_STATUS  = "✓"   # Success status - checkmark (ICN-14)
     ERROR_STATUS    = "×"   # Error status - X (ICN-15)
     PAUSED_STATUS   = "⏸"   # Paused status - pause symbol (ICN-16)

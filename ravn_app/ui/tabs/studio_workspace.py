@@ -114,7 +114,11 @@ class StudioWorkspace(ctk.CTkFrame):
         self.converter_tab.pack(fill="both", expand=True)
 
         subtitle_tab = self.tabview.add(f"{Icons.SUBTITLE}  {t('tabs.subtitle')}")
-        self.subtitle_tab = SubtitleTab(subtitle_tab, fg_color=Colors.BG_PRIMARY)
+        self.subtitle_tab = SubtitleTab(
+            subtitle_tab,
+            config_manager=self._config_manager,
+            fg_color=Colors.BG_PRIMARY,
+        )
         self.subtitle_tab.pack(fill="both", expand=True)
 
         filters_tab = self.tabview.add(f"{Icons.FILTERS}  {t('tabs.filters')}")

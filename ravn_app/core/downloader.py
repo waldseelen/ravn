@@ -13,7 +13,9 @@ from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
 from enum import Enum
 
+from ravn_app.core.download_naming import apply_naming_template, template_needs_video_info
 from ravn_app.core.runners import YtDlpRunner, RunnerResult, RunnerStatus
+from ravn_app.core.subtitle_manager import SubtitleDownloader
 
 
 logger = logging.getLogger(__name__)
@@ -171,6 +173,51 @@ class YouTubeDownloader:
         """Dosya adını temizle"""
         return re.sub(r'[\/*?:"<>|]', "", name)
 
+    @staticmethod
+    def _quality_label_for_naming(quality: DownloadQuality) -> str:
+        """Map internal quality enum to the labels used in size/resolution helpers."""
+        quality_labels = {
+            DownloadQuality.BEST: "En İyi",
+            DownloadQuality.HIGH_1080P: "1080p",
+            DownloadQuality.MEDIUM_720P: "720p",
+            DownloadQuality.LOW_480P: "480p",
+            DownloadQuality.AUDIO_ONLY: "Sadece Ses",
+        }
+        return quality_labels.get(quality, "En İyi")
+
+    def _resolve_naming_resolution(
+        self,
+        video_info: Optional[Dict[str, Any]],
+        quality: DownloadQuality,
+        format_type: DownloadFormat,
+    ) -> str:
+        """Resolve a friendly resolution token for filename templates."""
+        if format_type in _AUDIO_FORMATS or quality == DownloadQuality.AUDIO_ONLY:
+            return "audio"
+
+        if isinstance(video_info, dict):
+            try:
+                quality_maps = self._runner.compute_size_by_quality(video_info)
+                resolution_map = quality_maps.get("resolution_by_quality") or {}
+                quality_label = self._quality_label_for_naming(quality)
+                resolution = str(resolution_map.get(quality_label) or "").strip()
+                if resolution and resolution.lower() != "unknown":
+                    return resolution
+            except Exception as err:
+                logger.debug(f"Çözünürlük bilgisi çözümlenemedi: {err}")
+
+            width = video_info.get("width")
+            height = video_info.get("height")
+            if width and height:
+                return f"{width}x{height}"
+
+        fallback_map = {
+            DownloadQuality.HIGH_1080P: "1080p",
+            DownloadQuality.MEDIUM_720P: "720p",
+            DownloadQuality.LOW_480P: "480p",
+        }
+        return fallback_map.get(quality, "best")
+
     def _resolve_sort_subfolder(self, video_info: Optional[Dict[str, Any]], auto_sort_mode: str) -> str:
         """Metadata'dan klasörleme için alt klasör adını üret."""
         if not isinstance(video_info, dict):
@@ -272,6 +319,29 @@ class YouTubeDownloader:
 
         return args
 
+    def _build_subtitle_download_args(
+        self,
+        video_info: Optional[Dict[str, Any]],
+        format_type: DownloadFormat,
+        auto_download_subtitles: bool,
+        preferred_subtitle_language: str,
+        subtitle_fallback_language: str,
+        subtitle_include_auto_generated: bool,
+        auto_embed_subtitles: bool,
+    ) -> List[str]:
+        """Build downloader-side subtitle automation args using shared subtitle logic."""
+        if not auto_download_subtitles:
+            return []
+
+        embed_subtitles = bool(auto_embed_subtitles and format_type not in _AUDIO_FORMATS)
+        return SubtitleDownloader.build_download_args(
+            video_info,
+            preferred_language=preferred_subtitle_language,
+            fallback_language=subtitle_fallback_language,
+            include_auto_generated=subtitle_include_auto_generated,
+            embed_subtitles=embed_subtitles,
+        )
+
     def _apply_audio_metadata(
         self,
         downloaded_files: List[str],
@@ -353,6 +423,13 @@ class YouTubeDownloader:
         auto_sort_enabled: Optional[bool] = None,
         auto_sort_mode: str = "artist",
         audio_bitrate: Optional[str] = None,
+        naming_preset: str = "standard",
+        filename_template: Optional[str] = None,
+        auto_subtitle_download: bool = False,
+        preferred_subtitle_language: str = "tr",
+        subtitle_fallback_language: str = "en",
+        subtitle_include_auto_generated: bool = True,
+        auto_embed_subtitles: bool = False,
     ) -> DownloadResult:
         """
         Video indir
@@ -369,6 +446,13 @@ class YouTubeDownloader:
             auto_sort: İndirilen dosyaları kanal/sanatçı adına göre klasörlere ayır
             auto_sort_enabled: auto_sort için yeni isimlendirme (geriye uyumlu)
             auto_sort_mode: Klasörleme modu: artist veya channel
+            naming_preset: Hazır adlandırma profili (standard/clean/playlist)
+            filename_template: İsteğe bağlı özel şablon ({title}, {uploader}, ...)
+            auto_subtitle_download: İndirme sırasında uygun altyazıları da al
+            preferred_subtitle_language: Öncelikli altyazı dili
+            subtitle_fallback_language: Öncelikli dil yoksa alternatif dil
+            subtitle_include_auto_generated: Gerekirse otomatik üretilen altyazıları kullan
+            auto_embed_subtitles: Video indirmelerinde bulunan altyazıyı dosyaya göm
 
         Returns:
             DownloadResult: İndirme sonucu
@@ -376,7 +460,12 @@ class YouTubeDownloader:
         logger.info(f"İndirme başlatılıyor: {url}")
 
         sort_enabled = auto_sort if auto_sort_enabled is None else auto_sort_enabled
-        needs_video_info = bool(sort_enabled or (embed_metadata and format_type in [DownloadFormat.MP3, DownloadFormat.M4A]))
+        needs_video_info = bool(
+            sort_enabled
+            or (embed_metadata and format_type in [DownloadFormat.MP3, DownloadFormat.M4A])
+            or template_needs_video_info(naming_preset, filename_template)
+            or auto_subtitle_download
+        )
         video_info: Optional[Dict[str, Any]] = None
         if needs_video_info:
             try:
@@ -405,6 +494,18 @@ class YouTubeDownloader:
             ])
             extra_args.extend(self._build_audio_download_args(embed_metadata=embed_metadata, embed_lyrics=embed_lyrics))
 
+        extra_args.extend(
+            self._build_subtitle_download_args(
+                video_info=video_info,
+                format_type=format_type,
+                auto_download_subtitles=auto_subtitle_download,
+                preferred_subtitle_language=preferred_subtitle_language,
+                subtitle_fallback_language=subtitle_fallback_language,
+                subtitle_include_auto_generated=subtitle_include_auto_generated,
+                auto_embed_subtitles=auto_embed_subtitles,
+            )
+        )
+
         result = self._runner.download(
             url=url,
             output_dir=resolved_output_dir,
@@ -421,11 +522,21 @@ class YouTubeDownloader:
             if format_type in _AUDIO_FORMATS and embed_metadata:
                 self._apply_audio_metadata(downloaded_files, video_info, embed_lyrics)
 
+            downloaded_files = apply_naming_template(
+                downloaded_files,
+                output_dir=resolved_output_dir,
+                naming_preset=naming_preset,
+                custom_template=filename_template,
+                video_info=video_info,
+                resolution=self._resolve_naming_resolution(video_info, quality, format_type),
+            )
+
             logger.info(f"İndirme tamamlandı: {downloaded_files}")
             return DownloadResult(
                 success=True,
                 url=url,
-                output_files=downloaded_files
+                output_files=downloaded_files,
+                title=str((video_info or {}).get('title') or Path(downloaded_files[0]).stem if downloaded_files else ""),
             )
         else:
             logger.error(f"İndirme başarısız: {result.error_message}")

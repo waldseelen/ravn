@@ -471,7 +471,7 @@ class TestYtDlpRunner:
         mock_data = {
             "webpage_url": "https://www.youtube.com/playlist?list=PL123",
             "entries": [
-                {"id": "abc123", "title": "Video 1", "duration": 100},
+                {"id": "abc123", "title": "Video 1", "duration": 100, "view_count": 12345},
                 {"webpage_url": "https://youtu.be/def456", "title": "Video 2", "duration": 200},
             ],
         }
@@ -486,6 +486,7 @@ class TestYtDlpRunner:
         assert len(entries) == 2
         assert entries[0]["url"] == "https://www.youtube.com/watch?v=abc123"
         assert entries[0]["title"] == "Video 1"
+        assert entries[0]["view_count"] == 12345
         assert entries[1]["url"] == "https://youtu.be/def456"
 
     @patch('subprocess.run')

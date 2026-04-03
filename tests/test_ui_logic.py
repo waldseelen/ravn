@@ -135,10 +135,15 @@ class _FakeConfig:
             "history_limit": 1000,
             "auto_subtitle_download": False,
             "preferred_subtitle_language": "tr",
+            "subtitle_fallback_language": "en",
+            "subtitle_include_auto_generated": True,
+            "auto_embed_subtitles": False,
             "auto_id3_tagging": True,
             "auto_embed_lyrics": True,
             "auto_sort_downloads": False,
             "auto_sort_mode": "artist",
+            "download_naming_preset": "standard",
+            "download_filename_template": "",
         }
         return defaults.get(key, default)
 
@@ -441,10 +446,15 @@ class TestSettingsAndHistoryLogic:
         tab.history_limit_entry = _FakeEntry("500")
         tab.auto_subtitle_var = _FakeVar(True)
         tab.subtitle_lang_combo = _FakeCombo("en")
+        tab.subtitle_fallback_combo = _FakeCombo("none")
+        tab.subtitle_auto_generated_var = _FakeVar(True)
+        tab.auto_embed_subtitles_var = _FakeVar(True)
         tab.auto_id3_var = _FakeVar(True)
         tab.auto_lyrics_var = _FakeVar(True)
         tab.auto_sort_var = _FakeVar(True)
         tab.auto_sort_mode_combo = _FakeCombo("Sanatçı")
+        tab.naming_preset_combo = _FakeCombo("clean")
+        tab.filename_template_entry = _FakeEntry("{uploader}/{title}")
         tab.close_behavior_combo = _FakeCombo("Sistem Çekmecesine Küçült")
 
         import ravn_app.ui.history_settings_tab as module
@@ -462,9 +472,14 @@ class TestSettingsAndHistoryLogic:
         assert "default_download_path" in keys
         assert "history_limit" in keys
         assert "auto_id3_tagging" in keys
+        assert "subtitle_fallback_language" in keys
+        assert "subtitle_include_auto_generated" in keys
+        assert "auto_embed_subtitles" in keys
         assert "auto_embed_lyrics" in keys
         assert "auto_sort_downloads" in keys
         assert "auto_sort_mode" in keys
+        assert "download_naming_preset" in keys
+        assert "download_filename_template" in keys
 
 
 class TestPlaylistSortDialogLogic:
@@ -472,6 +487,46 @@ class TestPlaylistSortDialogLogic:
         assert PlaylistSortDialog._format_bytes(0) == "0 B"
         assert PlaylistSortDialog._format_bytes(1024) == "1.0 KB"
         assert PlaylistSortDialog._format_bytes(1024 * 1024) == "1.0 MB"
+
+    def test_parse_duration_filter_supports_seconds_and_mmss(self):
+        assert PlaylistSortDialog._parse_duration_filter("90") == 90.0
+        assert PlaylistSortDialog._parse_duration_filter("02:30") == 150.0
+        assert PlaylistSortDialog._parse_duration_filter("01:02:03") == 3723.0
+        assert PlaylistSortDialog._parse_duration_filter("bad") is None
+
+    def test_filter_rows_supports_title_duration_and_popularity(self):
+        dialog = PlaylistSortDialog.__new__(PlaylistSortDialog)
+        dialog._all_rows = [
+            {"index": 0, "title_sort": "alpha", "duration": 60.0, "view_count": 10},
+            {"index": 1, "title_sort": "beta clip", "duration": 180.0, "view_count": 500},
+            {"index": 2, "title_sort": "beta live", "duration": 240.0, "view_count": 200},
+        ]
+
+        rows = dialog._filter_rows(
+            title_query="beta",
+            min_duration=120.0,
+            max_duration=220.0,
+            popularity_mode="top50",
+        )
+
+        assert [row["index"] for row in rows] == [1]
+
+    def test_apply_range_selection_marks_requested_indexes(self):
+        dialog = PlaylistSortDialog.__new__(PlaylistSortDialog)
+        dialog._all_rows = [
+            {"index": 0, "position": 1, "selected": True},
+            {"index": 1, "position": 2, "selected": True},
+            {"index": 2, "position": 3, "selected": True},
+            {"index": 3, "position": 4, "selected": True},
+        ]
+        dialog.range_start_entry = _FakeEntry("2")
+        dialog.range_end_entry = _FakeEntry("3")
+        dialog._refresh_tree = Mock()
+
+        dialog._apply_range_selection()
+
+        assert [row["selected"] for row in dialog._all_rows] == [False, True, True, False]
+        dialog._refresh_tree.assert_called_once()
 
 
 class TestTorrentTabLogic:

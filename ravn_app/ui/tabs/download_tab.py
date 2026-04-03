@@ -906,6 +906,29 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Legacy compatibility wrapper for the primary download action."""
         self._download_video()
 
+    def _get_download_naming_settings(self) -> Dict[str, str]:
+        """Read filename-template preferences from persistent settings."""
+        return {
+            "naming_preset": str(self.config_manager.get("download_naming_preset", "standard") or "standard"),
+            "filename_template": str(self.config_manager.get("download_filename_template", "") or ""),
+        }
+
+    def _get_download_behavior_settings(self) -> Dict[str, Any]:
+        """Collect shared download automation settings used across UI flows."""
+        settings: Dict[str, Any] = {
+            "embed_metadata": bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True))),
+            "embed_lyrics": bool(self.config_manager.get("auto_embed_lyrics", True)),
+            "auto_sort_enabled": bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False))),
+            "auto_sort_mode": str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower(),
+            "auto_subtitle_download": bool(self.config_manager.get("auto_subtitle_download", False)),
+            "preferred_subtitle_language": str(self.config_manager.get("preferred_subtitle_language", "tr") or "tr"),
+            "subtitle_fallback_language": str(self.config_manager.get("subtitle_fallback_language", "en") or "en"),
+            "subtitle_include_auto_generated": bool(self.config_manager.get("subtitle_include_auto_generated", True)),
+            "auto_embed_subtitles": bool(self.config_manager.get("auto_embed_subtitles", False)),
+        }
+        settings.update(self._get_download_naming_settings())
+        return settings
+
     def _register_download_outputs(self, result) -> None:
         callback = getattr(self, "auto_add_to_library_callback", None)
         if not callable(callback):
@@ -943,10 +966,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.downloadLoading')}...")
         self._set_button_loading_state(self.download_btn, is_loading=True)
 
-        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
-        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
-        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
-        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
+        download_settings = self._get_download_behavior_settings()
 
         def run_download():
             try:
@@ -956,11 +976,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     format_type=format_type,
                     quality=quality,
                     progress_callback=self._on_download_progress,
-                    embed_metadata=embed_metadata,
-                    embed_lyrics=embed_lyrics,
-                    auto_sort_enabled=auto_sort_enabled,
-                    auto_sort_mode=auto_sort_mode,
                     audio_bitrate=audio_bitrate,
+                    **download_settings,
                 )
                 if result.success:
                     self.after(0, self._on_download_success, result)
@@ -1153,10 +1170,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
         format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
-        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
-        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
-        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
-        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
+        download_settings = self._get_download_behavior_settings()
 
         default_path = self.config_manager.get(
             "default_download_path",
@@ -1178,10 +1192,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     output_dir=output_dir,
                     format_type=format_type,
                     quality=quality,
-                    embed_metadata=embed_metadata,
-                    embed_lyrics=embed_lyrics,
-                    auto_sort_enabled=auto_sort_enabled,
-                    auto_sort_mode=auto_sort_mode,
+                    **download_settings,
                 ),
             )
 

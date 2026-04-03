@@ -476,6 +476,9 @@ class YtDlpRunner(BaseRunner):
                 "uploader": item.get("uploader") or item.get("channel") or "",
                 "channel": item.get("channel") or item.get("uploader") or "",
                 "album": item.get("album") or "",
+                "view_count": item.get("view_count", 0),
+                "like_count": item.get("like_count", 0),
+                "upload_date": item.get("upload_date") or "",
             }
 
             if with_details:

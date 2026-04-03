@@ -7,6 +7,7 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from pathlib import Path
 import threading
+from typing import Any
 from ..core.subtitle_manager import (
     SubtitleDownloader,
     SubtitleConverter,
@@ -48,10 +49,11 @@ def _setup_dnd(widget, callback, enter_callback=None, leave_callback=None):
 class SubtitleTab(ctk.CTkFrame):
     """Altyazı yönetim sekmesi"""
 
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, config_manager: Any = None, **kwargs):
         super().__init__(parent, **kwargs)
         self.configure(fg_color=Colors.BG_PRIMARY)
 
+        self.config_manager = config_manager
         self.subtitle_downloader = SubtitleDownloader()
         self.subtitle_converter = SubtitleConverter()
         self.subtitle_editor = SubtitleEditor()
@@ -60,8 +62,34 @@ class SubtitleTab(ctk.CTkFrame):
 
         self.current_video_file = None
         self.current_subtitle_file = None
+        self.language_vars = {}
 
         self.setup_ui()
+
+    def _language_label_key(self, language_code: str) -> str:
+        mapping = {
+            "tr": "subtitle.turkish",
+            "en": "subtitle.english",
+            "de": "subtitle.german",
+            "fr": "subtitle.french",
+            "es": "subtitle.spanish",
+        }
+        return mapping.get(language_code, "subtitle.english")
+
+    def _apply_config_defaults(self) -> None:
+        if self.config_manager is None:
+            return
+
+        preferred_language = str(self.config_manager.get("preferred_subtitle_language", "tr") or "tr").lower()
+        fallback_language = str(self.config_manager.get("subtitle_fallback_language", "en") or "en").lower()
+        selected_languages = {code for code in (preferred_language, fallback_language) if code and code != "none"}
+        if not selected_languages:
+            selected_languages = {"tr", "en"}
+
+        for language_code, variable in self.language_vars.items():
+            variable.set(language_code in selected_languages)
+
+        self.auto_sub_var.set(bool(self.config_manager.get("subtitle_include_auto_generated", True)))
 
     def setup_ui(self):
         """UI'ı oluştur"""
@@ -88,16 +116,18 @@ class SubtitleTab(ctk.CTkFrame):
         lang_frame = ctk.CTkFrame(download_frame, fg_color="transparent")
         lang_frame.pack(pady=Spacing.XS)
 
-        self.lang_tr_var = ctk.BooleanVar(value=True)
-        self.lang_en_var = ctk.BooleanVar(value=True)
-
-        self.lang_tr_cb = ctk.CTkCheckBox(lang_frame, text=t("subtitle.turkish"), variable=self.lang_tr_var)
-        self.lang_tr_cb.pack(side="left", padx=Spacing.XS)
-        Tooltip(self.lang_tr_cb, t("subtitle.languageTooltip"))
-
-        self.lang_en_cb = ctk.CTkCheckBox(lang_frame, text=t("subtitle.english"), variable=self.lang_en_var)
-        self.lang_en_cb.pack(side="left", padx=Spacing.XS)
-        Tooltip(self.lang_en_cb, t("subtitle.languageTooltip"))
+        for index, language_code in enumerate(SubtitleDownloader.SUPPORTED_LANGUAGE_CODES):
+            variable = ctk.BooleanVar(value=language_code in {"tr", "en"})
+            checkbox = ctk.CTkCheckBox(
+                lang_frame,
+                text=t(self._language_label_key(language_code)),
+                variable=variable,
+            )
+            checkbox.grid(row=index // 3, column=index % 3, padx=Spacing.XS, pady=Spacing.XS, sticky="w")
+            Tooltip(checkbox, t("subtitle.languageTooltip"))
+            self.language_vars[language_code] = variable
+            setattr(self, f"lang_{language_code}_var", variable)
+            setattr(self, f"lang_{language_code}_cb", checkbox)
 
         # Otomatik altyazı
         self.auto_sub_var = ctk.BooleanVar(value=True)
@@ -108,6 +138,7 @@ class SubtitleTab(ctk.CTkFrame):
         )
         self.auto_sub_cb.pack(pady=Spacing.XS)
         Tooltip(self.auto_sub_cb, t("subtitle.autoSubtitlesTooltip"))
+        self._apply_config_defaults()
 
         # Çıkış dizini
         ctk.CTkLabel(download_frame, text=t("subtitle.outputDir"), font=Fonts.LABEL).pack(pady=Spacing.XS)
@@ -461,11 +492,11 @@ class SubtitleTab(ctk.CTkFrame):
 
         output_dir = self.output_dir_entry.get()
 
-        languages = []
-        if self.lang_tr_var.get():
-            languages.append('tr')
-        if self.lang_en_var.get():
-            languages.append('en')
+        languages = [
+            language_code
+            for language_code, variable in self.language_vars.items()
+            if variable.get()
+        ]
 
         if not languages:
             messagebox.showwarning(t("subtitle.warningTitle"), t("subtitle.selectLanguage"))
@@ -582,10 +613,14 @@ class SubtitleTab(ctk.CTkFrame):
         def embed_thread():
             try:
                 if embed_type == "soft":
+                    preferred_language = "tr"
+                    if self.config_manager is not None:
+                        preferred_language = str(self.config_manager.get("preferred_subtitle_language", "tr") or "tr")
                     success = self.subtitle_embedder.embed_soft(
                         self.current_video_file,
                         self.current_subtitle_file,
-                        output_file
+                        output_file,
+                        language=preferred_language,
                     )
                 else:
                     success = self.subtitle_embedder.embed_hard(

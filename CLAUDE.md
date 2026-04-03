@@ -45,11 +45,14 @@ Use these files in order before substantial changes:
 
 - Phase 1 UI consistency tasks complete (UI-01 through UI-12).
 - Phases 1-4C and Phase 6 are complete.
-- Phase 7 media-management foundations are active in both CLI and desktop UI; queue/history persistence is complete, while auto-library wiring and deeper end-to-end coverage are still pending.
+- Phase 7 media-management expansion is complete in both CLI and desktop UI, including queue/history persistence, automatic media-library indexing, and deeper queue/library coverage.
 - Phase 5 (build/packaging/distribution) remains open.
 - Primary media flows run through shared runners (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
 - Some auxiliary modules still call `subprocess` directly.
 - Download flow supports single URL, playlist, batch (up to 50 URLs), and torrent/magnet.
+- Playlist selection dialog now supports title/duration/popularity filtering plus range-based partial download selection.
+- Download subtitle automation now supports preferred/fallback language handling, optional auto-generated caption fallback, and optional auto-embed behavior coordinated with `SubtitleTab` and settings.
+- Download outputs now support settings-backed naming presets and custom filename templates with safe post-download renaming.
 - Torrent flow supports `FULL`, `SEQUENTIAL`, and `STREAM` modes.
 - Settings UI is compact single-page and scrollable (not nested sub-tabs).
 - Theme system is strict two-theme: `dark` and `light` (legacy aliases normalized).
@@ -59,12 +62,12 @@ Use these files in order before substantial changes:
 ## Verified Facts
 
 - Config and history paths are OS-aware via `ravn_app/core/config_paths.py`.
-- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters` (plus `--json`).
+- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, `utilities` (plus `--json`).
 - History UI now aggregates downloads, conversions, and generic Phase 7 operation records from `DatabaseManager`.
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
 - FFmpeg realtime progress parsing is active.
 - Queue panel supports queued/running/completed states and cancel/open-folder actions.
-- Last full-suite baseline (2026-04-01): 498 passed, 1 skipped.
+- Last full-suite baseline (2026-04-03): 557 passed, 1 skipped.
 - Shared UI helpers in `ui_components.py`: `style_combo`, `style_entry`, `bind_focus_ring`, `set_button_loading_state`.
 - Keyboard shortcuts active: `Ctrl+Enter`, `Escape`, `Ctrl+L` across all tabs.
 

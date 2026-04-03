@@ -288,10 +288,7 @@ class PlaylistMixin:
         self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.downloadLoading')}...")
         self._set_button_loading_state(self.download_btn, is_loading=True)
 
-        embed_metadata = bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True)))
-        embed_lyrics = bool(self.config_manager.get("auto_embed_lyrics", True))
-        auto_sort_enabled = bool(self.config_manager.get("auto_sort_downloads", self.config_manager.get("auto_sort_by_channel", False)))
-        auto_sort_mode = str(self.config_manager.get("auto_sort_mode", "artist") or "artist").lower()
+        download_settings = self._get_download_behavior_settings()
 
         def run_playlist_download():
             all_files: List[str] = []
@@ -315,10 +312,7 @@ class PlaylistMixin:
                     format_type=format_type,
                     quality=quality,
                     progress_callback=item_progress,
-                    embed_metadata=embed_metadata,
-                    embed_lyrics=embed_lyrics,
-                    auto_sort_enabled=auto_sort_enabled,
-                    auto_sort_mode=auto_sort_mode,
+                    **download_settings,
                 )
 
                 if not result.success:

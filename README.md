@@ -5,10 +5,12 @@ RAVN is a desktop + CLI media manager. The desktop app is built with CustomTkint
 ## What RAVN Can Do
 
 - Download videos and audio from supported platforms via URL.
-- Fetch playlist metadata, sort/select items, and download only what you choose.
+- Fetch playlist metadata, sort/select items, filter by title/duration/popularity, apply range selection, and download only what you choose.
+- Apply download naming presets or custom filename tokens such as `{title}`, `{uploader}`, `{playlist}`, `{upload_date}`, and `{resolution}` from Settings without turning the default Download UI into a raw flag surface.
 - Run batch downloads (up to 50 URLs) through the queue.
 - Convert media formats with FFmpeg and track progress in real time.
 - Download/process/embed subtitles.
+- Automatically acquire preferred-language subtitles during downloads with fallback-language handling, optional auto-generated caption fallback, and optional auto-embed behavior for supported video outputs.
 - Mix audio tracks, concatenate media, overlay/PiP videos, and apply FFmpeg-based video filters from dedicated desktop tabs or the CLI.
 - Run comprehensive media utility operations: quick helpers (remux, extract-audio, mute, trim, preview-clip, thumbnail), audio utilities (volume, fade, bitrate, channels, silence-detect, loudnorm), video utilities (scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace), and smart helpers (blackdetect, scene-preview, scene-thumbnail) from the Utilities desktop tab or CLI.
 - Maintain a local SQLite media library with tags, collections, search filters, duplicate detection, and JSON/CSV export from the desktop UI or CLI.
@@ -50,7 +52,7 @@ Torrent support is fully integrated (Phase 6 complete):
 - Queue is now exposed from a global right-side panel instead of primary navigation
 - Settings now open as an independent lower-left sidebar utility workspace instead of a floating drawer-triggered panel
 - Theme and language selectors were removed from the Settings page in favor of shell-level sidebar toggles
-- Download workspace supports single URL, playlist selection/sorting, batch queue (up to 50), and magnet/torrent flows
+- Download workspace supports single URL, playlist selection/sorting, playlist title-duration-popularity filtering with range selection, batch queue (up to 50), magnet/torrent flows, settings-backed filename presets/templates with safe post-download renaming, and downloader-side subtitle automation with preferred/fallback language handling
 - Download workspace now groups the classic downloader and torrent manager under one segmented shell
 - Studio workspace groups convert, subtitle, filters, and mixer tools
 - Library workspace groups media library and history views
@@ -60,7 +62,7 @@ Torrent support is fully integrated (Phase 6 complete):
 - Reusable download UI components live in ravn_app/ui/components/
 - Config and history use OS-aware directories (Windows: %APPDATA%/ravn, Linux: ~/.config/ravn)
 - Theme system is strict 2-theme: dark and light (legacy names are normalized)
-- Settings UI is compact one-page scroll layout
+- Settings UI is compact one-page scroll layout and now includes downloader subtitle fallback / auto-generated / auto-embed controls alongside naming and metadata options
 - Playlist fetch/sort dialog includes selected total-size summary and high-contrast visibility fixes
 - Phase 7 desktop/media-management stack is active end-to-end (`AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, `MetadataHandler`, `mixer_tab.py`, `filters_tab.py`, `library_tab.py`, TaskQueue wiring, persisted operation history, automatic library indexing)
 - Phases 1-4C, Phase 6, Phase 7, and Phase 8 are complete; Phase 5 remains open in TASKS.md
@@ -116,13 +118,14 @@ ravn filters input.mp4 --brightness 20 --contrast 1.2 --blur 2 --output filtered
 
 ## Tests
 
-Verified on 2026-04-01:
+Verified on 2026-04-03:
 
-- Full baseline: `pytest -q` -> `538 passed, 1 skipped` (539 collected)
-- Phase 7 / queue / library regression sweep: `191 passed`
-- UI/config regression suites: `98 passed`
-- Shell/navigation + config/database regression sweep: `153 passed`
-- Torrent/UI follow-up suite: `153 passed`
+- Full baseline: `pytest -q` -> `557 passed, 1 skipped` (558 collected)
+- Targeted subtitle/download regression sweep: `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py` -> `115 passed, 1 skipped`
+- Targeted playlist/download regression sweep: `pytest -q tests/test_ui_logic.py tests/test_runners.py` -> `147 passed`
+- Targeted download/settings regression sweep: `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py` -> `137 passed, 1 skipped`
+- Targeted UI/i18n/design-token regression sweep: `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py` -> `108 passed`
+- Utilities desktop wiring and app startup follow-up were rechecked after Phase 7/8 regressions; `cmd.exe /c ".venv\Scripts\python.exe ravn.py"` returns without traceback in the current environment
 
 Useful commands:
 

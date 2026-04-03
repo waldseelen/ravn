@@ -15,6 +15,9 @@ Verified on 2026-04-03.
 - OS-aware config path resolution and startup migration are active (`ravn_app/core/config_paths.py` + `ravn.py`).
 - Download flow is wired end-to-end with background threads and UI-safe `after(...)` callbacks.
 - Playlist metadata and quality-based size estimation are active.
+- Playlist dialog now supports title/duration filtering, popularity-aware filtering when metadata is available, visible-row bulk actions, and range-based selection before download.
+- Downloader subtitle automation is now active through settings-backed preferred/fallback language resolution, optional auto-generated caption fallback, and optional auto-embed behavior for supported video downloads.
+- Downloader naming presets/templates are now active through settings-backed config, safe token expansion, and post-download renaming (`standard`, `clean`, `playlist` + custom token templates).
 - CLI is implemented in `ravn_app/cli.py` with `--json` support and commands for `torrent`, `mixer`, `library`, and `filters`.
 - Drag-and-drop uses `tkinterdnd2` when available and falls back safely.
 - Real-time FFmpeg progress parsing via `-progress pipe:1` is active in runner layer.
@@ -37,7 +40,10 @@ Verified on 2026-04-03.
 - `ravn_app/ui/tabs/` namespace now hosts tab modules/wrappers for cleaner structure.
 - Fetch overlap guards and processing-feedback timer safety were added to avoid UI race conditions.
 - Settings screen remains compact and scrollable without nested settings sub-tabs.
+- Download settings now expose naming presets and an optional custom filename template field without expanding the default Download workspace surface.
+- Subtitle settings now expose fallback-language, auto-generated-caption, and auto-embed controls; `SubtitleTab` also picks up the configured subtitle language defaults.
 - Playlist sort dialog action bar layout and table header contrast were improved for visibility.
+- Playlist sort dialog now exposes partial-download controls for title/duration/popularity filtering and range selection without adding a second playlist screen.
 - `download_tab.py` refactored to use a progressive disclosure linear flow, removing static dual columns.
 - `converter_tab.py` refactored to use a progressive disclosure linear flow with collapsible advanced settings.
 - `subtitle_tab.py` refactored to use a progressive disclosure segmented button layout, removing static dual columns.
@@ -70,15 +76,20 @@ Verified on 2026-04-03.
 
 ## Validation Status
 
-- Current full-suite baseline (2026-04-03): `pytest -q` -> `543 passed, 1 skipped` (post-utilities implementation).
-- Phase 7 targeted regression sweep (2026-04-03): All utilities tests passing, converter tab kwarg fix applied and verified.
+- Current full-suite baseline (2026-04-03): `pytest -q` -> `557 passed, 1 skipped` (subtitle automation follow-up verification).
+- Subtitle/download regression sweep (2026-04-03): `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py` -> `115 passed, 1 skipped`.
+- Playlist/download regression sweep (2026-04-03): `pytest -q tests/test_ui_logic.py tests/test_runners.py` -> `147 passed`.
+- Download/settings regression sweep (2026-04-03): `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py` -> `137 passed, 1 skipped`.
+- Phase 7 targeted regression sweep (2026-04-03): Utilities desktop wiring, translation coverage, and UI token validation were rechecked; targeted UI/i18n/design-token sweep passes alongside the full suite.
 
 ## Functional Highlights
 
 - Single video quality-based size estimation is active; estimates update on quality change.
 - ID3 metadata embedding options are supported for MP3/M4A workflows.
 - Auto-sort by channel/uploader structure is supported in download output templates.
-- Playlist selection/sorting supports clearer metrics and visibility-focused table styling.
+- Download output naming now supports preset-driven or custom token-driven post-download renaming with safe sanitization and nested playlist-style folder layouts.
+- Playlist selection/sorting supports clearer metrics, title/duration/popularity filtering, range-based partial selection, and visibility-focused table styling.
+- Download acquisition can now request the preferred subtitle language first, fall back to a configured alternate language, optionally accept auto-generated captions, and embed downloaded subtitle tracks when supported.
 - Torrent mode handling remains stable (`FULL`, `SEQUENTIAL`, `STREAM`).
 - Shared `style_combo`/`style_entry` helpers centralized in `ui_components.py`.
 - Keyboard shortcuts active: `Ctrl+Enter` (action), `Escape` (cancel), `Ctrl+L` (clear).

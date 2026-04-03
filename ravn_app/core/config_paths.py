@@ -245,10 +245,15 @@ CONFIG_SCHEMA = {
     'history_limit': {'type': int, 'default': 1000, 'min': 100, 'max': 10000},
     'auto_subtitle_download': {'type': bool, 'default': False},
     'preferred_subtitle_language': {'type': str, 'default': 'tr'},
+    'subtitle_fallback_language': {'type': str, 'default': 'en'},
+    'subtitle_include_auto_generated': {'type': bool, 'default': True},
+    'auto_embed_subtitles': {'type': bool, 'default': False},
     'auto_id3_tagging': {'type': bool, 'default': True},
     'auto_embed_lyrics': {'type': bool, 'default': True},
     'auto_sort_downloads': {'type': bool, 'default': False},
     'auto_sort_mode': {'type': str, 'default': 'artist', 'allowed': ['artist', 'channel']},
+    'download_naming_preset': {'type': str, 'default': 'standard', 'allowed': ['standard', 'clean', 'playlist']},
+    'download_filename_template': {'type': str, 'default': ''},
     'mixer': {
         'type': dict,
         'default': {

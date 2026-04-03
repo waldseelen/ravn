@@ -212,9 +212,15 @@ class TestDefaultConfig:
         assert 'theme' in config
         assert 'concurrent_downloads' in config
         assert 'language' in config
+        assert 'subtitle_fallback_language' in config
+        assert 'subtitle_include_auto_generated' in config
+        assert 'auto_embed_subtitles' in config
+        assert 'download_naming_preset' in config
+        assert 'download_filename_template' in config
         assert 'mixer' in config
         assert 'library' in config
         assert 'filters' in config
+        assert config['download_naming_preset'] == 'standard'
         assert config['library']['auto_add_downloads'] is True
         assert config['library']['auto_add_filter_output'] is True
 
@@ -240,6 +246,12 @@ class TestConfigValidation:
         is_valid, value, error = validate_config_value('default_format', 'INVALID_FORMAT')
         assert not is_valid
         assert value == 'MP4'  # Default
+
+    def test_validate_config_value_invalid_naming_preset(self):
+        """Naming preset should fall back to the standard preset."""
+        is_valid, value, error = validate_config_value('download_naming_preset', 'broken')
+        assert not is_valid
+        assert value == 'standard'
 
     def test_validate_config_value_invalid_type(self):
         """Test validating wrong type"""

@@ -79,6 +79,7 @@ ravn_app/
     config_paths.py       # OS-aware config/data/cache paths + legacy migration helpers
     converter.py          # FFmpeg conversion operations
     database.py           # history DB + config persistence + schema migrations
+    download_naming.py    # filename preset/token helpers + safe post-download renaming
     downloader.py         # yt-dlp-backed download orchestration
     error_handler.py      # user-friendly error parsing
     i18n.py               # translation lookup/runtime language selection
@@ -295,6 +296,7 @@ Feature logic lives below the shell/workspace level.
   - classic downloader logic
   - URL metadata fetch
   - playlist selection/sorting integration
+  - playlist dialog filtering / range-selection orchestration
   - batch mode handling
   - queue integration for batch work
 - `tabs/torrent_tab.py`
@@ -352,6 +354,7 @@ Feature logic lives below the shell/workspace level.
   - inline user-friendly error box with details toggle
 - `ui/components/playlist_sort_dialog.py`
   - sortable playlist picker with selected-count / selected-size summary
+  - title / duration / popularity filtering plus range-based selection helpers
 - `ui/components/playlist_item.py`
   - playlist row widget
 - `ui/components/url_input.py`
@@ -382,12 +385,18 @@ Directory: `ravn_app/core/runners/`
 
 #### Domain Services
 
+- `download_naming.py`
+  - filename preset definitions
+  - safe token expansion/sanitization
+  - post-download rename orchestration on top of the baseline yt-dlp title template
 - `downloader.py`
   - yt-dlp-backed media download orchestration for the download UI and CLI
+  - applies auto-sort output-dir routing plus post-download naming presets/templates
 - `converter.py`
   - FFmpeg-backed conversion/domain logic
 - `subtitle_manager.py`
   - subtitle download/embed helpers using FFmpeg + yt-dlp
+  - preferred/fallback language resolution helpers for downloader-side subtitle automation
 - `torrent_downloader.py`
   - high-level torrent orchestration built on `Aria2Runner`
   - mode semantics:
@@ -560,6 +569,8 @@ Flow:
 Notable config properties:
 
 - legacy flat settings still supported
+- download acquisition settings include flat naming keys such as `download_naming_preset` and `download_filename_template`
+- subtitle automation settings remain flat and include `auto_subtitle_download`, `preferred_subtitle_language`, `subtitle_fallback_language`, `subtitle_include_auto_generated`, and `auto_embed_subtitles`
 - nested sections now exist for:
   - `mixer`
   - `library`
@@ -608,8 +619,11 @@ Notable config properties:
 3. Non-torrent modes reuse `DownloadTab`.
 4. Torrent mode mounts `TorrentTab`.
 5. Media work flows to `YouTubeDownloader` or `TorrentDownloader`.
-6. Progress/error/success updates return through callbacks to the UI.
-7. Successful outputs may be auto-added into `MediaLibrary`.
+6. Playlist selection can be refined in the shared dialog through title/duration/popularity filters plus range-based selection before the final download set is approved.
+7. `YouTubeDownloader` may resolve subtitle automation rules (preferred/fallback language, optional auto-generated fallback, optional auto-embed) before dispatching yt-dlp.
+8. `YouTubeDownloader` may apply auto-sort routing plus naming preset/template post-processing before final file registration.
+9. Progress/error/success updates return through callbacks to the UI.
+10. Successful outputs may be auto-added into `MediaLibrary`.
 
 ### Studio Flow
 
@@ -637,7 +651,7 @@ Notable config properties:
 
 Last documented validated baseline remains:
 
-- full-suite baseline: `528 passed, 1 skipped` (`529` collected)
+- full-suite baseline: `557 passed, 1 skipped` (`558` collected)
 - targeted Phase 7 / queue / library regression sweep: `191 passed`
 - targeted UI/config sweep: `87 passed`
 - targeted torrent/UI sweep: `153 passed`

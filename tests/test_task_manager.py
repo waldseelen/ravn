@@ -163,34 +163,98 @@ class TestTaskQueue:
     def test_task_error_handling(self):
         """Test error handling"""
         error_holder = {'called': False, 'error': None}
-        
+
         def failing_fn(*args, **kwargs):
             raise ValueError("Test error")
-        
+
         def on_error(task, error_msg):
             error_holder['called'] = True
             error_holder['error'] = error_msg
-        
+
         self.queue.start()
-        
+
         task_id = self.queue.add_task(
             task_type=TaskType.GENERIC,
             name="Error Test",
             execute_fn=failing_fn,
             on_error=on_error
         )
-        
+
         # Wait for task to complete
         time.sleep(0.5)
-        
+
         # Process callbacks
         self.queue.process_callbacks()
-        
+
         assert error_holder['called']
         assert "Test error" in error_holder['error']
-        
+
         task = self.queue.get_task(task_id)
         assert task.status == TaskStatus.FAILED
+
+    def test_false_result_marks_task_failed(self):
+        """False return values should mark the task as failed."""
+        errors = []
+
+        def false_fn(*args, **kwargs):
+            return False
+
+        def on_error(task, error_msg):
+            errors.append(error_msg)
+
+        self.queue.start()
+        task_id = self.queue.add_task(
+            task_type=TaskType.GENERIC,
+            name="False Result Test",
+            execute_fn=false_fn,
+            on_error=on_error,
+        )
+
+        time.sleep(0.3)
+        self.queue.process_callbacks()
+
+        task = self.queue.get_task(task_id)
+        assert task.status == TaskStatus.FAILED
+        assert task.result is not None
+        assert task.result.success is False
+        assert errors
+
+    def test_cancel_running_task_uses_cancel_fn(self):
+        """Running tasks should be cancellable when a cancel_fn is provided."""
+        cancel_flag = {"requested": False}
+        cancel_events = []
+
+        def cancellable_fn(*args, progress_callback=None, **kwargs):
+            while not cancel_flag["requested"]:
+                if progress_callback:
+                    progress_callback(10, "working")
+                time.sleep(0.02)
+            raise RuntimeError("cancelled")
+
+        def cancel_fn():
+            cancel_flag["requested"] = True
+            return True
+
+        def on_cancel(task):
+            cancel_events.append(task.id)
+
+        self.queue.start()
+        task_id = self.queue.add_task(
+            task_type=TaskType.GENERIC,
+            name="Cancellable",
+            execute_fn=cancellable_fn,
+            cancel_fn=cancel_fn,
+            on_cancel=on_cancel,
+        )
+
+        time.sleep(0.15)
+        assert self.queue.cancel_task(task_id) is True
+        time.sleep(0.2)
+        self.queue.process_callbacks()
+
+        task = self.queue.get_task(task_id)
+        assert task.status == TaskStatus.CANCELLED
+        assert cancel_events == [task_id]
 
     def test_cancel_pending_task(self):
         """Test cancelling a pending task"""

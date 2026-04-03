@@ -448,7 +448,6 @@ class HistoryViewer(ctk.CTkFrame):
             search_frame,
             text=Icons.SEARCH,
             width=40,
-            height=40,  # ACC-05: minimum 32×32px tıklama alanı
             command=self._search,
             fg_color=Colors.BTN_SECONDARY,
             hover_color=Colors.BTN_SECONDARY_HOVER,

@@ -192,6 +192,9 @@ class Icons:
     SETTINGS    = "⚙"   # Settings/cog icon (ICN-05)
     QUEUE       = "☰"   # Queue/list icon (ICN-06)
     TORRENT     = "⊕"   # Torrent/magnet icon (ICN-07b)
+    MIXER       = "∿"   # Audio/video mixing tab
+    FILTERS     = "◫"   # Filters/effects tab
+    LIBRARY     = "▦"   # Local media library tab
 
     # Action Buttons (ICN-07 to ICN-11)
     DOWNLOAD_BTN = "↓"   # Large download button indicator (ICN-07)

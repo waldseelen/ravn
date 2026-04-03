@@ -16,8 +16,10 @@ from ravn_app.core.runners import (
     get_ffmpeg_runner,
     get_ytdlp_runner,
     Aria2Runner,
+    TorrentProgressSnapshot,
     get_aria2c_runner,
 )
+from ravn_app.core.runners.aria2 import _Aria2ProgressParser, emit_torrent_progress
 
 
 class TestFFmpegRunner:
@@ -1056,3 +1058,39 @@ class TestAria2Runner:
         line = "(45%) DL:1.2MiB"
         assert percent_pattern.search(line).group(1) == "45"
         assert dl_pattern.search(line).group(1) == "1.2MiB"
+
+    def test_progress_parser_extracts_eta_sizes_and_name(self):
+        parser = _Aria2ProgressParser()
+
+        parser.parse_line("FILE: /downloads/My.Movie.2026.mkv")
+        snapshot = parser.parse_line("[#1 SIZE:512MiB/2GiB(25%) CN:8 SEED:14 SPD:4MiBs ETA:6m30s]")
+
+        assert snapshot is not None
+        assert snapshot.name == "My.Movie.2026.mkv"
+        assert snapshot.percent == 25
+        assert snapshot.downloaded_text == "512.0 MB"
+        assert snapshot.total_text == "2.0 GB"
+        assert snapshot.remaining_text == "1.5 GB"
+        assert snapshot.speed_text == "4MiB/s"
+        assert snapshot.eta_text == "6m30s"
+        assert snapshot.peers == 8
+        assert snapshot.peers_text == "8"
+        assert snapshot.seeders == 14
+        assert snapshot.seeders_text == "14"
+
+    def test_emit_torrent_progress_supports_snapshot_callback(self):
+        received = []
+
+        def callback(snapshot: TorrentProgressSnapshot):
+            received.append(snapshot)
+
+        snapshot = TorrentProgressSnapshot(percent=42, status_message="4MiB/s")
+        emit_torrent_progress(callback, snapshot)
+
+        assert received == [snapshot]
+
+    @patch.object(Aria2Runner, "_find_executable", return_value="/custom/aria2c")
+    def test_is_available_uses_custom_executable_path(self, mock_find):
+        runner = Aria2Runner("/custom/aria2c")
+        assert runner.is_available() is True
+        mock_find.assert_called_once_with("/custom/aria2c")

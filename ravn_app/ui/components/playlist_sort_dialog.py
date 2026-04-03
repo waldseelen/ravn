@@ -174,8 +174,6 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
         self.tree.bind("<Double-1>", self._on_double_click)
-        self.tree.bind("<Motion>", self._on_tree_motion)
-        self._last_hovered_item = None
 
         btn_frame = ctk.CTkFrame(content_wrap, fg_color=Colors.BG_SURFACE)
         btn_frame.pack(fill="x")
@@ -327,21 +325,6 @@ class PlaylistSortDialog(ctk.CTkToplevel):
             if row["index"] == row_index:
                 row["selected"] = not row.get("selected", True)
                 break
-
-    def _on_tree_motion(self, event) -> None:
-        """Handle mouse motion to highlight hovered rows."""
-        item_id = self.tree.identify_row(event.y)
-
-        # Clear hover from previously hovered item
-        if self._last_hovered_item and self._last_hovered_item != item_id:
-            self.tree.item(self._last_hovered_item, tags=())
-
-        # Apply hover to current item
-        if item_id:
-            self.tree.item(item_id, tags=("hover",))
-            self._last_hovered_item = item_id
-        else:
-            self._last_hovered_item = None
 
         self._refresh_tree()
 

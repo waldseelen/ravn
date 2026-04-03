@@ -13,7 +13,7 @@ from unittest.mock import patch
 from ravn_app.core.logging_config import (
     get_log_directory, setup_logging, get_logger,
     log_operation, log_ffmpeg_operation, log_ytdlp_operation,
-    JsonFormatter, ColoredFormatter
+    JsonFormatter, ColoredFormatter, SafeConsoleWriter
 )
 
 
@@ -49,6 +49,8 @@ class TestSetupLogging:
         """Clean up loggers after each test"""
         logger = logging.getLogger('ravn_app')
         logger.handlers.clear()
+        if hasattr(logger, '_ravn_logging_initialized'):
+            delattr(logger, '_ravn_logging_initialized')
 
     def test_setup_logging_returns_logger(self):
         """setup_logging should return a logger"""
@@ -108,6 +110,49 @@ class TestSetupLogging:
                 for handler in logger.handlers[:]:
                     handler.close()
                     logger.removeHandler(handler)
+
+    def test_setup_logging_is_idempotent(self):
+        """Repeated setup should not duplicate handlers or startup logs."""
+        logger = setup_logging(enable_file_logging=False)
+        first_handlers = list(logger.handlers)
+
+        logger_again = setup_logging(enable_file_logging=False)
+
+        assert logger_again is logger
+        assert logger.handlers == first_handlers
+        assert len(logger.handlers) == 1
+
+
+class TestSafeConsoleWriter:
+    """Tests for console output safety wrapper."""
+
+    def test_safe_console_writer_falls_back_on_unicode_encode_error(self):
+        """Writer should escape unsupported characters instead of crashing."""
+        class Cp1252LikeStream:
+            encoding = 'cp1252'
+
+            def __init__(self):
+                self.writes = []
+
+            def write(self, message):
+                message.encode(self.encoding)
+                self.writes.append(message)
+                return len(message)
+
+            def flush(self):
+                return None
+
+            def isatty(self):
+                return False
+
+        stream = Cp1252LikeStream()
+        writer = SafeConsoleWriter(stream)
+
+        count = writer.write('Varsayılan platform indiricileri kaydedildi')
+
+        assert count > 0
+        assert stream.writes
+        assert '\\u0131' in stream.writes[-1]
 
 
 class TestGetLogger:

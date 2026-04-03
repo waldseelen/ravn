@@ -14,11 +14,16 @@ Use these files in order before substantial changes:
 4. `README.md` (user-facing capabilities and operation)
 5. This file (`AGENTS.md`) for workflow rules
 
+`AGENTS.md` is the canonical shared agent guide for the repo. Keep `CLAUDE.md` as a lightweight Claude Code compatibility entrypoint/addendum instead of a full duplicate copy.
+
 ## Start Here (Code)
 
 - `ravn.py`
 - `ravn_app/ui/main_window.py`
 - `ravn_app/ui/tabs/download_tab.py`
+- `ravn_app/ui/tabs/mixer_tab.py`
+- `ravn_app/ui/tabs/library_tab.py`
+- `ravn_app/ui/tabs/filters_tab.py`
 - `ravn_app/ui/components/error_panel.py`
 - `ravn_app/ui/components/playlist_sort_dialog.py`
 - `ravn_app/core/runners/`
@@ -42,11 +47,13 @@ Use these files in order before substantial changes:
 
 - Phase 1 UI consistency tasks complete (UI-01 through UI-12).
 - Phases 1-4C and Phase 6 are complete.
+- Phase 7 media-management expansion is complete in both CLI and desktop UI, including queue/history persistence, automatic media-library indexing, and deeper queue/library coverage.
+- Phase 8 workspace-shell / UX-navigation overhaul is complete, including grouped `Home` / `Download` / `Studio` / `Library` workspaces, a queue utility panel, lower-left theme/language sidebar toggles, a separate lower-left settings workspace entry, quick actions, command palette, progressive-disclosure guidance panels, accessibility/layout updates, and test/doc sync.
 - Phase 5 (build/packaging/distribution) remains open.
 - Primary media flows run through shared runners (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
 - Some auxiliary modules still call `subprocess` directly.
 - Download flow supports single URL, playlist, batch (up to 50 URLs), and torrent/magnet.
-- Torrent flow supports `FULL`, `SEQUENTIAL`, and `STREAM` modes.
+- Torrent flow supports `FULL`, `SEQUENTIAL`, and `STREAM` modes plus a dedicated queueable torrent tab with pause/resume controls, queued/paused/completed filtering, peer/seeder/size metrics, and per-file child rows.
 - Settings UI is compact single-page and scrollable (not nested sub-tabs).
 - Theme system is strict two-theme: `dark` and `light` (legacy aliases normalized).
 - Playlist fetch/sort dialog includes selected count, selected total size, high-contrast table headers, and stable action bar.
@@ -55,13 +62,15 @@ Use these files in order before substantial changes:
 ## Verified Facts
 
 - Config and history paths are OS-aware via `ravn_app/core/config_paths.py`.
-- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent` (plus `--json`).
+- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters` (plus `--json`).
+- History UI now aggregates downloads, conversions, and generic Phase 7 operation records.
+- Successful download, conversion, mixer, and filter outputs can auto-register into `MediaLibrary` via `MediaLibraryAutoAdder`.
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
 - FFmpeg realtime progress parsing is active.
 - Queue panel supports queued/running/completed states and cancel/open-folder actions.
-- Last full-suite baseline (2026-03-31): 472 passed, 1 skipped.
+- Last full-suite baseline (2026-04-01): 538 passed, 1 skipped.
 - Shared UI helpers in `ui_components.py`: `style_combo`, `style_entry`, `bind_focus_ring`, `set_button_loading_state`.
-- Keyboard shortcuts active: `Ctrl+Enter`, `Escape`, `Ctrl+L` across all tabs.
+- Keyboard shortcuts active: `Ctrl+Enter`, `Escape`, `Ctrl+L` on feature surfaces, plus shell-level `Ctrl+K` (command palette) and `Ctrl+,` (settings workspace).
 
 ## Working Rules
 
@@ -97,6 +106,7 @@ Use these files in order before substantial changes:
   - `SEQUENTIAL`: playback-friendly piece ordering
   - `STREAM`: local HTTP streaming path with quick play action
 - Surface aria2 progress and failures with user-readable feedback.
+- Preserve torrent-tab queue semantics, pause/resume behavior, filter states, peer/seeder/size metrics, and per-file child rows when iterating on torrent UX.
 
 ## Verification Commands
 

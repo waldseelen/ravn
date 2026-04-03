@@ -79,6 +79,35 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
+class SafeConsoleWriter:
+    """Write console logs without crashing on non-UTF terminals."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, message: str) -> int:
+        try:
+            return self._stream.write(message)
+        except UnicodeEncodeError:
+            encoding = getattr(self._stream, "encoding", None) or "utf-8"
+            safe_message = message.encode(encoding, errors="backslashreplace").decode(encoding, errors="ignore")
+            return self._stream.write(safe_message)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def isatty(self):
+        return self._stream.isatty()
+
+    @property
+    def encoding(self):
+        return getattr(self._stream, "encoding", None)
+
+
+# Initialize logging when module is imported
+_initialized = False
+
+
 def setup_logging(
     level: int = logging.INFO,
     enable_file_logging: bool = True,
@@ -103,18 +132,25 @@ def setup_logging(
     Returns:
         Root logger instance
     """
+    global _initialized
+
     # Get or create root logger for RAVN
     root_logger = logging.getLogger('ravn_app')
-    
+
+    # Make setup idempotent for repeated imports/startup paths.
+    if getattr(root_logger, "_ravn_logging_initialized", False):
+        root_logger.setLevel(level)
+        return root_logger
+
     # Clear any existing handlers
     root_logger.handlers.clear()
-    
+
     root_logger.setLevel(level)
     root_logger.propagate = False
     
     # Console handler
     if enable_console_logging:
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(SafeConsoleWriter(sys.stdout))
         console_handler.setLevel(level)
         
         console_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
@@ -149,7 +185,9 @@ def setup_logging(
     root_logger.info(f"RAVN logging initialized - level={logging.getLevelName(level)}")
     if enable_file_logging:
         root_logger.info(f"Log file: {log_dir / log_file_name}")
-    
+
+    root_logger._ravn_logging_initialized = True
+    _initialized = True
     return root_logger
 
 
@@ -252,10 +290,6 @@ def log_ytdlp_operation(
         output_file=output_file,
         error=error
     )
-
-
-# Initialize logging when module is imported
-_initialized = False
 
 
 def ensure_logging_initialized():

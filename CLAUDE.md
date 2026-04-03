@@ -19,6 +19,9 @@ Use these files in order before substantial changes:
 - `ravn.py`
 - `ravn_app/ui/main_window.py`
 - `ravn_app/ui/tabs/download_tab.py`
+- `ravn_app/ui/tabs/mixer_tab.py`
+- `ravn_app/ui/tabs/library_tab.py`
+- `ravn_app/ui/tabs/filters_tab.py`
 - `ravn_app/ui/components/error_panel.py`
 - `ravn_app/ui/components/playlist_sort_dialog.py`
 - `ravn_app/core/runners/`
@@ -42,6 +45,7 @@ Use these files in order before substantial changes:
 
 - Phase 1 UI consistency tasks complete (UI-01 through UI-12).
 - Phases 1-4C and Phase 6 are complete.
+- Phase 7 media-management foundations are active in both CLI and desktop UI; queue/history persistence is complete, while auto-library wiring and deeper end-to-end coverage are still pending.
 - Phase 5 (build/packaging/distribution) remains open.
 - Primary media flows run through shared runners (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
 - Some auxiliary modules still call `subprocess` directly.
@@ -55,11 +59,12 @@ Use these files in order before substantial changes:
 ## Verified Facts
 
 - Config and history paths are OS-aware via `ravn_app/core/config_paths.py`.
-- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent` (plus `--json`).
+- CLI supports: `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters` (plus `--json`).
+- History UI now aggregates downloads, conversions, and generic Phase 7 operation records from `DatabaseManager`.
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
 - FFmpeg realtime progress parsing is active.
 - Queue panel supports queued/running/completed states and cancel/open-folder actions.
-- Last full-suite baseline (2026-03-31): 472 passed, 1 skipped.
+- Last full-suite baseline (2026-04-01): 498 passed, 1 skipped.
 - Shared UI helpers in `ui_components.py`: `style_combo`, `style_entry`, `bind_focus_ring`, `set_button_loading_state`.
 - Keyboard shortcuts active: `Ctrl+Enter`, `Escape`, `Ctrl+L` across all tabs.
 

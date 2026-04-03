@@ -627,6 +627,24 @@ class ConverterTab(ctk.CTkFrame):
                 pass
         if self.notify_callback:
             self.notify_callback(settings.output_file)
+
+        auto_add_callback = getattr(self, "auto_add_to_library_callback", None)
+        if callable(auto_add_callback) and settings.output_file:
+            try:
+                auto_add_callback(
+                    settings.output_file,
+                    source_type="conversion",
+                    metadata={
+                        "input_file": settings.input_file,
+                        "video_codec": getattr(settings.video_codec, "name", "").lower(),
+                        "audio_codec": getattr(settings.audio_codec, "name", "").lower(),
+                        "audio_only": settings.audio_only,
+                        "video_only": settings.video_only,
+                    },
+                )
+            except Exception:
+                pass
+
         messagebox.showinfo(
             t("converter.successTitle"),
             t("converter.successMessage", output=settings.output_file),

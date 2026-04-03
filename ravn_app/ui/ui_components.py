@@ -68,8 +68,8 @@ class Toast(ctk.CTkFrame):
         close_btn = ctk.CTkButton(
             content,
             text=Icons.CLOSE,
-            width=Sizes.BTN_HEIGHT_SM,
-            height=Sizes.BTN_HEIGHT_SM,
+            width=24,
+            height=24,
             fg_color="transparent",
             hover_color=config["hover"],
             text_color=Colors.TEXT_MUTED,
@@ -485,6 +485,8 @@ class Tooltip:
     Shows on hover after 300ms delay.
     """
 
+    _instances = []
+
     def __init__(
         self,
         widget,
@@ -496,61 +498,98 @@ class Tooltip:
         self.delay_ms = delay_ms
         self.tooltip_window = None
         self._after_id = None
+        Tooltip._instances.append(self)
 
         # Bind events
         widget.bind("<Enter>", self._on_enter)
         widget.bind("<Leave>", self._on_leave)
         widget.bind("<ButtonPress>", self._on_leave)
+        widget.bind("<Destroy>", self._on_widget_destroy, add="+")
+
+    @classmethod
+    def dismiss_all(cls):
+        for tooltip in list(cls._instances):
+            try:
+                tooltip.dismiss()
+            except Exception:
+                continue
+
+    def dismiss(self):
+        self._cancel_timer()
+        self._hide_tooltip()
+
+    def _on_widget_destroy(self, event=None):
+        self.dismiss()
+        try:
+            Tooltip._instances.remove(self)
+        except ValueError:
+            pass
 
     def _on_enter(self, event=None):
         """Start delay timer on hover."""
+        if not self.text:
+            return
+        try:
+            if not self.widget.winfo_exists():
+                return
+        except Exception:
+            return
         self._cancel_timer()
-        self._after_id = self.widget.after(self.delay_ms, self._show_tooltip)
+        try:
+            self._after_id = self.widget.after(self.delay_ms, self._show_tooltip)
+        except Exception:
+            self._after_id = None
 
     def _on_leave(self, event=None):
         """Hide tooltip and cancel timer."""
-        self._cancel_timer()
-        self._hide_tooltip()
+        self.dismiss()
 
     def _cancel_timer(self):
         """Cancel pending show timer."""
         if self._after_id:
-            self.widget.after_cancel(self._after_id)
+            try:
+                self.widget.after_cancel(self._after_id)
+            except Exception:
+                pass
             self._after_id = None
 
     def _show_tooltip(self):
         """Display tooltip window."""
-        if self.tooltip_window:
+        self._after_id = None
+        if self.tooltip_window or not self.text:
             return
 
-        # Get widget position
-        x = self.widget.winfo_rootx()
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        try:
+            if not self.widget.winfo_exists() or not self.widget.winfo_viewable():
+                return
+            x = self.widget.winfo_rootx()
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+            root = self.widget.winfo_toplevel()
+            self.tooltip_window = ctk.CTkToplevel(root)
+            self.tooltip_window.wm_overrideredirect(True)
+            self.tooltip_window.wm_geometry(f"+{x}+{y}")
 
-        # Create tooltip window
-        self.tooltip_window = ctk.CTkToplevel(self.widget)
-        self.tooltip_window.wm_overrideredirect(True)
-        self.tooltip_window.wm_geometry(f"+{x}+{y}")
-
-        # Tooltip content
-        label = ctk.CTkLabel(
-            self.tooltip_window,
-            text=self.text,
-            font=Fonts.SMALL,
-            fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_SM,
-            padx=Spacing.SM,
-            pady=Spacing.XS,
-        )
-        label.pack()
-
-        # Prevent tooltip from stealing focus
-        self.tooltip_window.wm_attributes("-topmost", True)
+            label = ctk.CTkLabel(
+                self.tooltip_window,
+                text=self.text,
+                font=Fonts.SMALL,
+                fg_color=Colors.BG_CARD,
+                corner_radius=Sizes.CORNER_SM,
+                padx=Spacing.SM,
+                pady=Spacing.XS,
+            )
+            label.pack()
+            self.tooltip_window.wm_attributes("-topmost", True)
+        except Exception:
+            self.tooltip_window = None
 
     def _hide_tooltip(self):
         """Hide tooltip window."""
         if self.tooltip_window:
-            self.tooltip_window.destroy()
+            try:
+                self.tooltip_window.destroy()
+            except Exception:
+                pass
             self.tooltip_window = None
 
     def update_text(self, text: str):
@@ -728,7 +767,6 @@ def set_button_loading_state(button, is_loading: bool, loading_text: str = None,
                 text=loading_text or f"{Icons.SPINNER} ...",
                 state="disabled",
                 fg_color=Colors.BTN_DISABLED,
-                text_color=Colors.TEXT_MUTED,
             )
         else:
             text = original_text or getattr(button, '_original_text', button.cget("text"))
@@ -736,7 +774,6 @@ def set_button_loading_state(button, is_loading: bool, loading_text: str = None,
                 text=text,
                 state="normal",
                 fg_color=Colors.ACCENT,
-                text_color=Colors.TEXT_PRIMARY,
             )
     except Exception:
         pass

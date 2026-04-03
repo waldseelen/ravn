@@ -80,6 +80,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         toast_manager_getter: Callable[[], Any],
         queue_paused_getter: Callable[[], bool],
         show_queue_tab_callback: Callable[[], None],
+        auto_add_to_library_callback: Optional[Callable[..., None]] = None,
         **kwargs,
     ):
         kwargs.setdefault("fg_color", "transparent")
@@ -95,6 +96,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.toast_manager_getter = toast_manager_getter
         self.queue_paused_getter = queue_paused_getter
         self.show_queue_tab_callback = show_queue_tab_callback
+        self.auto_add_to_library_callback = auto_add_to_library_callback
 
         # Video column playlist state
         self._video_playlist_entries: List[Dict[str, Any]] = []
@@ -102,14 +104,14 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._video_playlist_source_url = ""
         self._video_playlist_detail_rows: List[Tuple[Any, Dict[str, Any]]] = []
         self._video_is_playlist_fetching = False
-        
+
         # Music column playlist state
         self._music_playlist_entries: List[Dict[str, Any]] = []
         self._music_playlist_selection_vars: List[ctk.BooleanVar] = []
         self._music_playlist_source_url = ""
         self._music_playlist_detail_rows: List[Tuple[Any, Dict[str, Any]]] = []
         self._music_is_playlist_fetching = False
-        
+
         # Active column pointers (will be set by _activate_video_side/_activate_music_side)
         self.playlist_entries: List[Dict[str, Any]] = []
         self.playlist_selection_vars: List[ctk.BooleanVar] = []
@@ -477,7 +479,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._activate_video_side()
 
         # Shared button bindings and tooltips
-        for button in (self._video_fetch_btn, self._video_download_btn, 
+        for button in (self._video_fetch_btn, self._video_download_btn,
                       self._music_fetch_btn, self._music_download_btn):
             button.bind("<ButtonPress-1>", lambda _e, btn=button: self._apply_button_press_state(btn))
             button.bind("<ButtonRelease-1>", lambda _e, btn=button: self._apply_button_release_state(btn))
@@ -546,7 +548,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self.error_panel = self._music_error_panel
             self.error_frame = self.error_panel
         self._active_btn_restore_text = f"♪ {t('download.musicDownloadBtn')}"
-        
+
         # Point playlist widgets to music column
         self.playlist_frame = self._music_playlist_widgets['frame']
         self.playlist_list_frame = self._music_playlist_widgets['list_frame']
@@ -554,7 +556,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.playlist_select_all_btn = self._music_playlist_widgets['select_all_btn']
         self.playlist_clear_btn = self._music_playlist_widgets['clear_btn']
         self.playlist_approve_btn = self._music_playlist_widgets['approve_btn']
-        
+
         # Load music column state
         self._active_column = 'music'
         self.playlist_entries = self._music_playlist_entries
@@ -562,13 +564,13 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.playlist_source_url = self._music_playlist_source_url
         self.playlist_detail_rows = self._music_playlist_detail_rows
         self.is_playlist_fetching = self._music_is_playlist_fetching
-    
+
     def _save_active_playlist_state(self) -> None:
         """Save current playlist state back to the appropriate column."""
         if not hasattr(self, '_active_column'):
             self._active_column = 'video'  # Default
             return
-            
+
         if self._active_column == 'video':
             self._video_playlist_entries = self.playlist_entries
             self._video_playlist_selection_vars = self.playlist_selection_vars
@@ -730,9 +732,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     def _detect_url_protocol(url: str) -> str:
         """Return 'magnet', 'torrent_file', or 'standard'."""
         normalized = (url or "").strip()
-        if normalized.lower().startswith("magnet:?xt=urn:"):
+        lowered = normalized.lower()
+        if lowered.startswith("magnet:?"):
             return "magnet"
-        if normalized.lower().endswith(".torrent"):
+        if lowered.endswith(".torrent"):
             return "torrent_file"
         return "standard"
 
@@ -898,6 +901,31 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         if not self.is_info_fetching:
             self._start_video_info_fetch(url)
+
+    def _execute_download(self):
+        """Legacy compatibility wrapper for the primary download action."""
+        self._download_video()
+
+    def _register_download_outputs(self, result) -> None:
+        callback = getattr(self, "auto_add_to_library_callback", None)
+        if not callable(callback):
+            return
+
+        output_files = [str(path) for path in getattr(result, "output_files", []) if path]
+        if not output_files:
+            return
+
+        metadata: Dict[str, Any] = {}
+        source_url = getattr(result, "url", None)
+        if source_url:
+            metadata["source_url"] = source_url
+
+        callback(
+            output_files,
+            source_type="download",
+            title=getattr(result, "title", None),
+            metadata=metadata or None,
+        )
 
     def _start_single_download(
         self,
@@ -1199,25 +1227,25 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
     def _create_playlist_panel(self, parent, download_command):
         """Create a playlist panel for a column.
-        
+
         Args:
             parent: Parent frame (video_col or music_col)
             download_command: Command for approve button (_download_video or _download_music)
-            
+
         Returns:
             Dictionary with playlist widgets: {
-                'frame', 'summary_label', 'list_frame', 
+                'frame', 'summary_label', 'list_frame',
                 'select_all_btn', 'clear_btn', 'approve_btn'
             }
         """
         playlist_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_CARD, corner_radius=6)
-        
+
         ctk.CTkLabel(
             playlist_frame,
             text=f"{Icons.QUEUE} {t('download.playlistTitle')}",
             font=Fonts.LABEL_BOLD,
         ).pack(anchor="w", padx=8, pady=(8, 4))
-        
+
         summary_label = ctk.CTkLabel(
             playlist_frame,
             text="",
@@ -1225,10 +1253,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             text_color=Colors.TEXT_MUTED,
         )
         summary_label.pack(anchor="w", padx=8, pady=(0, 4))
-        
+
         controls_row = ctk.CTkFrame(playlist_frame, fg_color="transparent")
         controls_row.pack(fill="x", padx=8, pady=(0, 4))
-        
+
         select_all_btn = ctk.CTkButton(
             controls_row,
             text=f"{Icons.CHECK} {t('download.playlistSelectAll')}",
@@ -1240,7 +1268,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             font=Fonts.SMALL,
         )
         select_all_btn.pack(side="left")
-        
+
         clear_btn = ctk.CTkButton(
             controls_row,
             text=f"{Icons.CLEAR_BTN} {t('download.playlistClear')}",
@@ -1252,7 +1280,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             font=Fonts.SMALL,
         )
         clear_btn.pack(side="left", padx=(6, 0))
-        
+
         approve_btn = ctk.CTkButton(
             controls_row,
             text=f"{Icons.DOWNLOAD_BTN} {t('download.playlistApprove')}",
@@ -1264,17 +1292,17 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             font=Fonts.LABEL_BOLD,
         )
         approve_btn.pack(side="right", padx=(6, 0))
-        
+
         list_frame = ctk.CTkScrollableFrame(
             playlist_frame,
             height=300,
             fg_color=Colors.BG_SURFACE,
         )
         list_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        
+
         # Start hidden
         playlist_frame.pack_forget()
-        
+
         return {
             'frame': playlist_frame,
             'summary_label': summary_label,

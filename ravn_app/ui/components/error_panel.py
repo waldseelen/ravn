@@ -79,9 +79,7 @@ class ErrorPanel(ctk.CTkFrame):
 
     def show_error(self, message: str, raw_text: str):
         """Populate the panel and make it visible."""
-        # ACC-03: Always prefix with error icon so color is not the sole indicator
-        prefixed = message if message.startswith(Icons.WARNING) else f"{Icons.WARNING}  {message}"
-        self.error_message_label.configure(text=prefixed)
+        self.error_message_label.configure(text=message)
 
         self.raw_error_textbox.configure(state="normal")
         self.raw_error_textbox.delete("1.0", "end")

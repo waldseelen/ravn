@@ -7,6 +7,7 @@ import os
 import sys
 import json
 import shutil
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Dict, Any
 import logging
@@ -90,6 +91,11 @@ def get_config_file_path() -> Path:
 def get_database_file_path() -> Path:
     """Get the full path to the history database file."""
     return get_data_directory() / 'ravn_history.db'
+
+
+def get_media_library_file_path() -> Path:
+    """Get the full path to the Phase 7 media library database file."""
+    return get_data_directory() / 'media_library.db'
 
 
 def ensure_directories_exist() -> Dict[str, Path]:
@@ -243,6 +249,40 @@ CONFIG_SCHEMA = {
     'auto_embed_lyrics': {'type': bool, 'default': True},
     'auto_sort_downloads': {'type': bool, 'default': False},
     'auto_sort_mode': {'type': str, 'default': 'artist', 'allowed': ['artist', 'channel']},
+    'mixer': {
+        'type': dict,
+        'default': {
+            'default_format': 'mp3',
+            'default_bitrate': '320k',
+            'crossfade_duration': 1.0,
+            'normalize_audio': True,
+            'video_codec': 'libx264',
+            'video_preset': 'medium',
+            'video_crf': 23,
+            'temp_dir': 'temp_mixer',
+        },
+    },
+    'library': {
+        'type': dict,
+        'default': {
+            'library_db': 'media_library.db',
+            'auto_thumbnail': True,
+            'thumbnail_size': [160, 90],
+            'max_search_results': 100,
+            'auto_add_downloads': True,
+            'auto_add_mixer_output': True,
+            'auto_add_filter_output': True,
+            'auto_add_converted_files': True,
+        },
+    },
+    'filters': {
+        'type': dict,
+        'default': {
+            'default_quality': 'high',
+            'preview_enabled': True,
+            'preview_scale': 0.5,
+        },
+    },
 }
 
 
@@ -258,7 +298,7 @@ def get_default_config() -> Dict[str, Any]:
         if key == 'default_download_path' and schema['default'] is None:
             config[key] = str(Path.home() / 'Downloads' / 'RAVN')
         else:
-            config[key] = schema['default']
+            config[key] = deepcopy(schema['default'])
     return config
 
 
@@ -287,7 +327,7 @@ def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
 
     # Type check
     if not isinstance(value, expected_type):
-        default = schema['default']
+        default = deepcopy(schema['default'])
         if key == 'default_download_path' and default is None:
             default = str(Path.home() / 'Downloads' / 'RAVN')
         return False, default, f"Invalid type for {key}: expected {expected_type.__name__}"
@@ -301,7 +341,7 @@ def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
 
     # Allowed values check
     if 'allowed' in schema and value not in schema['allowed']:
-        return False, schema['default'], f"Invalid value for {key}: must be one of {schema['allowed']}"
+        return False, deepcopy(schema['default']), f"Invalid value for {key}: must be one of {schema['allowed']}"
 
     return True, value, ""
 

@@ -47,6 +47,13 @@ class FeedbackMixin:
         except Exception:
             pass
 
+        register_outputs = getattr(self, "_register_download_outputs", None)
+        if callable(register_outputs):
+            try:
+                register_outputs(result)
+            except Exception:
+                pass
+
         if result.output_files:
             NotificationManager.show_download_complete(Path(result.output_files[0]).name)
 

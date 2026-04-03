@@ -36,6 +36,10 @@ class TaskType(Enum):
     SUBTITLE = "subtitle"
     GENERIC = "generic"
     TORRENT = "torrent"
+    MIXER_AUDIO = "mixer_audio"
+    MIXER_VIDEO = "mixer_video"
+    APPLY_FILTERS = "apply_filters"
+    LIBRARY_SCAN = "library_scan"
 
 
 @dataclass
@@ -61,17 +65,20 @@ class Task:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     result: Optional[TaskResult] = None
-    
+
     # Task execution details
     execute_fn: Optional[Callable] = None
     args: tuple = field(default_factory=tuple)
     kwargs: Dict[str, Any] = field(default_factory=dict)
-    
+    cancel_fn: Optional[Callable[[], bool]] = None
+    cancel_requested: bool = False
+
     # Callbacks
     on_progress: Optional[Callable[[int, str], None]] = None
     on_complete: Optional[Callable[['Task'], None]] = None
     on_error: Optional[Callable[['Task', str], None]] = None
-    
+    on_cancel: Optional[Callable[['Task'], None]] = None
+
     def __hash__(self):
         return hash(self.id)
 
@@ -103,7 +110,9 @@ class TaskQueue:
         kwargs: Optional[Dict[str, Any]] = None,
         on_progress: Optional[Callable[[int, str], None]] = None,
         on_complete: Optional[Callable[[Task], None]] = None,
-        on_error: Optional[Callable[[Task, str], None]] = None
+        on_error: Optional[Callable[[Task, str], None]] = None,
+        cancel_fn: Optional[Callable[[], bool]] = None,
+        on_cancel: Optional[Callable[[Task], None]] = None,
     ) -> str:
         """
         Add a new task to the queue
@@ -121,9 +130,11 @@ class TaskQueue:
             execute_fn=execute_fn,
             args=args,
             kwargs=kwargs or {},
+            cancel_fn=cancel_fn,
             on_progress=on_progress,
             on_complete=on_complete,
-            on_error=on_error
+            on_error=on_error,
+            on_cancel=on_cancel,
         )
         
         with self._lock:
@@ -174,105 +185,202 @@ class TaskQueue:
                     time.sleep(0.05)
 
                 task = self._queue.get(timeout=1.0)
-                
+
                 if task is None:  # Sentinel value
                     break
-                
+                if task.status == TaskStatus.CANCELLED:
+                    continue
+
                 self._execute_task(task)
-                
+
             except queue.Empty:
                 continue
             except Exception as e:
                 logger.error(f"Worker error: {e}")
     
+    @staticmethod
+    def _extract_output_path(task: Task, result: Any = None) -> Optional[str]:
+        """Best-effort output path discovery for heterogeneous task result types."""
+        candidates = [
+            task.kwargs.get('output_path'),
+            task.kwargs.get('output_file'),
+            getattr(result, 'output_path', None),
+            getattr(result, 'output_file', None),
+        ]
+
+        output_files = getattr(result, 'output_files', None)
+        if isinstance(output_files, (list, tuple)) and output_files:
+            candidates.append(output_files[0])
+
+        metadata = getattr(result, 'metadata', None)
+        if isinstance(metadata, dict):
+            candidates.extend([
+                metadata.get('output_path'),
+                metadata.get('output_file'),
+            ])
+
+        for candidate in candidates:
+            if isinstance(candidate, str) and candidate:
+                return candidate
+        return None
+
+    def _coerce_task_result(self, task: Task, result: Any) -> TaskResult:
+        """Normalize arbitrary execution results into TaskResult."""
+        if isinstance(result, TaskResult):
+            return result
+
+        if isinstance(result, bool):
+            return TaskResult(success=result, output_path=self._extract_output_path(task))
+
+        if isinstance(result, tuple) and len(result) >= 2:
+            return TaskResult(
+                success=bool(result[0]),
+                output_path=result[1] if len(result) > 1 else None,
+                error_message=result[2] if len(result) > 2 else None,
+            )
+
+        if hasattr(result, 'success'):
+            raw_metadata = getattr(result, 'metadata', {})
+            metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {'raw_result': result}
+            return TaskResult(
+                success=bool(getattr(result, 'success', False)),
+                output_path=self._extract_output_path(task, result),
+                error_message=getattr(result, 'error_message', None) or getattr(result, 'stderr', None) or None,
+                metadata=metadata,
+            )
+
+        return TaskResult(
+            success=True,
+            output_path=self._extract_output_path(task, result),
+            metadata={'raw_result': result},
+        )
+
+    def _queue_callback(self, callback_type: str, *payload: Any) -> None:
+        self._callback_queue.put((callback_type, *payload))
+
     def _execute_task(self, task: Task):
         """Execute a single task"""
         with self._lock:
+            if task.status == TaskStatus.CANCELLED:
+                return
             self._active_count += 1
             task.status = TaskStatus.RUNNING
             task.started_at = datetime.now()
-        
+
         logger.info(f"Task started: {task.id} - {task.name}")
-        
+
         try:
-            # Create a progress wrapper that's thread-safe
             def progress_wrapper(progress: int, message: str = ""):
+                if task.cancel_requested:
+                    return
                 task.progress = progress
                 task.progress_message = message
                 if task.on_progress:
-                    self._callback_queue.put(
-                        ('progress', task, progress, message)
-                    )
-            
-            # Execute the task function
+                    self._queue_callback('progress', task, progress, message)
+
+            raw_result = None
             if task.execute_fn:
-                result = task.execute_fn(
+                raw_result = task.execute_fn(
                     *task.args,
                     progress_callback=progress_wrapper,
                     **task.kwargs
                 )
-                
-                # Handle result
-                if isinstance(result, TaskResult):
-                    task.result = result
-                elif isinstance(result, bool):
-                    task.result = TaskResult(success=result)
-                elif isinstance(result, tuple) and len(result) >= 2:
-                    task.result = TaskResult(
-                        success=result[0],
-                        output_path=result[1] if len(result) > 1 else None,
-                        error_message=result[2] if len(result) > 2 else None
-                    )
-                else:
-                    task.result = TaskResult(success=True, metadata={'raw_result': result})
-            
+
+            task_result = self._coerce_task_result(task, raw_result)
+
             with self._lock:
-                task.status = TaskStatus.COMPLETED
                 task.completed_at = datetime.now()
-                if task.result:
-                    task.result.duration_seconds = (
-                        task.completed_at - task.started_at
-                    ).total_seconds()
-            
-            logger.info(f"Task completed: {task.id} - {task.name}")
-            
-            if task.on_complete:
-                self._callback_queue.put(('complete', task))
-        
+                if task.started_at:
+                    task_result.duration_seconds = (task.completed_at - task.started_at).total_seconds()
+                task.result = task_result
+
+                if task.cancel_requested:
+                    task.status = TaskStatus.CANCELLED
+                elif task_result.success:
+                    task.status = TaskStatus.COMPLETED
+                    task.progress = max(task.progress, 100)
+                else:
+                    task.status = TaskStatus.FAILED
+
+            if task.status == TaskStatus.CANCELLED:
+                logger.info(f"Task cancelled during execution: {task.id}")
+                if task.on_cancel:
+                    self._queue_callback('cancel', task)
+            elif task.status == TaskStatus.COMPLETED:
+                logger.info(f"Task completed: {task.id} - {task.name}")
+                if task.on_complete:
+                    self._queue_callback('complete', task)
+            else:
+                error_msg = task_result.error_message or "Task failed"
+                logger.error(f"Task failed: {task.id} - {error_msg}")
+                if task.on_error:
+                    self._queue_callback('error', task, error_msg)
+
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Task failed: {task.id} - {error_msg}")
-            
+
             with self._lock:
-                task.status = TaskStatus.FAILED
                 task.completed_at = datetime.now()
+                duration_seconds = 0.0
+                if task.started_at and task.completed_at:
+                    duration_seconds = (task.completed_at - task.started_at).total_seconds()
                 task.result = TaskResult(
                     success=False,
-                    error_message=error_msg
+                    output_path=self._extract_output_path(task),
+                    error_message=error_msg,
+                    duration_seconds=duration_seconds,
                 )
-            
-            if task.on_error:
-                self._callback_queue.put(('error', task, error_msg))
-        
+                task.status = TaskStatus.CANCELLED if task.cancel_requested else TaskStatus.FAILED
+
+            if task.status == TaskStatus.CANCELLED:
+                if task.on_cancel:
+                    self._queue_callback('cancel', task)
+            elif task.on_error:
+                self._queue_callback('error', task, error_msg)
+
         finally:
             with self._lock:
                 self._active_count -= 1
     
     def cancel_task(self, task_id: str) -> bool:
-        """Cancel a task if possible"""
+        """Cancel a task if possible."""
+        callback_task: Optional[Task] = None
+        should_invoke_cancel_fn = False
+        cancel_fn: Optional[Callable[[], bool]] = None
+
         with self._lock:
             if task_id not in self._tasks:
                 return False
-            
+
             task = self._tasks[task_id]
-            
+
             if task.status in (TaskStatus.PENDING, TaskStatus.QUEUED):
                 task.status = TaskStatus.CANCELLED
-                logger.info(f"Task cancelled: {task_id}")
-                return True
-            
-            # Cannot cancel running tasks directly
-            return False
+                task.cancel_requested = True
+                callback_task = task if task.on_cancel else None
+                logger.info(f"Task cancelled before execution: {task_id}")
+            elif task.status == TaskStatus.RUNNING and task.cancel_fn:
+                task.cancel_requested = True
+                should_invoke_cancel_fn = True
+                cancel_fn = task.cancel_fn
+            else:
+                return False
+
+        if callback_task is not None:
+            self._queue_callback('cancel', callback_task)
+            return True
+
+        if not should_invoke_cancel_fn:
+            return True
+
+        if should_invoke_cancel_fn and cancel_fn is not None:
+            cancelled = bool(cancel_fn())
+            if cancelled:
+                logger.info(f"Task cancellation requested: {task_id}")
+            return cancelled
+
+        return False
     
     def get_task(self, task_id: str) -> Optional[Task]:
         """Get task by ID"""
@@ -345,7 +453,12 @@ class TaskQueue:
                     _, task, error_msg = callback_data
                     if task.on_error:
                         task.on_error(task, error_msg)
-            
+
+                elif callback_type == 'cancel':
+                    _, task = callback_data
+                    if task.on_cancel:
+                        task.on_cancel(task)
+
             except queue.Empty:
                 break
     

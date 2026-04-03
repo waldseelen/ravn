@@ -12,7 +12,7 @@ from ..core.database import DatabaseManager, ConfigManager
 from ravn_app.core.i18n import t
 from .advanced_features import SearchFilter, ThemeManager
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
-from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip, EmptyStateWidget
+from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -116,11 +116,12 @@ class HistoryTab(ctk.CTkFrame):
         downloads = self.db.get_downloads(limit=100)
 
         if not downloads:
-            EmptyStateWidget(
+            ctk.CTkLabel(
                 self.scrollable_frame,
-                icon=Icons.EMPTY_FOLDER,
-                message=t("history.noHistory"),
-            ).pack(fill="both", expand=True, pady=Spacing.XL)
+                text=t("history.noHistory"),
+                font=Fonts.LABEL,
+                text_color=Colors.TEXT_MUTED
+            ).pack(pady=Spacing.XL)
             return
 
         for download in downloads:
@@ -200,25 +201,6 @@ class HistoryTab(ctk.CTkFrame):
                 cursor=Cursors.POINTER,
             ).pack(pady=2)
 
-        # MIC-02: Satır hover highlight — Enter/Leave ile BG_HOVER / BG_SURFACE geçişi
-        def _on_row_enter(event, frame=item_frame):
-            try:
-                frame.configure(fg_color=Colors.BG_HOVER)
-            except Exception:
-                pass
-
-        def _on_row_leave(event, frame=item_frame):
-            try:
-                frame.configure(fg_color=Colors.BG_SURFACE)
-            except Exception:
-                pass
-
-        # item_frame + tüm direkt/indirect child'lar hover'ı alır
-        for widget in (item_frame, info_frame, button_frame,
-                       title_label, details_label, date_label, status_label):
-            widget.bind("<Enter>", _on_row_enter, add="+")
-            widget.bind("<Leave>", _on_row_leave, add="+")
-
     def filter_history(self):
         """Geçmişi filtrele"""
         search_term = self.search_entry.get()
@@ -244,13 +226,6 @@ class HistoryTab(ctk.CTkFrame):
             from ..core.database import DownloadRecord
             download = DownloadRecord(**download_dict)
             self.create_history_item(download)
-
-        if not filtered:
-            EmptyStateWidget(
-                self.scrollable_frame,
-                icon=Icons.EMPTY_FOLDER,
-                message=t("history.noHistory"),
-            ).pack(fill="both", expand=True, pady=Spacing.XL)
 
     def show_statistics(self):
         """İstatistikleri göster"""
@@ -670,10 +645,19 @@ class SettingsTab(ctk.CTkFrame):
 
     def save_settings(self):
         """Ayarları kaydet"""
-        selected_theme = ThemeManager.normalize_theme_name(self.theme_combo.get())
+        theme_combo = getattr(self, 'theme_combo', None)
+        language_combo = getattr(self, 'language_combo', None)
+
+        selected_theme = (
+            ThemeManager.normalize_theme_name(theme_combo.get())
+            if theme_combo is not None
+            else None
+        )
         old_language = self.config.get('language', 'tr')
-        self.config.set('theme', selected_theme)
-        self.config.set('language', 'tr' if self.language_combo.get() == "Türkçe" else 'en')
+        if selected_theme is not None:
+            self.config.set('theme', selected_theme)
+        if language_combo is not None:
+            self.config.set('language', 'tr' if language_combo.get() == "Türkçe" else 'en')
         self.config.set('notifications_enabled', self.notifications_var.get())
         self.config.set('auto_update_check', self.auto_update_var.get())
 
@@ -727,14 +711,16 @@ class SettingsTab(ctk.CTkFrame):
         if auto_sort_mode_combo is not None:
             self.config.set('auto_sort_mode', auto_sort_mode_combo.get())
 
-        ThemeManager.apply_theme(selected_theme)
+        if selected_theme is not None:
+            ThemeManager.apply_theme(selected_theme)
 
         messagebox.showinfo(t("settings.saveSuccessTitle"), t("settings.saved"))
 
-        new_language = self.config.get('language', 'tr')
-        if old_language != new_language and callable(self.on_language_changed):
+        new_language = self.config.get('language', 'tr') if language_combo is not None else old_language
+        on_language_changed = getattr(self, 'on_language_changed', None)
+        if old_language != new_language and callable(on_language_changed):
             try:
-                self.on_language_changed()
+                on_language_changed()
             except Exception:
                 pass
 

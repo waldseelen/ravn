@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import sqlite3
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
@@ -26,7 +27,7 @@ from ravn_app.core.config_paths import (
 logger = logging.getLogger(__name__)
 
 
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 3
 
 
 class DatabaseMigrationError(Exception):
@@ -69,6 +70,30 @@ class ConversionRecord:
     conversion_date: str = ""
     duration: float = 0.0
     status: str = DownloadStatus.COMPLETED.value
+
+
+@dataclass
+class OperationRecord:
+    """Generic persisted Phase 7 operation record."""
+    id: Optional[int] = None
+    task_type: str = ""
+    operation: str = ""
+    title: str = ""
+    input_paths: List[str] = None
+    output_path: str = ""
+    format: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+    duration: float = 0.0
+    status: str = DownloadStatus.COMPLETED.value
+    error_message: str = ""
+    metadata: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.input_paths is None:
+            self.input_paths = []
+        if self.metadata is None:
+            self.metadata = {}
 
 
 class DatabaseManager:
@@ -165,6 +190,25 @@ class DatabaseManager:
             )
         ''')
 
+        # Generic operation history (Phase 7 queue/history persistence)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_type TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                title TEXT,
+                input_paths TEXT,
+                output_path TEXT,
+                format TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration REAL,
+                status TEXT DEFAULT 'completed',
+                error_message TEXT,
+                metadata TEXT
+            )
+        ''')
+
         self.conn.commit()
 
     def _run_migrations(self):
@@ -189,6 +233,8 @@ class DatabaseManager:
             try:
                 if target_version == 2:
                     self._migrate_v1_to_v2()
+                elif target_version == 3:
+                    self._migrate_v2_to_v3()
                 else:
                     raise DatabaseMigrationError(
                         f"No migration script available for schema v{target_version}"
@@ -301,6 +347,56 @@ class DatabaseManager:
         )
         self.conn.commit()
 
+    def _migrate_v2_to_v3(self):
+        """Migration script v2 -> v3 for generic Phase 7 operation history."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS migration_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_version INTEGER NOT NULL,
+                to_version INTEGER NOT NULL,
+                migration_name TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                details TEXT
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_type TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                title TEXT,
+                input_paths TEXT,
+                output_path TEXT,
+                format TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration REAL,
+                status TEXT DEFAULT 'completed',
+                error_message TEXT,
+                metadata TEXT
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            INSERT INTO migration_history (
+                from_version, to_version, migration_name, applied_at, details
+            ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            (
+                2,
+                3,
+                "phase7_operation_history",
+                self._utc_now_iso(),
+                "Added generic operations table for Phase 7 queue/history persistence",
+            ),
+        )
+        self.conn.commit()
+
     def add_download(self, record: DownloadRecord) -> int:
         """İndirme kaydı ekle"""
         cursor = self.conn.cursor()
@@ -374,6 +470,59 @@ class DatabaseManager:
         rows = cursor.fetchall()
         return [self._row_to_conversion_record(row) for row in rows]
 
+    def add_operation(self, record: OperationRecord) -> int:
+        """Persist a generic Phase 7 operation history record."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            INSERT INTO operations (
+                task_type, operation, title, input_paths, output_path, format,
+                started_at, completed_at, duration, status, error_message, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                record.task_type,
+                record.operation,
+                record.title,
+                json.dumps(record.input_paths, ensure_ascii=False),
+                record.output_path,
+                record.format,
+                record.started_at,
+                record.completed_at,
+                record.duration,
+                record.status,
+                record.error_message,
+                json.dumps(record.metadata, ensure_ascii=False),
+            ),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_operations(self, limit: int = 100, task_type: Optional[str] = None) -> List[OperationRecord]:
+        """Return persisted generic operation history rows."""
+        cursor = self.conn.cursor()
+        if task_type:
+            cursor.execute(
+                '''
+                SELECT * FROM operations
+                WHERE task_type = ?
+                ORDER BY COALESCE(completed_at, started_at) DESC
+                LIMIT ?
+                ''',
+                (task_type, limit),
+            )
+        else:
+            cursor.execute(
+                '''
+                SELECT * FROM operations
+                ORDER BY COALESCE(completed_at, started_at) DESC
+                LIMIT ?
+                ''',
+                (limit,),
+            )
+        rows = cursor.fetchall()
+        return [self._row_to_operation_record(row) for row in rows]
+
     def add_favorite(self, url: str, title: str) -> bool:
         """Favorilere ekle"""
         try:
@@ -423,6 +572,10 @@ class DatabaseManager:
         cursor.execute('SELECT COUNT(*) FROM conversions')
         stats['total_conversions'] = cursor.fetchone()[0]
 
+        # Toplam Phase 7 operasyon
+        cursor.execute('SELECT COUNT(*) FROM operations')
+        stats['total_operations'] = cursor.fetchone()[0]
+
         # En popüler format
         cursor.execute('''
             SELECT format, COUNT(*) as count
@@ -443,10 +596,13 @@ class DatabaseManager:
         if table == "all":
             cursor.execute('DELETE FROM downloads')
             cursor.execute('DELETE FROM conversions')
+            cursor.execute('DELETE FROM operations')
         elif table == "downloads":
             cursor.execute('DELETE FROM downloads')
         elif table == "conversions":
             cursor.execute('DELETE FROM conversions')
+        elif table == "operations":
+            cursor.execute('DELETE FROM operations')
 
         self.conn.commit()
         return True
@@ -478,6 +634,32 @@ class DatabaseManager:
             conversion_date=row['conversion_date'],
             duration=row['duration'],
             status=row['status']
+        )
+
+    def _row_to_operation_record(self, row) -> OperationRecord:
+        """SQLite row'unu OperationRecord'a çevir."""
+        try:
+            input_paths = json.loads(row['input_paths']) if row['input_paths'] else []
+        except Exception:
+            input_paths = []
+        try:
+            metadata = json.loads(row['metadata']) if row['metadata'] else {}
+        except Exception:
+            metadata = {}
+        return OperationRecord(
+            id=row['id'],
+            task_type=row['task_type'],
+            operation=row['operation'],
+            title=row['title'] or "",
+            input_paths=input_paths,
+            output_path=row['output_path'] or "",
+            format=row['format'] or "",
+            started_at=row['started_at'] or "",
+            completed_at=row['completed_at'] or "",
+            duration=row['duration'] or 0.0,
+            status=row['status'] or DownloadStatus.COMPLETED.value,
+            error_message=row['error_message'] or "",
+            metadata=metadata,
         )
 
     def close(self):
@@ -566,8 +748,13 @@ class ConfigManager:
 
     def reset(self) -> bool:
         """Konfigürasyonu varsayılana sıfırla"""
-        self.config = self.DEFAULT_CONFIG.copy()
+        self.config = deepcopy(self.DEFAULT_CONFIG)
         return self.save_config()
+
+    def get_section(self, key: str) -> Dict[str, Any]:
+        """Return a defensive copy of a nested config section."""
+        value = self.config.get(key, {})
+        return deepcopy(value) if isinstance(value, dict) else {}
 
     def export_config(self, export_path: str) -> bool:
         """Konfigürasyonu dışa aktar"""

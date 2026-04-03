@@ -136,6 +136,69 @@ class TestCliCommands:
         assert result.exit_code == 0
         assert '"count"' in result.output
 
+    @patch("ravn_app.cli.AudioMixerRunner")
+    def test_mixer_audio_json(self, mock_mixer_cls):
+        mixer = Mock()
+        mixer.concat.return_value = Mock(success=True, error_message="", metadata={})
+        mock_mixer_cls.return_value = mixer
+
+        with self.runner.isolated_filesystem():
+            file_a = Path("a.mp3")
+            file_b = Path("b.mp3")
+            file_a.write_bytes(b"a")
+            file_b.write_bytes(b"b")
+            result = self.runner.invoke(
+                cli,
+                [
+                    "mixer",
+                    "audio",
+                    "--input",
+                    str(file_a),
+                    "--input",
+                    str(file_b),
+                    "--output",
+                    "out.mp3",
+                    "--json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert '"operation": "concat"' in result.output
+
+    @patch("ravn_app.cli.MediaLibrary")
+    def test_library_add_json(self, mock_library_cls):
+        library = Mock()
+        library.add_media.return_value = 7
+        mock_library_cls.return_value = library
+
+        with self.runner.isolated_filesystem():
+            file_path = Path("clip.mp4")
+            file_path.write_bytes(b"clip")
+            result = self.runner.invoke(
+                cli,
+                ["library", "add", str(file_path), "--tags", "work,tutorial", "--json"],
+            )
+
+        assert result.exit_code == 0
+        assert '"id": 7' in result.output
+
+    @patch("ravn_app.cli.VideoMixerRunner")
+    def test_filters_json(self, mock_runner_cls):
+        runner = Mock()
+        runner.apply_filters.return_value = Mock(success=True, error_message="", metadata={"filters": ["eq=brightness=0.2"]})
+        mock_runner_cls.return_value = runner
+
+        with self.runner.isolated_filesystem():
+            video = Path("video.mp4")
+            video.write_bytes(b"video")
+            result = self.runner.invoke(
+                cli,
+                ["filters", str(video), "--brightness", "20", "--output", "filtered.mp4", "--json"],
+            )
+
+        assert result.exit_code == 0
+        assert '"filters"' in result.output
+
     def test_serve_placeholder(self):
         result = self.runner.invoke(cli, ["serve", "--json"])
         assert result.exit_code == 0

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import sqlite3
 import pytest
 
-from ravn_app.core.database import ConfigManager, ConversionRecord, DatabaseManager, DownloadRecord
+from ravn_app.core.database import ConfigManager, ConversionRecord, DatabaseManager, DownloadRecord, OperationRecord
 
 
 class TestDatabaseManagerBasics:
@@ -66,9 +66,9 @@ class TestDatabaseManagerBasics:
             db = DatabaseManager(db_path=str(db_path))
             try:
                 cursor = db.conn.cursor()
-                cursor.execute("UPDATE schema_version SET version = 2 WHERE id = 1")
+                cursor.execute("UPDATE schema_version SET version = 3 WHERE id = 1")
                 db.conn.commit()
-                with patch("ravn_app.core.database.LATEST_SCHEMA_VERSION", 3):
+                with patch("ravn_app.core.database.LATEST_SCHEMA_VERSION", 4):
                     with pytest.raises(Exception):
                         db._run_migrations()
             finally:
@@ -252,6 +252,35 @@ class TestDatabaseManagerBasics:
             finally:
                 db.close()
 
+    def test_add_and_get_operations(self, tmp_path):
+        db_path = tmp_path / "ravn.db"
+        with patch("ravn_app.core.database.ensure_directories_exist"), patch(
+            "ravn_app.core.database.migrate_all_legacy_files"
+        ):
+            db = DatabaseManager(db_path=str(db_path))
+            try:
+                db.add_operation(
+                    OperationRecord(
+                        task_type="mixer_audio",
+                        operation="mix",
+                        title="mix.mp3",
+                        input_paths=["a.mp3", "b.mp3"],
+                        output_path="mix.mp3",
+                        format="mp3",
+                        started_at="2024-01-01T00:00:00",
+                        completed_at="2024-01-01T00:00:10",
+                        duration=10.0,
+                        status="completed",
+                        metadata={"track_count": 2},
+                    )
+                )
+                rows = db.get_operations(limit=10)
+                assert len(rows) == 1
+                assert rows[0].task_type == "mixer_audio"
+                assert rows[0].metadata["track_count"] == 2
+            finally:
+                db.close()
+
     def test_favorites_add_get_remove(self, tmp_path):
         db_path = tmp_path / "ravn.db"
         with patch("ravn_app.core.database.ensure_directories_exist"), patch(
@@ -286,11 +315,26 @@ class TestDatabaseManagerBasics:
                         status="completed",
                     )
                 )
+                db.add_operation(
+                    OperationRecord(
+                        task_type="apply_filters",
+                        operation="apply_filters",
+                        title="filtered.mp4",
+                        input_paths=["input.mp4"],
+                        output_path="filtered.mp4",
+                        format="mp4",
+                        completed_at="2024-01-01T00:00:05",
+                        status="completed",
+                    )
+                )
                 stats = db.get_statistics()
                 assert stats["total_downloads"] >= 1
                 assert stats["successful_downloads"] >= 1
+                assert stats["total_operations"] >= 1
                 db.clear_history("downloads")
                 assert len(db.get_downloads(limit=10)) == 0
+                db.clear_history("operations")
+                assert len(db.get_operations(limit=10)) == 0
             finally:
                 db.close()
 
@@ -364,6 +408,16 @@ class TestConfigManagerBasics:
             cfg.set("language", "en")
             assert cfg.reset() is True
             assert cfg.get("language") == "tr"
+
+    def test_get_section_returns_copy(self, tmp_path):
+        config_file = tmp_path / "config.json"
+        with patch("ravn_app.core.database.ensure_directories_exist"), patch(
+            "ravn_app.core.database.migrate_all_legacy_files"
+        ):
+            cfg = ConfigManager(config_file=str(config_file))
+            mixer_section = cfg.get_section("mixer")
+            mixer_section["default_format"] = "wav"
+            assert cfg.get("mixer")["default_format"] == "mp3"
 
     def test_save_config_failure(self, tmp_path):
         config_file = tmp_path / "config.json"

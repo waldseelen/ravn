@@ -6,6 +6,7 @@ Entry point: ravn_app.cli:cli
 import json
 import os
 import sys
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -32,7 +33,8 @@ from ravn_app.core.database import (
     DownloadRecord,
 )
 from ravn_app.core.i18n import get_i18n
-from ravn_app.core.runners import FFmpegRunner
+from ravn_app.core.persistence.media_library import MediaLibrary, MediaSearchFilters
+from ravn_app.core.runners import AudioMixerRunner, AudioTrack, FFmpegRunner, VideoMixerRunner
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
 
@@ -77,6 +79,10 @@ def _error(message: str, as_json: bool) -> None:
     else:
         click.echo(f"{_tr('cli.errorPrefix')}: {message}", err=True)
     sys.exit(1)
+
+
+def _parse_csv_values(raw: Optional[str]) -> list[str]:
+    return [item.strip() for item in str(raw or "").split(",") if item.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -638,6 +644,501 @@ def torrent_cmd(
         click.echo(f"\n{_tr('cli.doneFiles', output=str(out))}")
         for f in result.output_files:
             click.echo(f"  {f}")
+
+
+# ---------------------------------------------------------------------------
+# ravn mixer
+# ---------------------------------------------------------------------------
+
+@cli.group("mixer")
+def mixer_group():
+    """Mix and composite local audio/video files."""
+
+
+@mixer_group.command("audio")
+@click.option(
+    "--input",
+    "input_files",
+    multiple=True,
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Input audio file(s). Repeat --input for multiple files.",
+)
+@click.option("--output", required=True, type=click.Path(dir_okay=False, path_type=Path), help="Output audio file.")
+@click.option("--mix", "mix_mode", is_flag=True, default=False, help="Mix tracks together instead of concatenating sequentially.")
+@click.option("--crossfade", default=0.0, show_default=True, type=float, help="Sequential crossfade duration in seconds.")
+@click.option("--volume", multiple=True, type=float, help="Per-track volume for --mix mode. Repeat once per input.")
+@click.option("--normalize/--no-normalize", default=False, help="Normalize the mixed audio loudness.")
+@click.option("--sample-rate", default=None, type=int, help="Target sample rate for mix/concat output.")
+@click.option("--bitrate", default=None, help="Target audio bitrate (for example 320k).")
+@click.option("--trim-start", default=None, type=float, help="Trim start time in seconds (single input only).")
+@click.option("--trim-duration", default=None, type=float, help="Trim duration in seconds (single input only).")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def mixer_audio_cmd(
+    input_files: tuple[Path, ...],
+    output: Path,
+    mix_mode: bool,
+    crossfade: float,
+    volume: tuple[float, ...],
+    normalize: bool,
+    sample_rate: Optional[int],
+    bitrate: Optional[str],
+    trim_start: Optional[float],
+    trim_duration: Optional[float],
+    as_json: bool,
+):
+    """Run audio concat, mix, crossfade, or trim operations."""
+    mixer = AudioMixerRunner()
+    input_paths = [str(path) for path in input_files]
+
+    if trim_start is not None or trim_duration is not None:
+        if len(input_paths) != 1 or trim_start is None or trim_duration is None:
+            _error("Audio trim requires exactly one input plus --trim-start and --trim-duration.", as_json)
+        operation = "trim"
+        result = mixer.trim(
+            input_file=input_paths[0],
+            output_file=str(output),
+            start_time=trim_start,
+            duration=trim_duration,
+            bitrate=bitrate,
+        )
+    elif crossfade > 0:
+        operation = "crossfade"
+        result = mixer.crossfade(
+            input_files=input_paths,
+            output_file=str(output),
+            duration=crossfade,
+            bitrate=bitrate,
+        )
+    elif mix_mode:
+        if volume and len(volume) != len(input_paths):
+            _error("Provide one --volume value per --input when using --mix.", as_json)
+        operation = "mix"
+        volumes = list(volume) if volume else [1.0] * len(input_paths)
+        tracks = [
+            AudioTrack(file_path=path, volume=volumes[index])
+            for index, path in enumerate(input_paths)
+        ]
+        result = mixer.mix(
+            tracks=tracks,
+            output_file=str(output),
+            bitrate=bitrate,
+            sample_rate=sample_rate,
+            normalize=normalize,
+        )
+    else:
+        operation = "concat"
+        result = mixer.concat(
+            input_files=input_paths,
+            output_file=str(output),
+            bitrate=bitrate,
+            sample_rate=sample_rate,
+        )
+
+    if not result.success:
+        _error(result.error_message or f"Audio {operation} failed", as_json)
+
+    payload = {
+        "success": True,
+        "operation": operation,
+        "inputs": input_paths,
+        "output": str(output),
+    }
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Audio {operation} complete: {output}")
+
+
+@mixer_group.command("video")
+@click.argument("inputs", nargs=-1, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option(
+    "--operation",
+    default="concat",
+    show_default=True,
+    type=click.Choice(
+        ["concat", "overlay", "pip", "side-by-side", "watermark", "transition", "replace-audio", "extract-frame"],
+        case_sensitive=False,
+    ),
+    help="Video mix operation to perform.",
+)
+@click.option("--output", required=True, type=click.Path(dir_okay=False, path_type=Path), help="Output file path.")
+@click.option("--position", default="top-right", show_default=True, help="Overlay/PiP/watermark position (name or x,y).")
+@click.option("--scale", default=None, type=float, help="Overlay/PiP/watermark scale factor.")
+@click.option("--opacity", default=1.0, show_default=True, type=float, help="Overlay opacity for overlay/watermark.")
+@click.option("--orientation", default="horizontal", show_default=True, type=click.Choice(["horizontal", "vertical"], case_sensitive=False), help="Side-by-side layout orientation.")
+@click.option("--transition-duration", default=1.0, show_default=True, type=float, help="Transition duration in seconds.")
+@click.option("--timestamp", default=0.0, show_default=True, type=float, help="Frame extraction timestamp in seconds.")
+@click.option("--codec", default=None, help="Override output video codec.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def mixer_video_cmd(
+    inputs: tuple[Path, ...],
+    operation: str,
+    output: Path,
+    position: str,
+    scale: Optional[float],
+    opacity: float,
+    orientation: str,
+    transition_duration: float,
+    timestamp: float,
+    codec: Optional[str],
+    as_json: bool,
+):
+    """Run video concat, overlay, PiP, watermark, transition, or frame extraction operations."""
+    runner = VideoMixerRunner()
+    input_paths = [str(path) for path in inputs]
+    normalized_operation = operation.lower()
+
+    if normalized_operation == "concat":
+        result = runner.concat(input_files=input_paths, output_file=str(output), reencode=False, video_codec=codec)
+    elif normalized_operation == "overlay":
+        if len(input_paths) != 2:
+            _error("Overlay requires exactly two input files.", as_json)
+        result = runner.overlay(
+            base_file=input_paths[0],
+            overlay_file=input_paths[1],
+            output_file=str(output),
+            position=position,
+            scale=scale,
+            opacity=opacity,
+            video_codec=codec,
+        )
+    elif normalized_operation == "pip":
+        if len(input_paths) != 2:
+            _error("PiP requires exactly two input files.", as_json)
+        result = runner.picture_in_picture(
+            main_file=input_paths[0],
+            pip_file=input_paths[1],
+            output_file=str(output),
+            position=position,
+            scale=scale or 0.25,
+            video_codec=codec,
+        )
+    elif normalized_operation == "side-by-side":
+        if len(input_paths) != 2:
+            _error("Side-by-side requires exactly two input files.", as_json)
+        result = runner.side_by_side(
+            left_file=input_paths[0],
+            right_file=input_paths[1],
+            output_file=str(output),
+            orientation=orientation,
+            video_codec=codec,
+        )
+    elif normalized_operation == "watermark":
+        if len(input_paths) != 2:
+            _error("Watermark requires exactly two input files.", as_json)
+        result = runner.watermark(
+            video_file=input_paths[0],
+            watermark_file=input_paths[1],
+            output_file=str(output),
+            position=position,
+            scale=scale,
+            opacity=opacity,
+            video_codec=codec,
+        )
+    elif normalized_operation == "transition":
+        if len(input_paths) != 2:
+            _error("Transition requires exactly two input files.", as_json)
+        result = runner.transition(
+            first_file=input_paths[0],
+            second_file=input_paths[1],
+            output_file=str(output),
+            duration=transition_duration,
+            video_codec=codec,
+        )
+    elif normalized_operation == "replace-audio":
+        if len(input_paths) != 2:
+            _error("replace-audio requires exactly one video input and one audio input.", as_json)
+        result = runner.replace_audio(
+            video_file=input_paths[0],
+            audio_file=input_paths[1],
+            output_file=str(output),
+        )
+    elif normalized_operation == "extract-frame":
+        if len(input_paths) != 1:
+            _error("extract-frame requires exactly one input file.", as_json)
+        result = runner.extract_frame(input_file=input_paths[0], output_file=str(output), timestamp=timestamp)
+    else:
+        _error(f"Unsupported video mixer operation: {operation}", as_json)
+        return
+
+    if not result.success:
+        _error(result.error_message or f"Video {normalized_operation} failed", as_json)
+
+    payload = {
+        "success": True,
+        "operation": normalized_operation,
+        "inputs": input_paths,
+        "output": str(output),
+    }
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Video {normalized_operation} complete: {output}")
+
+
+# ---------------------------------------------------------------------------
+# ravn library
+# ---------------------------------------------------------------------------
+
+@cli.group("library")
+def library_group():
+    """Manage the Phase 7 local media library database."""
+
+
+@library_group.command("add")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--title", default=None, help="Override the detected media title.")
+@click.option("--tags", default="", help="Comma-separated tags to attach.")
+@click.option("--thumbnail", default=None, help="Optional thumbnail path.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_add_cmd(file: Path, title: Optional[str], tags: str, thumbnail: Optional[str], as_json: bool):
+    """Add a local file to the media library."""
+    library = MediaLibrary()
+    try:
+        media_id = library.add_media(
+            file_path=str(file),
+            title=title,
+            tags=_parse_csv_values(tags),
+            thumbnail=thumbnail,
+        )
+    except Exception as exc:
+        library.close()
+        _error(str(exc), as_json)
+    payload = {"success": True, "id": media_id, "file": str(file), "tags": _parse_csv_values(tags)}
+    library.close()
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Added media item #{media_id}: {file}")
+
+
+@library_group.command("search")
+@click.option("--query", default="", help="Text search query.")
+@click.option("--format", "fmt", default=None, help="Filter by container/format.")
+@click.option("--tags", default="", help="Comma-separated tag filter (OR logic).")
+@click.option("--duration-min", default=None, type=float, help="Minimum duration in seconds.")
+@click.option("--duration-max", default=None, type=float, help="Maximum duration in seconds.")
+@click.option("--size-min", default=None, type=int, help="Minimum file size in bytes.")
+@click.option("--size-max", default=None, type=int, help="Maximum file size in bytes.")
+@click.option("--sort", "sort_by", default="added_at", show_default=True, type=click.Choice(["added_at", "date", "size", "duration", "name", "title"], case_sensitive=False), help="Sort key.")
+@click.option("--ascending", is_flag=True, default=False, help="Sort ascending instead of descending.")
+@click.option("--limit", default=100, show_default=True, type=int, help="Maximum results to return.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_search_cmd(
+    query: str,
+    fmt: Optional[str],
+    tags: str,
+    duration_min: Optional[float],
+    duration_max: Optional[float],
+    size_min: Optional[int],
+    size_max: Optional[int],
+    sort_by: str,
+    ascending: bool,
+    limit: int,
+    as_json: bool,
+):
+    """Search the local media library."""
+    library = MediaLibrary()
+    filters = MediaSearchFilters(
+        format=fmt,
+        duration_min=duration_min,
+        duration_max=duration_max,
+        size_min=size_min,
+        size_max=size_max,
+        tags=_parse_csv_values(tags),
+        sort_by=sort_by,
+        sort_desc=not ascending,
+        limit=limit,
+    )
+    items = library.search_media(query=query, filters=filters)
+    payload = {"count": len(items), "items": [asdict(item) for item in items]}
+    library.close()
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        if not items:
+            click.echo("No media items matched the current search.")
+            return
+        for item in items:
+            click.echo(f"[{item.id}] {item.title} ({item.format}, {item.duration:.1f}s, {item.size} bytes)")
+
+
+@library_group.command("create-collection")
+@click.option("--name", required=True, help="Collection name.")
+@click.option("--description", default="", help="Optional description.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_create_collection_cmd(name: str, description: str, as_json: bool):
+    """Create a new collection."""
+    library = MediaLibrary()
+    try:
+        collection_id = library.create_collection(name=name, description=description)
+    except Exception as exc:
+        library.close()
+        _error(str(exc), as_json)
+    payload = {"success": True, "id": collection_id, "name": name}
+    library.close()
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Created collection #{collection_id}: {name}")
+
+
+@library_group.command("add-to-collection")
+@click.argument("media_id", type=int)
+@click.argument("collection_id", type=int)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_add_to_collection_cmd(media_id: int, collection_id: int, as_json: bool):
+    """Add a media item to a collection."""
+    library = MediaLibrary()
+    success = library.add_to_collection(media_id=media_id, collection_id=collection_id)
+    library.close()
+    if not success:
+        _error("Could not add media item to the collection.", as_json)
+    payload = {"success": True, "media_id": media_id, "collection_id": collection_id}
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Added media item #{media_id} to collection #{collection_id}")
+
+
+@library_group.command("stats")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_stats_cmd(as_json: bool):
+    """Show library statistics."""
+    library = MediaLibrary()
+    stats = library.get_statistics()
+    library.close()
+    if as_json:
+        _output(stats, as_json=True)
+    else:
+        click.echo(f"Items: {stats['total_items']}")
+        click.echo(f"Size : {stats['total_size']} bytes")
+        click.echo(f"Duration: {stats['total_duration']:.1f}s")
+        click.echo(f"Collections: {stats['collections']}")
+        click.echo(f"Duplicate groups: {stats['duplicate_groups']}")
+
+
+@library_group.command("export")
+@click.option("--format", "export_format", required=True, type=click.Choice(["json", "csv"], case_sensitive=False), help="Export format.")
+@click.option("--output", required=True, type=click.Path(dir_okay=False, path_type=Path), help="Export output file.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def library_export_cmd(export_format: str, output: Path, as_json: bool):
+    """Export the media library to JSON or CSV."""
+    library = MediaLibrary()
+    try:
+        success = library.export_library(export_format=export_format, output_file=str(output))
+    except Exception as exc:
+        library.close()
+        _error(str(exc), as_json)
+    library.close()
+    if not success:
+        _error("Library export failed.", as_json)
+    payload = {"success": True, "format": export_format.lower(), "output": str(output)}
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Library exported to: {output}")
+
+
+# ---------------------------------------------------------------------------
+# ravn filters
+# ---------------------------------------------------------------------------
+
+@cli.command("filters")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--brightness", default=None, type=float, help="Brightness adjustment (-1..1 or percentage).")
+@click.option("--contrast", default=None, type=float, help="Contrast multiplier.")
+@click.option("--saturation", default=None, type=float, help="Saturation multiplier.")
+@click.option("--hue", default=None, type=float, help="Hue rotation in degrees.")
+@click.option("--gamma", default=None, type=float, help="Gamma correction value.")
+@click.option("--crop-left", default=0, show_default=True, type=int, help="Pixels to crop from the left.")
+@click.option("--crop-top", default=0, show_default=True, type=int, help="Pixels to crop from the top.")
+@click.option("--crop-right", default=0, show_default=True, type=int, help="Pixels to crop from the right.")
+@click.option("--crop-bottom", default=0, show_default=True, type=int, help="Pixels to crop from the bottom.")
+@click.option("--rotate", default=None, type=float, help="Rotation in degrees.")
+@click.option("--flip-horizontal", is_flag=True, default=False, help="Flip the video horizontally.")
+@click.option("--flip-vertical", is_flag=True, default=False, help="Flip the video vertically.")
+@click.option("--blur", default=None, type=float, help="Gaussian blur strength.")
+@click.option("--sharpen", default=None, type=float, help="Sharpen strength.")
+@click.option("--denoise", default=None, type=click.Choice(["light", "moderate", "strong", "ultra"], case_sensitive=False), help="Denoise preset.")
+@click.option("--grayscale", is_flag=True, default=False, help="Convert output to grayscale.")
+@click.option("--sepia", is_flag=True, default=False, help="Apply a sepia tone.")
+@click.option("--invert", is_flag=True, default=False, help="Invert video colors.")
+@click.option("--deinterlace", is_flag=True, default=False, help="Apply yadif deinterlacing.")
+@click.option("--lut", "lut_file", default=None, type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Optional LUT (.cube/.3dl) file.")
+@click.option("--codec", default=None, help="Override output video codec.")
+@click.option("--bitrate", default=None, help="Target video bitrate (for example 6M).")
+@click.option("--output", required=True, type=click.Path(dir_okay=False, path_type=Path), help="Filtered output file path.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def filters_cmd(
+    file: Path,
+    brightness: Optional[float],
+    contrast: Optional[float],
+    saturation: Optional[float],
+    hue: Optional[float],
+    gamma: Optional[float],
+    crop_left: int,
+    crop_top: int,
+    crop_right: int,
+    crop_bottom: int,
+    rotate: Optional[float],
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    blur: Optional[float],
+    sharpen: Optional[float],
+    denoise: Optional[str],
+    grayscale: bool,
+    sepia: bool,
+    invert: bool,
+    deinterlace: bool,
+    lut_file: Optional[Path],
+    codec: Optional[str],
+    bitrate: Optional[str],
+    output: Path,
+    as_json: bool,
+):
+    """Apply FFmpeg-based video filters to a local file."""
+    runner = VideoMixerRunner()
+    result = runner.apply_filters(
+        input_file=str(file),
+        output_file=str(output),
+        brightness=brightness,
+        contrast=contrast,
+        saturation=saturation,
+        hue=hue,
+        gamma=gamma,
+        crop_left=crop_left,
+        crop_top=crop_top,
+        crop_right=crop_right,
+        crop_bottom=crop_bottom,
+        rotate=rotate,
+        flip_horizontal=flip_horizontal,
+        flip_vertical=flip_vertical,
+        blur=blur,
+        sharpen=sharpen,
+        denoise=denoise,
+        grayscale=grayscale,
+        sepia=sepia,
+        invert=invert,
+        deinterlace=deinterlace,
+        lut_file=str(lut_file) if lut_file else None,
+        video_codec=codec,
+        bitrate=bitrate,
+    )
+    if not result.success:
+        _error(result.error_message or "Video filters failed", as_json)
+
+    payload = {
+        "success": True,
+        "input": str(file),
+        "output": str(output),
+        "filters": result.metadata.get("filters", []),
+    }
+    if as_json:
+        _output(payload, as_json=True)
+    else:
+        click.echo(f"Filtered video written to: {output}")
 
 
 # ---------------------------------------------------------------------------

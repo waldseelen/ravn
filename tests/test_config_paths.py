@@ -18,6 +18,7 @@ from ravn_app.core.config_paths import (
     get_cache_directory,
     get_config_file_path,
     get_database_file_path,
+    get_media_library_file_path,
     ensure_directories_exist,
     find_legacy_config_file,
     find_legacy_database_file,
@@ -103,6 +104,12 @@ class TestFilePaths:
         """Test database file path"""
         path = get_database_file_path()
         assert path.name == 'ravn_history.db'
+        assert 'ravn' in str(path).lower()
+
+    def test_get_media_library_file_path(self):
+        """Test media library database file path"""
+        path = get_media_library_file_path()
+        assert path.name == 'media_library.db'
         assert 'ravn' in str(path).lower()
 
 
@@ -205,6 +212,11 @@ class TestDefaultConfig:
         assert 'theme' in config
         assert 'concurrent_downloads' in config
         assert 'language' in config
+        assert 'mixer' in config
+        assert 'library' in config
+        assert 'filters' in config
+        assert config['library']['auto_add_downloads'] is True
+        assert config['library']['auto_add_filter_output'] is True
 
     def test_default_download_path_is_valid(self):
         """Test default download path is a valid path string"""
@@ -293,6 +305,9 @@ class TestConfigSchema:
             'theme',
             'concurrent_downloads',
             'language',
+            'mixer',
+            'library',
+            'filters',
         ]
 
         for key in required_keys:
@@ -302,7 +317,7 @@ class TestConfigSchema:
         """Test all schema types are valid Python types"""
         for key, schema in CONFIG_SCHEMA.items():
             assert 'type' in schema
-            assert schema['type'] in (str, int, bool)
+            assert schema['type'] in (str, int, bool, dict)
 
     def test_schema_defaults_match_types(self):
         """Test default values match their specified types"""

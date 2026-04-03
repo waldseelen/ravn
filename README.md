@@ -10,6 +10,7 @@ RAVN is a desktop + CLI media manager. The desktop app is built with CustomTkint
 - Convert media formats with FFmpeg and track progress in real time.
 - Download/process/embed subtitles.
 - Mix audio tracks, concatenate media, overlay/PiP videos, and apply FFmpeg-based video filters from dedicated desktop tabs or the CLI.
+- Run comprehensive media utility operations: quick helpers (remux, extract-audio, mute, trim, preview-clip, thumbnail), audio utilities (volume, fade, bitrate, channels, silence-detect, loudnorm), video utilities (scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace), and smart helpers (blackdetect, scene-preview, scene-thumbnail) from the Utilities desktop tab or CLI.
 - Maintain a local SQLite media library with tags, collections, search filters, duplicate detection, and JSON/CSV export from the desktop UI or CLI.
 - Automatically add supported download, conversion, mixer, and filter outputs into the local media library.
 - Run mixer/filter/library jobs through the shared queue and review persisted download / conversion / Phase 7 operation history in the desktop UI.
@@ -22,7 +23,7 @@ RAVN is a desktop + CLI media manager. The desktop app is built with CustomTkint
 - Workspace switching now keeps views mounted and raises them in place for smoother transitions with less visible redraw flicker.
 - Theme switching now applies in place without a full shell rebuild; language switching refreshes shell/workspace text with lighter in-place updates.
 - Use shell-level keyboard shortcuts such as `Ctrl+Enter`, `Escape`, `Ctrl+L`, `Ctrl+K`, and `Ctrl+,` for fast actions and settings access.
-- Use CLI for automation (`download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`).
+- Use CLI for automation (`download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, `utilities`).
 
 ## Torrent / Magnet Features
 

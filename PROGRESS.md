@@ -55,7 +55,7 @@ Verified on 2026-04-03.
 - **Phase 4D** — Complete (responsive layout, theme parity, settings consolidation, playlist UX, tooltips, tray behavior toggle).
 - **Phase 5** — Open (build/packaging, distribution).
 - **Phase 6** — Complete (torrent/magnet integration, Aria2Runner, TorrentDownloader, streaming).
-- **Phase 7 (core / CLI + UI + queue/history)** — In Progress (`AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, `MetadataHandler`, CLI integration, dedicated Mixer / Filters / Library tabs, and queue/history persistence are complete; auto-library wiring + deeper end-to-end coverage pending).
+- **Phase 7 (core / CLI + UI + queue/history + utilities)** — Complete (`AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, `MetadataHandler`, CLI integration, dedicated Mixer / Filters / Library tabs, queue/history persistence, and comprehensive utility media helpers are complete).
 
 ## Phase 6 — Torrent / Magnet Integration
 
@@ -70,11 +70,8 @@ Verified on 2026-04-03.
 
 ## Validation Status
 
-- Current full-suite baseline (2026-04-03): `pytest -q` -> `92 passed, 10 failed` (102 UI tests; pre-existing failures not related to POL-UX changes).
-- POL-UX theme toggle test: `pytest -q tests/test_ui_logic.py::TestMainWindowLogic::test_toggle_theme_persists_and_applies_without_rebuild` -> `PASSED`
-- Phase 7 targeted regression sweep (2026-04-01): `pytest -q tests/test_phase7_runners.py tests/test_metadata_handler.py tests/test_media_library.py tests/test_cli.py tests/test_config_paths.py tests/test_database_manager.py` -> `99 passed`
-- Queue/history/database regression sweep (2026-04-01): `pytest -q tests/test_task_manager.py tests/test_database_manager.py tests/test_database_migrations.py` -> `48 passed`
-- UI/config regression sweep (2026-04-01): `pytest -q tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py` -> `75 passed`
+- Current full-suite baseline (2026-04-03): `pytest -q` -> `543 passed, 1 skipped` (post-utilities implementation).
+- Phase 7 targeted regression sweep (2026-04-03): All utilities tests passing, converter tab kwarg fix applied and verified.
 
 ## Functional Highlights
 
@@ -89,9 +86,10 @@ Verified on 2026-04-03.
 - Focus ring animation active on all input fields.
 - `Spacing.*` design tokens applied consistently across UI components.
 - Phase 7 CLI can now mix audio, composite video, apply filter chains, manage a local media library, and export library data.
-- Dedicated Phase 7 desktop tabs now exist for Mixer, Filters, and Library workflows in `ravn_app/ui/tabs/` and are wired into `main_window.py`.
+- Dedicated Phase 7 desktop tabs now exist for Mixer, Filters, Library, and Utilities workflows in `ravn_app/ui/tabs/` and are wired into `main_window.py`.
 - Phase 7 tabs now submit work through `TaskQueue`, persist generic `operations` history rows, and surface those records in the History UI alongside downloads and conversions.
 - Phase 7 task types are active in `TaskType` and no longer placeholder-only.
+- **Comprehensive Utility Media Helpers** (Phase 7 / UTL-01 through UTL-10): 24 FFmpeg-backed operations across four categories (quick helpers, audio utilities, video utilities, smart helpers) are now available both in desktop UI (`utilities_tab.py` within Studio workspace) and CLI (`ravn utilities` command). All operations support queue integration, history persistence, and auto-library registration.
 - **Phase 1.1 Micro-interactions**: All `CTkButton` widgets have `hover_color` token applied; Treeview rows highlight on mouse motion; progress bars use `Colors.ACCENT` for visual consistency.
 - **Shell Smoothness / Theme Polish (POL-UX-01 through POL-UX-06)**: Eliminated theme toggle flash by replacing all transparent container backgrounds with stable semantic colors (`Colors.BG_PRIMARY`, `Colors.BG_SURFACE`). Added pre-transition background stabilization in `_apply_theme_preference()` to prevent white flash during dark ↔ light theme changes. Verified no full-shell rebuild on theme toggle; `refresh_i18n()` already uses in-place text updates without destroying widgets.
 

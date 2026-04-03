@@ -41,6 +41,7 @@ ravn.py
               -> SubtitleTab
               -> FiltersTab
               -> MixerTab
+              -> UtilitiesTab
           -> LibraryWorkspace
               -> LibraryTab
               -> HistoryTab
@@ -137,6 +138,7 @@ tests/
   - `mixer ...`
   - `library ...`
   - `filters`
+  - `utilities ...`
   - `serve` placeholder
 - CLI commands support human-readable output plus `--json` where implemented.
 
@@ -262,12 +264,13 @@ Responsibilities:
   - Subtitle
   - Filters
   - Mixer
+  - Utilities
 - reuses existing feature modules instead of rewriting tool logic
 
 Important nuance:
 
 - `ConverterTab` and `SubtitleTab` are older standalone feature implementations reused inside the new workspace shell.
-- `FiltersTab` and `MixerTab` are newer Phase 7 queue-aware modules.
+- `FiltersTab`, `MixerTab`, and `UtilitiesTab` are newer Phase 7+ queue-aware modules.
 
 #### `LibraryWorkspace`
 
@@ -315,6 +318,14 @@ Feature logic lives below the shell/workspace level.
 - `tabs/mixer_tab.py`
   - audio/video mixing workflows
   - queue-aware Phase 7 operations UI
+- `tabs/utilities_tab.py`
+  - comprehensive media utility helpers (24 operations across 4 categories)
+  - quick helpers: remux, extract-audio, mute, trim, preview-clip, thumbnail
+  - audio utilities: volume, fade, bitrate, channels, silence-detect, loudnorm
+  - video utilities: scale, crop, pad, rotate, fps, color, blur/sharpen, deinterlace
+  - smart helpers: blackdetect, scene-preview, scene-thumbnail
+  - queue-aware Phase 7+ operations UI
+  - auto-library registration support
 
 #### Library / History / Settings
 
@@ -393,6 +404,16 @@ Directory: `ravn_app/core/runners/`
     - `mixer_video`
     - `apply_filters`
     - `library_scan`
+    - `utilities_operation`
+- `media_helpers.py`
+   - comprehensive FFmpeg-backed media utility operations
+   - 24 operations across 4 categories:
+     - quick helpers: remux, extract-audio, mute, trim, preview-clip, thumbnail
+     - audio utilities: volume, fade, bitrate, channels, silence-detect, loudnorm
+     - video utilities: scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace
+     - smart helpers: blackdetect, scene-preview, scene-thumbnail
+   - uses `FFmpegRunner` for consistent process execution
+   - returns `RunnerResult` with metadata and summaries
 - `database.py`
   - download / conversion / operation history persistence
   - config JSON persistence via `ConfigManager`
@@ -593,9 +614,9 @@ Notable config properties:
 ### Studio Flow
 
 1. User opens `StudioWorkspace`.
-2. Internal tabview routes to Convert / Subtitle / Filters / Mixer.
+2. Internal tabview routes to Convert / Subtitle / Filters / Mixer / Utilities.
 3. Convert/subtitle reuse existing feature implementations.
-4. Filters/mixer use Phase 7 runner helpers and queue-backed workflows where applicable.
+4. Filters/mixer/utilities use Phase 7+ runner helpers and queue-backed workflows.
 5. Completed outputs may be persisted into generic operation history and optionally auto-added to the media library.
 
 ### Library Flow

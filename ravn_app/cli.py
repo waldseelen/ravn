@@ -37,6 +37,7 @@ from ravn_app.core.persistence.media_library import MediaLibrary, MediaSearchFil
 from ravn_app.core.runners import AudioMixerRunner, AudioTrack, FFmpegRunner, VideoMixerRunner
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
+from ravn_app.core.media_helpers import get_media_helpers
 
 
 # ---------------------------------------------------------------------------
@@ -1139,6 +1140,207 @@ def filters_cmd(
         _output(payload, as_json=True)
     else:
         click.echo(f"Filtered video written to: {output}")
+
+
+# ---------------------------------------------------------------------------
+# ravn utilities  - Quick media helpers
+# ---------------------------------------------------------------------------
+
+@cli.command("utilities")
+@click.option("--operation", "-o", required=True, 
+              type=click.Choice(["remux", "extract-audio", "mute", "trim", "preview", "thumbnail",
+                                "volume", "fade", "bitrate", "channels", "silence-detect", "loudnorm",
+                                "scale", "crop", "pad", "rotate", "fps", "color", "blur", "deinterlace",
+                                "blackdetect", "scene-preview", "scene-thumbnail"], case_sensitive=False),
+              help="Utility operation to perform")
+@click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--output", "-out", type=click.Path(dir_okay=False, path_type=Path), help="Output file path")
+@click.option("--start", type=float, help="Start time in seconds (for trim/preview)")
+@click.option("--end", type=float, help="End time in seconds (for trim)")
+@click.option("--duration", "-d", type=float, help="Duration in seconds (for trim/preview/fade)")
+@click.option("--volume", type=float, help="Volume adjustment in dB")
+@click.option("--fade-in", type=float, help="Fade in duration in seconds")
+@click.option("--fade-out", type=float, help="Fade out duration in seconds")
+@click.option("--bitrate", type=str, help="Audio bitrate (e.g., 192k)")
+@click.option("--sample-rate", type=int, help="Audio sample rate (e.g., 44100)")
+@click.option("--channels", type=int, help="Audio channels (1=mono, 2=stereo)")
+@click.option("--width", "-w", type=int, help="Width for scale/crop/pad")
+@click.option("--height", "-h", type=int, help="Height for scale/crop/pad")
+@click.option("--rotation", type=click.Choice(["90", "180", "270"]), help="Rotation angle")
+@click.option("--fps", type=int, help="Target frame rate")
+@click.option("--brightness", type=float, help="Brightness (-1.0 to 1.0)")
+@click.option("--contrast", type=float, help="Contrast (0.0 to 2.0)")
+@click.option("--saturation", type=float, help="Saturation (0.0 to 3.0)")
+@click.option("--blur-amount", type=float, help="Blur amount (0-5)")
+@click.option("--sharpen-amount", type=float, help="Sharpen amount (0-5)")
+@click.option("--scene-count", type=int, default=10, help="Number of scenes (for scene operations)")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def utilities_cmd(
+    operation: str,
+    input_file: Path,
+    output: Optional[Path],
+    start: Optional[float],
+    end: Optional[float],
+    duration: Optional[float],
+    volume: Optional[float],
+    fade_in: Optional[float],
+    fade_out: Optional[float],
+    bitrate: Optional[str],
+    sample_rate: Optional[int],
+    channels: Optional[int],
+    width: Optional[int],
+    height: Optional[int],
+    rotation: Optional[str],
+    fps: Optional[int],
+    brightness: Optional[float],
+    contrast: Optional[float],
+    saturation: Optional[float],
+    blur_amount: Optional[float],
+    sharpen_amount: Optional[float],
+    scene_count: int,
+    as_json: bool,
+):
+    """Run utility media helper operations."""
+    helpers = get_media_helpers()
+    op = operation.lower()
+    
+    # Auto-generate output file if not provided (except for detection operations)
+    if not output and op not in ("silence-detect", "blackdetect"):
+        output = input_file.parent / f"{input_file.stem}_{op}{input_file.suffix}"
+    
+    try:
+        # Quick Helpers
+        if op == "remux":
+            result = helpers.remux(str(input_file), str(output))
+        elif op == "extract-audio":
+            result = helpers.extract_audio(str(input_file), str(output), audio_bitrate=bitrate)
+        elif op == "mute":
+            result = helpers.mute(str(input_file), str(output))
+        elif op == "trim":
+            if start is None:
+                _error("--start is required for trim operation", as_json)
+            result = helpers.trim(str(input_file), str(output), start, end_time=end, duration=duration)
+        elif op == "preview":
+            dur = duration or 10.0
+            st = start or 0.0
+            result = helpers.preview_clip(str(input_file), str(output), duration=dur, start_time=st)
+        elif op == "thumbnail":
+            ts = start or 1.0
+            result = helpers.thumbnail(str(input_file), str(output), timestamp=ts, width=width)
+        
+        # Audio Utilities
+        elif op == "volume":
+            if volume is None:
+                _error("--volume is required for volume operation", as_json)
+            result = helpers.adjust_volume(str(input_file), str(output), volume)
+        elif op == "fade":
+            result = helpers.fade_audio(str(input_file), str(output), 
+                                       fade_in_duration=fade_in or 0.0, 
+                                       fade_out_duration=fade_out or 0.0)
+        elif op == "bitrate":
+            if not bitrate:
+                _error("--bitrate is required for bitrate operation", as_json)
+            result = helpers.convert_audio_bitrate(str(input_file), str(output), bitrate, sample_rate=sample_rate)
+        elif op == "channels":
+            if not channels:
+                _error("--channels is required for channels operation", as_json)
+            result = helpers.convert_channels(str(input_file), str(output), channels)
+        elif op == "silence-detect":
+            result = helpers.detect_silence(str(input_file))
+            if result.success:
+                periods = result.metadata.get("silence_periods", [])
+                if as_json:
+                    _output({"success": True, "silence_periods": periods}, as_json=True)
+                else:
+                    click.echo(f"Found {len(periods)} silent periods:")
+                    for start_t, end_t, dur in periods:
+                        click.echo(f"  {start_t:.2f}s - {end_t:.2f}s (duration: {dur:.2f}s)")
+                return
+        elif op == "loudnorm":
+            result = helpers.loudness_normalize(str(input_file), str(output))
+        
+        # Video Utilities
+        elif op == "scale":
+            result = helpers.scale_video(str(input_file), str(output), width=width, height=height)
+        elif op == "crop":
+            if not width or not height:
+                _error("--width and --height are required for crop operation", as_json)
+            result = helpers.crop_video(str(input_file), str(output), width, height)
+        elif op == "pad":
+            if not width or not height:
+                _error("--width and --height are required for pad operation", as_json)
+            result = helpers.pad_video(str(input_file), str(output), width, height)
+        elif op == "rotate":
+            if not rotation:
+                _error("--rotation is required for rotate operation", as_json)
+            result = helpers.rotate_video(str(input_file), str(output), int(rotation))
+        elif op == "fps":
+            if not fps:
+                _error("--fps is required for fps operation", as_json)
+            result = helpers.change_fps(str(input_file), str(output), fps)
+        elif op == "color":
+            result = helpers.adjust_color(str(input_file), str(output), 
+                                         brightness=brightness or 0.0,
+                                         contrast=contrast or 1.0,
+                                         saturation=saturation or 1.0)
+        elif op == "blur":
+            result = helpers.blur_sharpen(str(input_file), str(output),
+                                         blur_amount=blur_amount or 0.0,
+                                         sharpen_amount=sharpen_amount or 0.0)
+        elif op == "deinterlace":
+            result = helpers.deinterlace(str(input_file), str(output))
+        
+        # Smart Helpers
+        elif op == "blackdetect":
+            result = helpers.detect_black_frames(str(input_file))
+            if result.success:
+                periods = result.metadata.get("black_periods", [])
+                if as_json:
+                    _output({"success": True, "black_periods": periods}, as_json=True)
+                else:
+                    click.echo(f"Found {len(periods)} black periods:")
+                    for start_t, end_t, dur in periods:
+                        click.echo(f"  {start_t:.2f}s - {end_t:.2f}s (duration: {dur:.2f}s)")
+                return
+        elif op == "scene-preview":
+            output_dir = output or input_file.parent / f"{input_file.stem}_scene_previews"
+            result = helpers.generate_scene_previews(str(input_file), str(output_dir), scene_count=scene_count)
+            if result.success:
+                files = result.metadata.get("preview_files", [])
+                if as_json:
+                    _output({"success": True, "preview_files": files, "count": len(files)}, as_json=True)
+                else:
+                    click.echo(f"Generated {len(files)} scene preview clips in: {output_dir}")
+                return
+        elif op == "scene-thumbnail":
+            output_dir = output or input_file.parent / f"{input_file.stem}_scene_thumbnails"
+            result = helpers.generate_scene_thumbnails(str(input_file), str(output_dir), scene_count=scene_count)
+            if result.success:
+                files = result.metadata.get("thumbnail_files", [])
+                if as_json:
+                    _output({"success": True, "thumbnail_files": files, "count": len(files)}, as_json=True)
+                else:
+                    click.echo(f"Generated {len(files)} scene thumbnails in: {output_dir}")
+                return
+        else:
+            _error(f"Unknown operation: {operation}", as_json)
+        
+        # Handle result
+        if result.success:
+            if as_json:
+                _output({
+                    "success": True,
+                    "input": str(input_file),
+                    "output": result.metadata.get("output_file", str(output)),
+                    "operation": op,
+                }, as_json=True)
+            else:
+                click.echo(f"✓ {op.title()} completed: {result.metadata.get('output_file', output)}")
+        else:
+            _error(result.error_message or f"{op} operation failed", as_json)
+            
+    except Exception as e:
+        _error(f"Utility operation failed: {str(e)}", as_json)
 
 
 # ---------------------------------------------------------------------------

@@ -44,18 +44,28 @@ def _setup_dnd(widget, callback, enter_callback=None, leave_callback=None):
 class ConverterTab(ctk.CTkFrame):
     """Video converter sekmesi"""
 
-    def __init__(self, parent, db_manager=None, notify_callback: Optional[Callable[[str], None]] = None, **kwargs):
+    def __init__(
+        self,
+        parent,
+        db_manager=None,
+        notify_callback: Optional[Callable[[str], None]] = None,
+        auto_add_to_library_callback: Optional[Callable[..., None]] = None,
+        **kwargs,
+    ):
+        kwargs.setdefault("fg_color", "transparent")
         super().__init__(parent, **kwargs)
+        self.configure(fg_color=Colors.BG_PRIMARY)
+
         self.converter = VideoConverter()
         self.batch_converter = None
         self.conversion_thread = None
         self.is_converting = False
         self.db_manager = db_manager  # Veritabanı yöneticisi
         self.notify_callback = notify_callback
+        self.auto_add_to_library_callback = auto_add_to_library_callback
         self.animation_manager = get_animation_manager()  # Animation utilities
         self._spinner_animation_id = None  # Track active spinner
         self._progress_value = 0.0
-        self.configure(fg_color=Colors.BG_PRIMARY)
 
         self.setup_ui()
 

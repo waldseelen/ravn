@@ -13,6 +13,7 @@ from ravn_app.ui.tabs.converter_tab import ConverterTab
 from ravn_app.ui.tabs.filters_tab import FiltersTab
 from ravn_app.ui.tabs.mixer_tab import MixerTab
 from ravn_app.ui.tabs.subtitle_tab import SubtitleTab
+from ravn_app.ui.tabs.utilities_tab import UtilitiesTab
 
 
 class StudioWorkspace(ctk.CTkFrame):
@@ -144,6 +145,20 @@ class StudioWorkspace(ctk.CTkFrame):
         )
         self.mixer_tab.pack(fill="both", expand=True)
 
+        utilities_tab = self.tabview.add(f"{Icons.FILTERS}  {t('tabs.utilities')}")
+        self.utilities_tab = UtilitiesTab(
+            utilities_tab,
+            config_manager=self._config_manager,
+            db_manager=self._db_manager,
+            task_queue=self._task_queue,
+            animation_manager=self._animation_manager,
+            toast_manager_getter=self._toast_manager_getter,
+            show_queue_tab_callback=self._show_queue_callback,
+            auto_add_to_library_callback=self._auto_add_to_library_callback,
+            fg_color=Colors.BG_PRIMARY,
+        )
+        self.utilities_tab.pack(fill="both", expand=True)
+
     def refresh_i18n(self) -> None:
         active_view = self._active_view_key
         for child in list(self.winfo_children()):
@@ -157,6 +172,7 @@ class StudioWorkspace(ctk.CTkFrame):
             "subtitle": f"{Icons.SUBTITLE}  {t('tabs.subtitle')}",
             "filters": f"{Icons.FILTERS}  {t('tabs.filters')}",
             "mixer": f"{Icons.MIXER}  {t('tabs.mixer')}",
+            "utilities": f"{Icons.FILTERS}  {t('tabs.utilities')}",
         }
         normalized_view = view_key if view_key in mapping else "convert"
         self._active_view_key = normalized_view

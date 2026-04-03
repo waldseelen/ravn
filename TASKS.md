@@ -1,7 +1,6 @@
 # RAVN — Project Task Board
 
 All development tasks organized by priority and status.
-
 ﻿Read AGENT.md, CLAUDE.md , ARCHITECTURE.md, README.md and PROGRESS.md first. Treat them as one
 unified instruction set and follow all rules, constraints, and context strictly.
 
@@ -13,33 +12,6 @@ and most specific instruction.
 
 After completing all eligible tasks, update AGENT.md, CLAUDE.md, and PROGRESS.md briefly and
 accurately based on this session.
-
-## Patch Proposal — Shell Smoothness / Theme Polish Follow-Up
-
-User-validated improvement landed, but a follow-up polish pass is still desired later. Current shell is noticeably better, yet some transitions can still feel strained and some light/dark theme surfaces may flash overly bright during live switching.
-
-### Goals
-
-- Remove the remaining "UI is struggling / repainting" feeling during workspace and theme transitions
-- Eliminate white flash / over-bright intermediate surfaces during dark ↔ light theme changes
-- Reduce remaining redraw/flicker without regressing the current workspace shell, queue drawer, or utility toggles
-- Keep fixes incremental and stability-first rather than introducing flashy animation
-
-### Proposed Execution Patch
-
-- [x] **[POL-UX-01]** Audit remaining visible redraw/flicker sources in the desktop shell — workspace switches, queue drawer open/close, command palette open/close, and light/dark theme toggles — then document the worst offenders before further changes
-- [x] **[POL-UX-02]** Continue the no-flicker shell pass by reducing any remaining unmount/remount behavior in workspace and utility-panel transitions; prefer mounted views, in-place raise/swap patterns, and minimal layout churn
-- [x] **[POL-UX-03]** Audit root/stage/workspace container backgrounds and transparent-layer chains for theme-transition artifacts; replace remaining problematic transparent layers with stable semantic surface colors where needed
-- [x] **[POL-UX-04]** Fix remaining light/dark theme flash issues where parts of the UI appear briefly pure white / over-bright during live theme switching, especially in header, stage, sidebar utility area, tab hosts, and settings surfaces
-- [x] **[POL-UX-05]** Add targeted regression coverage for shell smoothness primitives that are testable in isolation (mounted workspace switching, no full-rebuild theme path, tooltip cleanup, in-place i18n refresh hooks)
-- [x] **[POL-UX-06]** If runtime behavior changes again during this polish pass, sync `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and `TASKS.md` so the shell-transition model matches repository reality
-
-### Guardrails
-
-- Do **not** reintroduce full-shell rebuilds for ordinary theme switching
-- Do **not** trade stability for decorative animation
-- Do **not** regress queue drawer behavior, settings utility access, or current keyboard shortcuts
-- Do **not** hardcode theme-specific colors outside existing semantic token usage unless a token fix is part of the change
 
 ## Patch Proposal — Utility Media Helpers / Smart Helpers
 
@@ -88,16 +60,16 @@ Group the proposal into four implementation buckets:
 
 ### Proposed Execution Patch
 
-- \[ ] **\[UTL-01]** Design the Studio-side information architecture for utility helpers: decide whether these ship as a dedicated `Utilities` Studio subview, grouped preset cards inside existing `Filters` / `Mixer`, or a hybrid utility shell; document the mapping before implementation
-- \[ ] **\[UTL-02]** Add shared core helper APIs for quick FFmpeg jobs (remux, extract-audio, mute, trim, preview clip, thumbnail) using existing runner abstractions instead of one-off subprocess calls
-- \[ ] **\[UTL-03]** Add audio utility operations (volume, fade, bitrate/sample-rate conversion, mono/stereo conversion, silence detect/remove, loudnorm) with reusable parameter normalization and result metadata
-- \[ ] **\[UTL-04]** Add video utility operations (scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace) as composable runner-backed operations aligned with current filter/mixer architecture
-- \[ ] **\[UTL-05]** Add smart helper operations for `blackdetect` and scene-based preview/thumbnail generation, including output file conventions and user-readable summaries
-- \[ ] **\[UTL-06]** Integrate the new helpers into the desktop **Studio** workspace with compact progressive-disclosure UI, queue support where appropriate, and no new top-level navigation overload
-- \[ ] **\[UTL-07]** Extend CLI coverage so the same utility helpers are scriptable from `ravn`, with consistent flags, JSON output support where appropriate, and README examples
-- \[ ] **\[UTL-08]** Support persistence/history/library integration: store generated utility operations in generic `operations` history and auto-register generated outputs into `MediaLibrary` when enabled
-- \[ ] **\[UTL-09]** Add/update tests for helper argument building, runner integration, CLI behavior, queue/history persistence, and Studio workspace rendering/interaction paths
-- \[ ] **\[UTL-10]** Update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and translations when implementation begins so utility/smart-helper behavior matches repository reality
+- \[x] **\[UTL-01]** Design the Studio-side information architecture for utility helpers: decide whether these ship as a dedicated `Utilities` Studio subview, grouped preset cards inside existing `Filters` / `Mixer`, or a hybrid utility shell; document the mapping before implementation
+- \[x] **\[UTL-02]** Add shared core helper APIs for quick FFmpeg jobs (remux, extract-audio, mute, trim, preview clip, thumbnail) using existing runner abstractions instead of one-off subprocess calls
+- \[x] **\[UTL-03]** Add audio utility operations (volume, fade, bitrate/sample-rate conversion, mono/stereo conversion, silence detect/remove, loudnorm) with reusable parameter normalization and result metadata
+- \[x] **\[UTL-04]** Add video utility operations (scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace) as composable runner-backed operations aligned with current filter/mixer architecture
+- \[x] **\[UTL-05]** Add smart helper operations for `blackdetect` and scene-based preview/thumbnail generation, including output file conventions and user-readable summaries
+- \[x] **\[UTL-06]** Integrate the new helpers into the desktop **Studio** workspace with compact progressive-disclosure UI, queue support where appropriate, and no new top-level navigation overload
+- \[x] **\[UTL-07]** Extend CLI coverage so the same utility helpers are scriptable from `ravn`, with consistent flags, JSON output support where appropriate, and README examples
+- \[x] **\[UTL-08]** Support persistence/history/library integration: store generated utility operations in generic `operations` history and auto-register generated outputs into `MediaLibrary` when enabled
+- \[x] **\[UTL-09]** Add/update tests for helper argument building, runner integration, CLI behavior, queue/history persistence, and Studio workspace rendering/interaction paths
+- \[x] **\[UTL-10]** Update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and translations when implementation begins so utility/smart-helper behavior matches repository reality
 
 ### Guardrails
 

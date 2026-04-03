@@ -133,6 +133,7 @@ class YtDlpRunner(BaseRunner):
             if result.success:
                 downloaded_files = self._extract_downloaded_files(result.stdout)
                 result.metadata["downloaded_files"] = downloaded_files
+                result.metadata["archive_skipped"] = self._was_archive_skipped(result.stdout)
                 return result
 
             last_result = result
@@ -156,6 +157,12 @@ class YtDlpRunner(BaseRunner):
             error_message="All download attempts failed",
         )
 
+    @staticmethod
+    def _was_archive_skipped(stdout: str) -> bool:
+        """Return True when yt-dlp reports an already-recorded archive entry."""
+        text = str(stdout or "")
+        return "already been recorded in the archive" in text.lower()
+
     def _extract_downloaded_files(self, stdout: str) -> List[str]:
         """Extract list of downloaded files from yt-dlp output."""
         files: List[str] = []
@@ -165,11 +172,21 @@ class YtDlpRunner(BaseRunner):
             r"\[ExtractAudio\] Destination: (.+)",
         ]
 
+        seen: set[str] = set()
+        ordered_files: List[str] = []
         for pattern in patterns:
             matches = re.findall(pattern, stdout)
-            files.extend(matches)
+            for match in matches:
+                normalized = str(match).strip()
+                if not normalized:
+                    continue
+                key = normalized.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                ordered_files.append(normalized)
 
-        return list(set(files))
+        return ordered_files
 
     def extract_info(self, url: str, timeout: int = 60) -> Optional[Dict[str, Any]]:
         """

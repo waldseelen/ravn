@@ -114,8 +114,16 @@ class DownloadWorkspace(ctk.CTkFrame):
         self.content_host.grid_rowconfigure(0, weight=1)
         self.content_host.grid_columnconfigure(0, weight=1)
 
-        self.download_tab = DownloadTab(
+        self.download_scroll_frame = ctk.CTkScrollableFrame(
             self.content_host,
+            fg_color=Colors.BG_PRIMARY,
+            corner_radius=0,
+        )
+        self.download_scroll_frame.grid(row=0, column=0, sticky="nsew")
+        self.download_scroll_frame.grid_columnconfigure(0, weight=1)
+
+        self.download_tab = DownloadTab(
+            self.download_scroll_frame,
             downloader=self._downloader,
             config_manager=self._config_manager,
             platform_manager=self._platform_manager,
@@ -127,7 +135,7 @@ class DownloadWorkspace(ctk.CTkFrame):
             auto_add_to_library_callback=self._auto_add_to_library_callback,
             fg_color=Colors.BG_PRIMARY,
         )
-        self.download_tab.grid(row=0, column=0, sticky="nsew")
+        self.download_tab.pack(fill="x", expand=True)
 
         self.torrent_tab = TorrentTab(
             self.content_host,
@@ -176,7 +184,8 @@ class DownloadWorkspace(ctk.CTkFrame):
             self._show_mode_frame(self.torrent_tab, self.download_tab)
             return
 
-        self._show_mode_frame(self.download_tab, self.torrent_tab)
+        standard_frame = getattr(self, "download_scroll_frame", self.download_tab)
+        self._show_mode_frame(standard_frame, self.torrent_tab)
         self._sync_standard_mode(mode_key)
 
     def _show_mode_frame(self, active_frame, inactive_frame) -> None:

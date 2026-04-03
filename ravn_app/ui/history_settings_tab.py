@@ -12,6 +12,7 @@ from ..core.database import DatabaseManager, ConfigManager
 from ravn_app.core.download_naming import normalize_naming_preset
 from ravn_app.core.i18n import t
 from .advanced_features import SearchFilter, ThemeManager
+from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
 
@@ -321,6 +322,60 @@ class SettingsTab(ctk.CTkFrame):
         reverse_options = {label.lower(): preset for preset, label in options.items()}
         normalized_value = str(value or "").strip().lower()
         return normalize_naming_preset(reverse_options.get(normalized_value, normalized_value))
+
+    @staticmethod
+    def _postprocess_audio_format_options() -> list[str]:
+        return ["MP3", "M4A", "AAC", "FLAC", "OPUS", "WAV"]
+
+    @staticmethod
+    def _postprocess_convert_format_options() -> list[str]:
+        return ["MP4", "MKV", "WebM", "MP3", "M4A", "AAC", "FLAC", "OPUS"]
+
+    @staticmethod
+    def _normalize_postprocess_format(value: str, *, default: str = "mp3") -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized == "webm":
+            return "webm"
+        return normalized or default
+
+    @staticmethod
+    def _postprocess_format_for_display(value: str, *, default: str = "MP3") -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized == "webm":
+            return "WebM"
+        return normalized.upper() if normalized else default
+
+    @staticmethod
+    def _download_cookie_mode_options() -> dict[str, str]:
+        return {
+            "none": t("settings.downloadAdvancedCookiesNone"),
+            "browser": t("settings.downloadAdvancedCookiesBrowser"),
+            "file": t("settings.downloadAdvancedCookiesFile"),
+        }
+
+    @staticmethod
+    def _download_cookie_browser_options() -> list[str]:
+        return ["chrome", "firefox", "edge", "safari", "brave", "chromium", "opera"]
+
+    @classmethod
+    def _download_cookie_mode_for_display(cls, value: str) -> str:
+        options = cls._download_cookie_mode_options()
+        return options.get(str(value or "none").strip().lower(), options["none"])
+
+    @classmethod
+    def _normalize_download_cookie_mode_for_storage(cls, value: str) -> str:
+        options = cls._download_cookie_mode_options()
+        reverse_options = {label.lower(): key for key, label in options.items()}
+        normalized_value = str(value or "none").strip().lower()
+        return reverse_options.get(normalized_value, normalized_value or "none")
+
+    @staticmethod
+    def _safe_int(value, default: int = 0, *, minimum: int = 0) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = default
+        return max(minimum, parsed)
 
     @staticmethod
     def _subtitle_fallback_options() -> dict[str, str]:
@@ -660,6 +715,221 @@ class SettingsTab(ctk.CTkFrame):
             wraplength=560,
         ).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
 
+        ctk.CTkLabel(metadata_frame, text=t("settings.postProcessSection"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.SM, Spacing.XS))
+
+        self.postprocess_extract_audio_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.postProcessExtractAudio"),
+            variable=self.postprocess_extract_audio_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        ctk.CTkLabel(metadata_frame, text=t("settings.postProcessAudioFormat"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.postprocess_audio_format_combo = ctk.CTkComboBox(
+            metadata_frame,
+            values=self._postprocess_audio_format_options(),
+        )
+        style_combo(self.postprocess_audio_format_combo)
+        self.postprocess_audio_format_combo.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(metadata_frame, text=t("settings.postProcessAudioBitrate"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.postprocess_audio_bitrate_combo = ctk.CTkComboBox(
+            metadata_frame,
+            values=["128k", "192k", "320k"],
+        )
+        style_combo(self.postprocess_audio_bitrate_combo)
+        self.postprocess_audio_bitrate_combo.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        self.postprocess_convert_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.postProcessConvert"),
+            variable=self.postprocess_convert_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        ctk.CTkLabel(metadata_frame, text=t("settings.postProcessConvertFormat"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.postprocess_convert_format_combo = ctk.CTkComboBox(
+            metadata_frame,
+            values=self._postprocess_convert_format_options(),
+        )
+        style_combo(self.postprocess_convert_format_combo)
+        self.postprocess_convert_format_combo.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        self.postprocess_embed_subtitles_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.postProcessEmbedSubtitles"),
+            variable=self.postprocess_embed_subtitles_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        ctk.CTkLabel(
+            metadata_frame,
+            text=t("settings.postProcessHelp"),
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            justify="left",
+            wraplength=560,
+        ).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(metadata_frame, text=t("settings.downloadReliabilitySection"), font=Fonts.H2).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.SM, Spacing.XS))
+
+        self.download_archive_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.downloadArchive"),
+            variable=self.download_archive_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        self.download_duplicate_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.downloadDuplicateDetection"),
+            variable=self.download_duplicate_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        self.download_continue_partial_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.downloadContinuePartial"),
+            variable=self.download_continue_partial_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        self.download_format_fallback_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            metadata_frame,
+            text=t("settings.downloadFormatFallback"),
+            variable=self.download_format_fallback_var,
+            font=Fonts.LABEL,
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        ctk.CTkLabel(metadata_frame, text=t("settings.downloadRateLimit"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.SM, Spacing.XS))
+        self.download_rate_limit_entry = ctk.CTkEntry(
+            metadata_frame,
+            placeholder_text=t("settings.downloadRateLimitPlaceholder"),
+        )
+        style_entry(self.download_rate_limit_entry)
+        self.download_rate_limit_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(
+            metadata_frame,
+            text=t("settings.downloadReliabilityHelp"),
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            justify="left",
+            wraplength=560,
+        ).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        advanced_panel = CollapsiblePanel(
+            parent,
+            title=t("settings.downloadAdvancedSection"),
+            subtitle=t("settings.downloadAdvancedHelp"),
+            expanded=False,
+        )
+        advanced_panel.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
+        advanced_body = advanced_panel.content_frame()
+
+        auth_frame = ctk.CTkFrame(advanced_body, fg_color="transparent")
+        auth_frame.pack(fill="x")
+        ctk.CTkLabel(auth_frame, text=t("settings.downloadAdvancedAuthSection"), font=Fonts.LABEL_BOLD).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(auth_frame, text=t("settings.downloadAdvancedCookiesMode"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_cookie_mode_combo = ctk.CTkComboBox(
+            auth_frame,
+            values=list(self._download_cookie_mode_options().values()),
+            command=lambda _value: self._update_download_advanced_controls_state(),
+        )
+        style_combo(self.download_cookie_mode_combo)
+        self.download_cookie_mode_combo.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(auth_frame, text=t("settings.downloadAdvancedCookiesBrowserLabel"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_cookie_browser_combo = ctk.CTkComboBox(
+            auth_frame,
+            values=self._download_cookie_browser_options(),
+        )
+        style_combo(self.download_cookie_browser_combo)
+        self.download_cookie_browser_combo.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(auth_frame, text=t("settings.downloadAdvancedCookiesProfileLabel"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_cookie_profile_entry = ctk.CTkEntry(
+            auth_frame,
+            placeholder_text=t("settings.downloadAdvancedCookiesProfilePlaceholder"),
+        )
+        style_entry(self.download_cookie_profile_entry)
+        self.download_cookie_profile_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(auth_frame, text=t("settings.downloadAdvancedCookiesFileLabel"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        cookie_file_row = ctk.CTkFrame(auth_frame, fg_color="transparent")
+        cookie_file_row.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+        self.download_cookie_file_entry = ctk.CTkEntry(
+            cookie_file_row,
+            placeholder_text=t("settings.downloadAdvancedCookiesFilePlaceholder"),
+        )
+        style_entry(self.download_cookie_file_entry)
+        self.download_cookie_file_entry.pack(side="left", fill="x", expand=True, padx=(0, Spacing.XS))
+        ctk.CTkButton(
+            cookie_file_row,
+            text=t("common.browse"),
+            width=80,
+            command=self.select_cookies_file,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+        ).pack(side="right")
+
+        ctk.CTkLabel(
+            auth_frame,
+            text=t("settings.downloadAdvancedAuthHelp"),
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            justify="left",
+            wraplength=560,
+        ).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        tuning_frame = ctk.CTkFrame(advanced_body, fg_color="transparent")
+        tuning_frame.pack(fill="x", pady=(Spacing.SM, 0))
+        ctk.CTkLabel(tuning_frame, text=t("settings.downloadAdvancedTuningSection"), font=Fonts.LABEL_BOLD).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(tuning_frame, text=t("settings.downloadAdvancedConcurrentFragments"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_concurrent_fragments_entry = ctk.CTkEntry(
+            tuning_frame,
+            placeholder_text="1",
+        )
+        style_entry(self.download_concurrent_fragments_entry)
+        self.download_concurrent_fragments_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(tuning_frame, text=t("settings.downloadAdvancedFragmentRetries"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_fragment_retries_entry = ctk.CTkEntry(
+            tuning_frame,
+            placeholder_text="10",
+        )
+        style_entry(self.download_fragment_retries_entry)
+        self.download_fragment_retries_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(tuning_frame, text=t("settings.downloadAdvancedSocketTimeout"), font=Fonts.LABEL).pack(anchor="w", padx=Spacing.XS, pady=(Spacing.XS, 0))
+        self.download_socket_timeout_entry = ctk.CTkEntry(
+            tuning_frame,
+            placeholder_text="30",
+        )
+        style_entry(self.download_socket_timeout_entry)
+        self.download_socket_timeout_entry.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(
+            tuning_frame,
+            text=t("settings.downloadAdvancedTuningHelp"),
+            font=Fonts.SMALL,
+            text_color=Colors.TEXT_MUTED,
+            justify="left",
+            wraplength=560,
+        ).pack(anchor="w", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        self._update_download_advanced_controls_state()
+
         # Torrent / aria2c ayarları
         torrent_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
         torrent_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
@@ -704,6 +974,28 @@ class SettingsTab(ctk.CTkFrame):
             font=Fonts.LABEL
         ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
+    def _update_download_advanced_controls_state(self):
+        mode_combo = getattr(self, 'download_cookie_mode_combo', None)
+        browser_combo = getattr(self, 'download_cookie_browser_combo', None)
+        profile_entry = getattr(self, 'download_cookie_profile_entry', None)
+        file_entry = getattr(self, 'download_cookie_file_entry', None)
+
+        mode = self._normalize_download_cookie_mode_for_storage(mode_combo.get() if mode_combo is not None else 'none')
+        browser_state = 'normal' if mode == 'browser' else 'disabled'
+        file_state = 'normal' if mode == 'file' else 'disabled'
+
+        for widget in (browser_combo, profile_entry):
+            if widget is not None:
+                try:
+                    widget.configure(state=browser_state)
+                except Exception:
+                    pass
+        if file_entry is not None:
+            try:
+                file_entry.configure(state=file_state)
+            except Exception:
+                pass
+
     def load_settings(self):
         """Ayarları yükle"""
         self.theme_combo.set(ThemeManager.get_theme_display_name(self.config.get('theme', 'dark')))
@@ -736,6 +1028,27 @@ class SettingsTab(ctk.CTkFrame):
         auto_sort_var = getattr(self, 'auto_sort_var', None)
         naming_preset_combo = getattr(self, 'naming_preset_combo', None)
         filename_template_entry = getattr(self, 'filename_template_entry', None)
+        postprocess_extract_audio_var = getattr(self, 'postprocess_extract_audio_var', None)
+        postprocess_audio_format_combo = getattr(self, 'postprocess_audio_format_combo', None)
+        postprocess_audio_bitrate_combo = getattr(self, 'postprocess_audio_bitrate_combo', None)
+        postprocess_convert_var = getattr(self, 'postprocess_convert_var', None)
+        postprocess_convert_format_combo = getattr(self, 'postprocess_convert_format_combo', None)
+        postprocess_embed_subtitles_var = getattr(self, 'postprocess_embed_subtitles_var', None)
+        download_archive_var = getattr(self, 'download_archive_var', None)
+        download_duplicate_var = getattr(self, 'download_duplicate_var', None)
+        download_continue_partial_var = getattr(self, 'download_continue_partial_var', None)
+        download_format_fallback_var = getattr(self, 'download_format_fallback_var', None)
+        download_rate_limit_entry = getattr(self, 'download_rate_limit_entry', None)
+        download_cookie_mode_combo = getattr(self, 'download_cookie_mode_combo', None)
+        download_cookie_browser_combo = getattr(self, 'download_cookie_browser_combo', None)
+        download_cookie_profile_entry = getattr(self, 'download_cookie_profile_entry', None)
+        download_cookie_file_entry = getattr(self, 'download_cookie_file_entry', None)
+        download_concurrent_fragments_entry = getattr(self, 'download_concurrent_fragments_entry', None)
+        download_fragment_retries_entry = getattr(self, 'download_fragment_retries_entry', None)
+        download_socket_timeout_entry = getattr(self, 'download_socket_timeout_entry', None)
+        postprocess_section = self.config.get('download_postprocess', {}) or {}
+        robustness_section = self.config.get('download_robustness', {}) or {}
+        advanced_section = self.config.get('download_advanced', {}) or {}
         if embed_metadata_var is not None:
             embed_metadata_var.set(self.config.get('embed_metadata', False))
         if auto_sort_var is not None:
@@ -744,6 +1057,43 @@ class SettingsTab(ctk.CTkFrame):
             naming_preset_combo.set(self._naming_preset_for_display(self.config.get('download_naming_preset', 'standard')))
         if filename_template_entry is not None:
             filename_template_entry.insert(0, self.config.get('download_filename_template', ''))
+        if postprocess_extract_audio_var is not None:
+            postprocess_extract_audio_var.set(bool(postprocess_section.get('extract_audio', False)))
+        if postprocess_audio_format_combo is not None:
+            postprocess_audio_format_combo.set(self._postprocess_format_for_display(postprocess_section.get('audio_format', 'mp3'), default='MP3'))
+        if postprocess_audio_bitrate_combo is not None:
+            postprocess_audio_bitrate_combo.set(str(postprocess_section.get('audio_bitrate', '192k') or '192k'))
+        if postprocess_convert_var is not None:
+            postprocess_convert_var.set(bool(postprocess_section.get('convert_enabled', False)))
+        if postprocess_convert_format_combo is not None:
+            postprocess_convert_format_combo.set(self._postprocess_format_for_display(postprocess_section.get('convert_format', 'mkv'), default='MKV'))
+        if postprocess_embed_subtitles_var is not None:
+            postprocess_embed_subtitles_var.set(bool(postprocess_section.get('embed_subtitles', False)))
+        if download_archive_var is not None:
+            download_archive_var.set(bool(robustness_section.get('enable_archive', True)))
+        if download_duplicate_var is not None:
+            download_duplicate_var.set(bool(robustness_section.get('detect_duplicates', True)))
+        if download_continue_partial_var is not None:
+            download_continue_partial_var.set(bool(robustness_section.get('continue_partial', True)))
+        if download_format_fallback_var is not None:
+            download_format_fallback_var.set(bool(robustness_section.get('format_fallback', True)))
+        if download_rate_limit_entry is not None:
+            download_rate_limit_entry.insert(0, str(robustness_section.get('rate_limit_kbps', 0) or 0))
+        if download_cookie_mode_combo is not None:
+            download_cookie_mode_combo.set(self._download_cookie_mode_for_display(advanced_section.get('cookies_mode', 'none')))
+        if download_cookie_browser_combo is not None:
+            download_cookie_browser_combo.set(str(advanced_section.get('cookies_browser', 'chrome') or 'chrome'))
+        if download_cookie_profile_entry is not None:
+            download_cookie_profile_entry.insert(0, str(advanced_section.get('cookies_profile', '') or ''))
+        if download_cookie_file_entry is not None:
+            download_cookie_file_entry.insert(0, str(advanced_section.get('cookies_file', '') or ''))
+        if download_concurrent_fragments_entry is not None:
+            download_concurrent_fragments_entry.insert(0, str(advanced_section.get('concurrent_fragments', 1) or 1))
+        if download_fragment_retries_entry is not None:
+            download_fragment_retries_entry.insert(0, str(advanced_section.get('fragment_retries', 0) or 0))
+        if download_socket_timeout_entry is not None:
+            download_socket_timeout_entry.insert(0, str(advanced_section.get('socket_timeout_seconds', 0) or 0))
+        self._update_download_advanced_controls_state()
 
         self.aria2c_path_entry.insert(0, self.config.get('aria2c_path', 'aria2c'))
         self.torrent_seed_time_entry.insert(0, str(self.config.get('torrent_seed_time', 0)))
@@ -819,6 +1169,24 @@ class SettingsTab(ctk.CTkFrame):
         auto_lyrics_var = getattr(self, 'auto_lyrics_var', None)
         naming_preset_combo = getattr(self, 'naming_preset_combo', None)
         filename_template_entry = getattr(self, 'filename_template_entry', None)
+        postprocess_extract_audio_var = getattr(self, 'postprocess_extract_audio_var', None)
+        postprocess_audio_format_combo = getattr(self, 'postprocess_audio_format_combo', None)
+        postprocess_audio_bitrate_combo = getattr(self, 'postprocess_audio_bitrate_combo', None)
+        postprocess_convert_var = getattr(self, 'postprocess_convert_var', None)
+        postprocess_convert_format_combo = getattr(self, 'postprocess_convert_format_combo', None)
+        postprocess_embed_subtitles_var = getattr(self, 'postprocess_embed_subtitles_var', None)
+        download_archive_var = getattr(self, 'download_archive_var', None)
+        download_duplicate_var = getattr(self, 'download_duplicate_var', None)
+        download_continue_partial_var = getattr(self, 'download_continue_partial_var', None)
+        download_format_fallback_var = getattr(self, 'download_format_fallback_var', None)
+        download_rate_limit_entry = getattr(self, 'download_rate_limit_entry', None)
+        download_cookie_mode_combo = getattr(self, 'download_cookie_mode_combo', None)
+        download_cookie_browser_combo = getattr(self, 'download_cookie_browser_combo', None)
+        download_cookie_profile_entry = getattr(self, 'download_cookie_profile_entry', None)
+        download_cookie_file_entry = getattr(self, 'download_cookie_file_entry', None)
+        download_concurrent_fragments_entry = getattr(self, 'download_concurrent_fragments_entry', None)
+        download_fragment_retries_entry = getattr(self, 'download_fragment_retries_entry', None)
+        download_socket_timeout_entry = getattr(self, 'download_socket_timeout_entry', None)
 
         if embed_metadata_var is not None:
             embed_metadata_enabled = embed_metadata_var.get()
@@ -836,6 +1204,73 @@ class SettingsTab(ctk.CTkFrame):
             self.config.set('download_naming_preset', self._normalize_naming_preset_for_storage(naming_preset_combo.get()))
         if filename_template_entry is not None:
             self.config.set('download_filename_template', filename_template_entry.get().strip())
+
+        postprocess_payload = {
+            'extract_audio': bool(postprocess_extract_audio_var.get()) if postprocess_extract_audio_var is not None else False,
+            'audio_format': self._normalize_postprocess_format(
+                postprocess_audio_format_combo.get() if postprocess_audio_format_combo is not None else 'MP3',
+                default='mp3',
+            ),
+            'audio_bitrate': str(
+                postprocess_audio_bitrate_combo.get()
+                if postprocess_audio_bitrate_combo is not None
+                else '192k'
+            ).strip().lower(),
+            'convert_enabled': bool(postprocess_convert_var.get()) if postprocess_convert_var is not None else False,
+            'convert_format': self._normalize_postprocess_format(
+                postprocess_convert_format_combo.get() if postprocess_convert_format_combo is not None else 'MKV',
+                default='mkv',
+            ),
+            'embed_subtitles': bool(postprocess_embed_subtitles_var.get()) if postprocess_embed_subtitles_var is not None else False,
+        }
+        self.config.set('download_postprocess', postprocess_payload)
+
+        try:
+            rate_limit_kbps = int(download_rate_limit_entry.get()) if download_rate_limit_entry is not None else 0
+        except ValueError:
+            rate_limit_kbps = 0
+        self.config.set(
+            'download_robustness',
+            {
+                'enable_archive': bool(download_archive_var.get()) if download_archive_var is not None else True,
+                'detect_duplicates': bool(download_duplicate_var.get()) if download_duplicate_var is not None else True,
+                'continue_partial': bool(download_continue_partial_var.get()) if download_continue_partial_var is not None else True,
+                'format_fallback': bool(download_format_fallback_var.get()) if download_format_fallback_var is not None else True,
+                'rate_limit_kbps': max(0, rate_limit_kbps),
+            },
+        )
+        self.config.set(
+            'download_advanced',
+            {
+                'cookies_mode': self._normalize_download_cookie_mode_for_storage(
+                    download_cookie_mode_combo.get() if download_cookie_mode_combo is not None else 'none'
+                ),
+                'cookies_browser': str(
+                    download_cookie_browser_combo.get() if download_cookie_browser_combo is not None else 'chrome'
+                ).strip().lower() or 'chrome',
+                'cookies_profile': str(
+                    download_cookie_profile_entry.get() if download_cookie_profile_entry is not None else ''
+                ).strip(),
+                'cookies_file': str(
+                    download_cookie_file_entry.get() if download_cookie_file_entry is not None else ''
+                ).strip(),
+                'concurrent_fragments': self._safe_int(
+                    download_concurrent_fragments_entry.get() if download_concurrent_fragments_entry is not None else 1,
+                    1,
+                    minimum=1,
+                ),
+                'fragment_retries': self._safe_int(
+                    download_fragment_retries_entry.get() if download_fragment_retries_entry is not None else 0,
+                    0,
+                    minimum=0,
+                ),
+                'socket_timeout_seconds': self._safe_int(
+                    download_socket_timeout_entry.get() if download_socket_timeout_entry is not None else 0,
+                    0,
+                    minimum=0,
+                ),
+            },
+        )
 
         if selected_theme is not None:
             ThemeManager.apply_theme(selected_theme)
@@ -874,6 +1309,15 @@ class SettingsTab(ctk.CTkFrame):
         if dir_path:
             self.download_dir_entry.delete(0, "end")
             self.download_dir_entry.insert(0, dir_path)
+
+    def select_cookies_file(self):
+        """cookies.txt dosyası seç"""
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Cookie files", "*.txt *.cookies"), ("All files", "*.*")]
+        )
+        if file_path and getattr(self, 'download_cookie_file_entry', None) is not None:
+            self.download_cookie_file_entry.delete(0, "end")
+            self.download_cookie_file_entry.insert(0, file_path)
 
     def export_settings(self):
         """Ayarları dışa aktar"""

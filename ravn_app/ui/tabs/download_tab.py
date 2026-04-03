@@ -6,6 +6,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
+from ravn_app.core.download_profiles import (
+    apply_profile_overrides,
+    get_download_profile,
+    resolve_profile_output_dir,
+)
 from ravn_app.core.downloader import DownloadFormat, DownloadQuality
 from ravn_app.core.i18n import t
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
@@ -256,6 +261,28 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         )
         self.info_label.pack(fill="x", padx=15, pady=(6, 4))
 
+        profile_frame = ctk.CTkFrame(self, fg_color="transparent")
+        profile_frame.pack(fill="x", padx=15, pady=(0, 8))
+        ctk.CTkLabel(
+            profile_frame,
+            text=t("download.profileLabel"),
+            font=Fonts.LABEL,
+        ).pack(side="left", padx=(0, 8))
+        self.download_profile_menu = ctk.CTkOptionMenu(
+            profile_frame,
+            values=list(self._download_profile_options().values()),
+            command=self._apply_download_profile_ui,
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.ACCENT,
+            button_hover_color=Colors.ACCENT_HOVER,
+            dropdown_fg_color=Colors.BG_SURFACE,
+            text_color=Colors.TEXT_PRIMARY,
+            dropdown_text_color=Colors.TEXT_PRIMARY,
+        )
+        self.download_profile_menu.pack(side="left", padx=(0, 8))
+        self.download_profile_menu.set(self._download_profile_options()["custom"])
+        Tooltip(self.download_profile_menu, t("download.profileHelp"))
+
         # ── Two-column layout: Video | Music ─────────────────────────────
         self._columns_frame = ctk.CTkFrame(self, fg_color="transparent")
         self._columns_frame.pack(fill="x", padx=15, pady=(0, 10))
@@ -499,6 +526,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         if hasattr(self, '_save_active_playlist_state'):
             self._save_active_playlist_state()
 
+        if hasattr(self, '_video_fetch_btn'):
+            self.fetch_data_btn = self._video_fetch_btn
         if hasattr(self, '_video_download_btn'):
             self.download_btn = self._video_download_btn
         if hasattr(self, '_video_progress'):
@@ -538,6 +567,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         if hasattr(self, '_save_active_playlist_state'):
             self._save_active_playlist_state()
 
+        if hasattr(self, '_music_fetch_btn'):
+            self.fetch_data_btn = self._music_fetch_btn
         if hasattr(self, '_music_download_btn'):
             self.download_btn = self._music_download_btn
         if hasattr(self, '_music_progress'):
@@ -599,16 +630,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         self._activate_music_side()
 
-        format_type = _FORMAT_MAP.get(self.music_format_menu.get(), DownloadFormat.MP3)
-        bitrate_str = self.music_bitrate_menu.get()
-        audio_bitrate = _AUDIO_BITRATE_MAP.get(bitrate_str, "0")
-        quality = DownloadQuality.AUDIO_ONLY
-
-        default_path = self.config_manager.get(
-            "default_download_path",
-            str(Path.home() / "Downloads" / "RAVN"),
-        )
-        output_dir = str(Path(default_path))
+        format_type, quality, audio_bitrate = self._resolve_effective_download_selection(prefer_music=True)
+        output_dir = self._resolve_download_output_dir()
         self._start_single_download(url, output_dir, format_type, quality, audio_bitrate)
 
     # _on_mode_changed kept for backward compat with any external callers
@@ -621,6 +644,9 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     def _on_ctrl_enter(self, event=None):
         """Handle Ctrl+Enter - trigger primary download action."""
         if not self.winfo_viewable():
+            return
+        if self._selected_download_profile().preferred_surface == "audio":
+            self._download_music()
             return
         self._download_video()
 
@@ -658,10 +684,20 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         )
 
     def _toggle_batch_mode(self):
+        fetch_buttons = [
+            button for button in (
+                getattr(self, "_video_fetch_btn", None),
+                getattr(self, "_music_fetch_btn", None),
+                getattr(self, "fetch_data_btn", None),
+            )
+            if button is not None
+        ]
+
         if self.batch_mode_var.get():
             self.url_input_row.pack_forget()
             self.batch_url_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.info_label)
-            self._set_button_loading_state(self.fetch_data_btn, is_loading=True)
+            for button in fetch_buttons:
+                self._set_button_loading_state(button, is_loading=True)
             self.info_label.configure(
                 text=t("download.batchModeInfo")
             )
@@ -669,7 +705,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         self.batch_url_frame.pack_forget()
         self.url_input_row.pack(side="left", fill="x", expand=True)
-        self._set_button_loading_state(self.fetch_data_btn, is_loading=False)
+        for button in fetch_buttons:
+            self._set_button_loading_state(button, is_loading=False)
         self.info_label.configure(
             text=self._build_default_info_text(self.platform_manager.get_supported_platforms())
         )
@@ -906,6 +943,83 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Legacy compatibility wrapper for the primary download action."""
         self._download_video()
 
+    @staticmethod
+    def _download_profile_options() -> Dict[str, str]:
+        return {
+            "custom": t("download.profileCustom"),
+            "music": t("download.profileMusic"),
+            "podcast": t("download.profilePodcast"),
+            "archive": t("download.profileArchive"),
+            "social_clip": t("download.profileSocialClip"),
+        }
+
+    def _current_download_profile_key(self) -> str:
+        menu = getattr(self, "download_profile_menu", None)
+        options = self._download_profile_options()
+        reverse = {label: key for key, label in options.items()}
+        value = menu.get() if menu is not None else options["custom"]
+        return reverse.get(value, "custom")
+
+    def _selected_download_profile(self):
+        return get_download_profile(self._current_download_profile_key())
+
+    @staticmethod
+    def _quality_label_for_profile_display(value: str) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized in {"en iyi", "en iyi̇", "best"}:
+            return t("download.qualityBest")
+        if normalized in {"sadece ses", "audio only"}:
+            return t("download.qualityAudioOnly")
+        return value
+
+    def _apply_download_profile_ui(self, _value: Optional[str] = None) -> None:
+        profile = self._selected_download_profile()
+        if profile.key == "custom":
+            return
+
+        if profile.preferred_surface == "audio":
+            self._activate_music_side()
+            if profile.format_key:
+                self.music_format_menu.set(profile.format_key)
+            if profile.audio_bitrate:
+                bitrate_value = str(profile.audio_bitrate).replace("K", "k")
+                if bitrate_value in {"320k", "192k", "128k"}:
+                    self.music_bitrate_menu.set(bitrate_value)
+        else:
+            self._activate_video_side()
+            if profile.format_key:
+                self.format_menu.set(profile.format_key)
+            if profile.quality_label:
+                self.quality_menu.set(self._quality_label_for_profile_display(profile.quality_label))
+
+    def _resolve_effective_download_selection(self, *, prefer_music: bool = False) -> tuple[DownloadFormat, DownloadQuality, Optional[str]]:
+        profile = self._selected_download_profile()
+        if profile.key != "custom":
+            format_key = profile.format_key or (self.music_format_menu.get() if prefer_music else self.format_menu.get())
+            quality_label = profile.quality_label or (t("download.qualityAudioOnly") if prefer_music else self.quality_menu.get())
+            normalized_quality = _QUALITY_MAP.get(quality_label, DownloadQuality.AUDIO_ONLY if prefer_music else DownloadQuality.BEST)
+            return (
+                _FORMAT_MAP.get(format_key, DownloadFormat.MP3 if prefer_music else DownloadFormat.MP4),
+                normalized_quality,
+                profile.audio_bitrate or None,
+            )
+
+        if prefer_music:
+            format_type = _FORMAT_MAP.get(self.music_format_menu.get(), DownloadFormat.MP3)
+            bitrate_str = self.music_bitrate_menu.get()
+            return format_type, DownloadQuality.AUDIO_ONLY, _AUDIO_BITRATE_MAP.get(bitrate_str, "0")
+
+        format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
+        quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
+        return format_type, quality, None
+
+    def _resolve_download_output_dir(self) -> str:
+        default_path = self.config_manager.get(
+            "default_download_path",
+            str(Path.home() / "Downloads" / "RAVN"),
+        )
+        return resolve_profile_output_dir(str(Path(default_path)), self._selected_download_profile())
+
     def _get_download_naming_settings(self) -> Dict[str, str]:
         """Read filename-template preferences from persistent settings."""
         return {
@@ -915,6 +1029,16 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
     def _get_download_behavior_settings(self) -> Dict[str, Any]:
         """Collect shared download automation settings used across UI flows."""
+        postprocess_section = self.config_manager.get("download_postprocess", {}) or {}
+        robustness_section = self.config_manager.get("download_robustness", {}) or {}
+        advanced_section = self.config_manager.get("download_advanced", {}) or {}
+
+        def _safe_int(value: Any, default: int = 0) -> int:
+            try:
+                return int(value or default)
+            except (TypeError, ValueError):
+                return default
+
         settings: Dict[str, Any] = {
             "embed_metadata": bool(self.config_manager.get("auto_id3_tagging", self.config_manager.get("embed_metadata", True))),
             "embed_lyrics": bool(self.config_manager.get("auto_embed_lyrics", True)),
@@ -925,9 +1049,33 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             "subtitle_fallback_language": str(self.config_manager.get("subtitle_fallback_language", "en") or "en"),
             "subtitle_include_auto_generated": bool(self.config_manager.get("subtitle_include_auto_generated", True)),
             "auto_embed_subtitles": bool(self.config_manager.get("auto_embed_subtitles", False)),
+            "postprocess_profile": {
+                "extract_audio": bool(postprocess_section.get("extract_audio", False)),
+                "audio_format": str(postprocess_section.get("audio_format", "mp3") or "mp3"),
+                "audio_bitrate": str(postprocess_section.get("audio_bitrate", "192k") or "192k"),
+                "convert_enabled": bool(postprocess_section.get("convert_enabled", False)),
+                "convert_format": str(postprocess_section.get("convert_format", "mkv") or "mkv"),
+                "embed_subtitles": bool(postprocess_section.get("embed_subtitles", False)),
+            },
+            "robustness_profile": {
+                "enable_archive": bool(robustness_section.get("enable_archive", True)),
+                "detect_duplicates": bool(robustness_section.get("detect_duplicates", True)),
+                "continue_partial": bool(robustness_section.get("continue_partial", True)),
+                "format_fallback": bool(robustness_section.get("format_fallback", True)),
+                "rate_limit_kbps": _safe_int(robustness_section.get("rate_limit_kbps", 0), 0),
+            },
+            "advanced_profile": {
+                "cookies_mode": str(advanced_section.get("cookies_mode", "none") or "none"),
+                "cookies_browser": str(advanced_section.get("cookies_browser", "chrome") or "chrome"),
+                "cookies_profile": str(advanced_section.get("cookies_profile", "") or ""),
+                "cookies_file": str(advanced_section.get("cookies_file", "") or ""),
+                "concurrent_fragments": _safe_int(advanced_section.get("concurrent_fragments", 1), 1),
+                "fragment_retries": _safe_int(advanced_section.get("fragment_retries", 0), 0),
+                "socket_timeout_seconds": _safe_int(advanced_section.get("socket_timeout_seconds", 0), 0),
+            },
         }
         settings.update(self._get_download_naming_settings())
-        return settings
+        return apply_profile_overrides(settings, self._selected_download_profile())
 
     def _register_download_outputs(self, result) -> None:
         callback = getattr(self, "auto_add_to_library_callback", None)
@@ -938,15 +1086,17 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         if not output_files:
             return
 
-        metadata: Dict[str, Any] = {}
+        metadata: Dict[str, Any] = dict(getattr(result, "metadata", {}) or {})
         source_url = getattr(result, "url", None)
         if source_url:
-            metadata["source_url"] = source_url
+            metadata.setdefault("source_url", source_url)
 
+        tags = metadata.get("library_tags")
         callback(
             output_files,
             source_type="download",
             title=getattr(result, "title", None),
+            tags=tags if isinstance(tags, list) and tags else None,
             metadata=metadata or None,
         )
 
@@ -967,6 +1117,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._set_button_loading_state(self.download_btn, is_loading=True)
 
         download_settings = self._get_download_behavior_settings()
+        if audio_bitrate is not None:
+            download_settings["audio_bitrate"] = audio_bitrate
 
         def run_download():
             try:
@@ -976,7 +1128,6 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                     format_type=format_type,
                     quality=quality,
                     progress_callback=self._on_download_progress,
-                    audio_bitrate=audio_bitrate,
                     **download_settings,
                 )
                 if result.success:
@@ -1009,16 +1160,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._show_download_error(t("download.urlRequired"), "")
             return
 
-        quality_str = self.quality_menu.get()
-        quality = _QUALITY_MAP.get(quality_str, DownloadQuality.BEST)
-        format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
-        audio_bitrate = None
-
-        default_path = self.config_manager.get(
-            "default_download_path",
-            str(Path.home() / "Downloads" / "RAVN"),
-        )
-        output_dir = str(Path(default_path))
+        format_type, quality, audio_bitrate = self._resolve_effective_download_selection(prefer_music=False)
+        output_dir = self._resolve_download_output_dir()
 
         if self._looks_like_playlist_url(url):
             if self.is_playlist_fetching:
@@ -1168,15 +1311,12 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._show_download_error(t("download.tooManyUrls"), "")
             urls = urls[:50]
 
-        quality = _QUALITY_MAP.get(self.quality_menu.get(), DownloadQuality.BEST)
-        format_type = _FORMAT_MAP.get(self.format_menu.get(), DownloadFormat.MP4)
+        format_type, quality, audio_bitrate = self._resolve_effective_download_selection(prefer_music=False)
         download_settings = self._get_download_behavior_settings()
+        if audio_bitrate is not None:
+            download_settings["audio_bitrate"] = audio_bitrate
 
-        default_path = self.config_manager.get(
-            "default_download_path",
-            str(Path.home() / "Downloads" / "RAVN"),
-        )
-        output_dir = str(Path(default_path))
+        output_dir = self._resolve_download_output_dir()
 
         self.download_status_label.configure(text=t("download.queuedAddProgress", count=len(urls)))
         self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.queuedAddLoading')}")

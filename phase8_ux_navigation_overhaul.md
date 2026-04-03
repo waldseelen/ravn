@@ -1,7 +1,11 @@
 # Phase 8 — UX / Information Architecture / Navigation Overhaul
 
-Status: Implemented and validated Phase 8 shell plan
-Last updated: 2026-04-01
+Status: Implemented and retained as the historical Phase 8 shell design record
+Last updated: 2026-04-03
+
+> Note: This file is the approved Phase 8 planning/design document.
+> For the current repository-wide runtime structure, use `ARCHITECTURE.md`.
+> For validated implementation state, use `PROGRESS.md`.
 
 ## Goal
 

@@ -269,6 +269,274 @@ class TestYouTubeDownloader:
         assert renamed_path.parent.name == "StudioChannel"
         assert renamed_path.name == "1920x1080 - Clip.mp4"
 
+    def test_download_enriches_metadata_with_normalized_title_and_tags(self, tmp_path):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {
+            "title": "Song Name (Official Video)",
+            "uploader": "Artist Name - Topic",
+            "playlist_title": "Album 2026",
+            "extractor_key": "YouTube",
+            "upload_date": "20260403",
+            "webpage_url": "https://example.com/watch?v=1",
+        }
+
+        source_file = tmp_path / "Song Name.mp4"
+        source_file.write_bytes(b"video")
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": [str(source_file)]},
+        )
+
+        result = self.downloader.download(
+            url="https://www.youtube.com/watch?v=1",
+            output_dir=str(tmp_path),
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            auto_subtitle_download=True,
+        )
+
+        assert result.title == "Song Name"
+        assert result.metadata["normalized"]["uploader"] == "Artist Name"
+        assert "youtube" in result.metadata["library_tags"]
+        assert "creator-artist-name" in result.metadata["library_tags"]
+        assert result.metadata["acquisition"]["upload_date"] == "20260403"
+
+    def test_download_passes_archive_resume_and_rate_limit_args(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip", "duration": 10}
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp4"]},
+        )
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            robustness_profile={
+                "enable_archive": True,
+                "detect_duplicates": True,
+                "continue_partial": True,
+                "format_fallback": True,
+                "rate_limit_kbps": 512,
+            },
+        )
+
+        extra_args = self.downloader._runner.download.call_args.kwargs["extra_args"]
+        assert "--download-archive" in extra_args
+        assert "--continue" in extra_args
+        assert "--part" in extra_args
+        assert "--limit-rate" in extra_args
+        assert "512K" in extra_args
+
+    def test_download_passes_advanced_auth_and_fragment_args(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip", "duration": 10}
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp4"]},
+        )
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            advanced_profile={
+                "cookies_mode": "browser",
+                "cookies_browser": "firefox",
+                "cookies_profile": "default-release",
+                "concurrent_fragments": 4,
+                "fragment_retries": 8,
+                "socket_timeout_seconds": 55,
+            },
+        )
+
+        extra_args = self.downloader._runner.download.call_args.kwargs["extra_args"]
+        assert "--cookies-from-browser" in extra_args
+        assert "firefox:default-release" in extra_args
+        assert "--concurrent-fragments" in extra_args
+        assert "4" in extra_args
+        assert "--fragment-retries" in extra_args
+        assert "8" in extra_args
+        assert "--socket-timeout" in extra_args
+        assert "55" in extra_args
+
+    def test_download_uses_cookie_file_auth_when_configured(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip", "duration": 10}
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": ["out.mp4"]},
+        )
+
+        self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            advanced_profile={
+                "cookies_mode": "file",
+                "cookies_file": "C:/secure/cookies.txt",
+            },
+        )
+
+        extra_args = self.downloader._runner.download.call_args.kwargs["extra_args"]
+        assert "--cookies" in extra_args
+        assert "C:/secure/cookies.txt" in extra_args
+        assert "--cookies-from-browser" not in extra_args
+
+    def test_download_retries_with_fallback_format_when_primary_fails(self, tmp_path):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip"}
+        source_file = tmp_path / "Clip.mp4"
+        source_file.write_bytes(b"video")
+        self.downloader._runner.download.side_effect = [
+            RunnerResult(success=False, return_code=1, error_message="No downloadable formats available"),
+            RunnerResult(success=True, return_code=0, metadata={"downloaded_files": [str(source_file)]}),
+        ]
+
+        result = self.downloader.download(
+            url="https://example.com/v",
+            output_dir=str(tmp_path),
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.HIGH_1080P,
+            robustness_profile={"format_fallback": True},
+        )
+
+        assert result.success is True
+        assert result.metadata["robustness"]["format_fallback_used"] is True
+        assert self.downloader._runner.download.call_count == 2
+        second_call = self.downloader._runner.download.call_args_list[1].kwargs
+        assert second_call["format_spec"] == DownloadFormat.MP4.format_spec
+
+    def test_download_archive_skip_marks_duplicate_metadata(self):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip", "uploader": "Uploader"}
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": [], "archive_skipped": True},
+        )
+
+        result = self.downloader.download(
+            url="https://example.com/v",
+            output_dir="C:/downloads",
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            robustness_profile={"detect_duplicates": True, "enable_archive": True},
+        )
+
+        assert result.success is True
+        assert result.output_files == []
+        assert result.metadata["robustness"]["archive_skipped"] is True
+
+    def test_download_filters_supporting_artifacts_out_of_primary_outputs(self, tmp_path):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip"}
+
+        video_file = tmp_path / "Clip.mp4"
+        subtitle_file = tmp_path / "Clip.en.vtt"
+        video_file.write_bytes(b"video")
+        subtitle_file.write_text("WEBVTT", encoding="utf-8")
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": [str(video_file), str(subtitle_file)]},
+        )
+
+        result = self.downloader.download(
+            url="https://example.com/v",
+            output_dir=str(tmp_path),
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            auto_subtitle_download=True,
+        )
+
+        assert result.output_files == [str(video_file)]
+        assert result.metadata["supporting_files"] == [str(subtitle_file)]
+
+    def test_download_postprocess_extract_audio_pipeline_returns_final_audio(self, tmp_path):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip"}
+
+        video_file = tmp_path / "Clip.mp4"
+        audio_file = tmp_path / "Clip.mp3"
+        video_file.write_bytes(b"video")
+
+        helpers = Mock()
+
+        def _extract_audio(**_kwargs):
+            audio_file.write_bytes(b"audio")
+            return RunnerResult(success=True, return_code=0, metadata={"output_file": str(audio_file)})
+
+        helpers.extract_audio.side_effect = _extract_audio
+        self.downloader._media_helpers_factory = lambda: helpers
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": [str(video_file)]},
+        )
+
+        result = self.downloader.download(
+            url="https://example.com/v",
+            output_dir=str(tmp_path),
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            postprocess_profile={
+                "extract_audio": True,
+                "audio_format": "mp3",
+                "audio_bitrate": "192k",
+            },
+        )
+
+        assert result.success is True
+        assert result.output_files == [str(audio_file)]
+        assert result.metadata["postprocess"]["executed_steps"] == ["extract_audio"]
+
+    def test_download_postprocess_embeds_matching_subtitle_sidecar(self, tmp_path):
+        self.downloader._runner = Mock()
+        self.downloader._runner.extract_info.return_value = {"title": "Clip"}
+
+        video_file = tmp_path / "Clip.mp4"
+        subtitle_file = tmp_path / "Clip.en.vtt"
+        subtitled_file = tmp_path / "Clip.subtitled.mp4"
+        video_file.write_bytes(b"video")
+        subtitle_file.write_text("WEBVTT", encoding="utf-8")
+
+        embedder = Mock()
+
+        def _embed_soft(**_kwargs):
+            subtitled_file.write_bytes(b"subbed")
+            return True
+
+        embedder.embed_soft.side_effect = _embed_soft
+        self.downloader._subtitle_embedder_factory = lambda: embedder
+        self.downloader._runner.download.return_value = RunnerResult(
+            success=True,
+            return_code=0,
+            metadata={"downloaded_files": [str(video_file), str(subtitle_file)]},
+        )
+
+        result = self.downloader.download(
+            url="https://example.com/v",
+            output_dir=str(tmp_path),
+            format_type=DownloadFormat.MP4,
+            quality=DownloadQuality.BEST,
+            postprocess_profile={"embed_subtitles": True},
+            auto_subtitle_download=True,
+            preferred_subtitle_language="en",
+        )
+
+        assert result.success is True
+        assert result.output_files == [str(subtitled_file)]
+        assert "embed_subtitles" in result.metadata["postprocess"]["executed_steps"]
+
 
 class TestFileUtils:
     """Dosya işlemleri testleri"""

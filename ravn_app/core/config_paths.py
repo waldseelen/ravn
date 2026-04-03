@@ -98,6 +98,11 @@ def get_media_library_file_path() -> Path:
     return get_data_directory() / 'media_library.db'
 
 
+def get_download_archive_file_path() -> Path:
+    """Get the full path to the shared yt-dlp download archive file."""
+    return get_data_directory() / 'download_archive.txt'
+
+
 def ensure_directories_exist() -> Dict[str, Path]:
     """
     Create all required directories if they don't exist.
@@ -254,6 +259,39 @@ CONFIG_SCHEMA = {
     'auto_sort_mode': {'type': str, 'default': 'artist', 'allowed': ['artist', 'channel']},
     'download_naming_preset': {'type': str, 'default': 'standard', 'allowed': ['standard', 'clean', 'playlist']},
     'download_filename_template': {'type': str, 'default': ''},
+    'download_postprocess': {
+        'type': dict,
+        'default': {
+            'extract_audio': False,
+            'audio_format': 'mp3',
+            'audio_bitrate': '192k',
+            'convert_enabled': False,
+            'convert_format': 'mkv',
+            'embed_subtitles': False,
+        },
+    },
+    'download_robustness': {
+        'type': dict,
+        'default': {
+            'enable_archive': True,
+            'detect_duplicates': True,
+            'continue_partial': True,
+            'format_fallback': True,
+            'rate_limit_kbps': 0,
+        },
+    },
+    'download_advanced': {
+        'type': dict,
+        'default': {
+            'cookies_mode': 'none',
+            'cookies_browser': 'chrome',
+            'cookies_profile': '',
+            'cookies_file': '',
+            'concurrent_fragments': 1,
+            'fragment_retries': 0,
+            'socket_timeout_seconds': 0,
+        },
+    },
     'mixer': {
         'type': dict,
         'default': {

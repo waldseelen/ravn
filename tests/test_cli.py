@@ -44,6 +44,125 @@ class TestCliCommands:
         assert result.exit_code == 0
         assert '"success": true' in result.output.lower()
 
+    @patch("ravn_app.cli.YouTubeDownloader")
+    @patch("ravn_app.cli.DatabaseManager")
+    def test_download_profile_json_forwards_acquisition_settings(self, mock_db_cls, mock_downloader_cls, tmp_path):
+        mock_downloader = Mock()
+        mock_downloader.download.return_value = Mock(
+            success=True,
+            url="https://example.com/video",
+            output_files=[str(tmp_path / "Music" / "video.mp3")],
+            title="Demo Video",
+            duration=20,
+            metadata={"robustness": {"archive_skipped": False}},
+        )
+        mock_downloader_cls.return_value = mock_downloader
+        mock_db_cls.return_value = Mock()
+
+        result = self.runner.invoke(
+            cli,
+            [
+                "download",
+                "https://example.com/video",
+                "--profile",
+                "music",
+                "--output",
+                str(tmp_path),
+                "--extract-audio",
+                "--convert-to",
+                "m4a",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        kwargs = mock_downloader.download.call_args.kwargs
+        assert kwargs["output_dir"].endswith("Music")
+        assert kwargs["format_type"].value[0] == "mp3"
+        assert kwargs["quality"].value == "bestaudio/best"
+        assert kwargs["naming_preset"] == "clean"
+        assert kwargs["postprocess_profile"]["extract_audio"] is True
+        assert kwargs["postprocess_profile"]["convert_enabled"] is True
+        assert kwargs["postprocess_profile"]["convert_format"] == "m4a"
+        assert '"profile": "music"' in result.output
+        assert '"effective"' in result.output
+
+    @patch("ravn_app.cli.YouTubeDownloader")
+    def test_download_rejects_conflicting_cookie_sources(self, mock_downloader_cls):
+        mock_downloader_cls.return_value = Mock()
+
+        with self.runner.isolated_filesystem():
+            cookie_file = Path("cookies.txt")
+            cookie_file.write_text("cookies", encoding="utf-8")
+            result = self.runner.invoke(
+                cli,
+                [
+                    "download",
+                    "https://example.com/video",
+                    "--cookies-from-browser",
+                    "firefox",
+                    "--cookies-file",
+                    str(cookie_file),
+                    "--json",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert "either --cookies-from-browser or --cookies-file" in result.output
+
+    @patch("ravn_app.cli.YouTubeDownloader")
+    def test_download_rejects_cookies_profile_without_browser(self, mock_downloader_cls):
+        mock_downloader_cls.return_value = Mock()
+        result = self.runner.invoke(
+            cli,
+            [
+                "download",
+                "https://example.com/video",
+                "--cookies-profile",
+                "Profile 1",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "requires --cookies-from-browser" in result.output
+
+    @patch("ravn_app.cli.YouTubeDownloader")
+    @patch("ravn_app.cli.DatabaseManager")
+    def test_download_archive_profile_applies_profile_defaults(self, mock_db_cls, mock_downloader_cls, tmp_path):
+        mock_downloader = Mock()
+        mock_downloader.download.return_value = Mock(
+            success=True,
+            url="https://example.com/video",
+            output_files=[str(tmp_path / "Archive" / "video.mkv")],
+            title="Demo Video",
+            duration=20,
+            metadata={},
+        )
+        mock_downloader_cls.return_value = mock_downloader
+        mock_db_cls.return_value = Mock()
+
+        result = self.runner.invoke(
+            cli,
+            [
+                "download",
+                "https://example.com/video",
+                "--profile",
+                "archive",
+                "--output",
+                str(tmp_path),
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        kwargs = mock_downloader.download.call_args.kwargs
+        assert kwargs["output_dir"].endswith("Archive")
+        assert kwargs["format_type"].value[0] == "mkv"
+        assert kwargs["naming_preset"] == "playlist"
+        assert kwargs["auto_subtitle_download"] is True
+        assert kwargs["postprocess_profile"]["embed_subtitles"] is True
+
     @patch("ravn_app.cli.VideoConverter")
     @patch("ravn_app.cli.DatabaseManager")
     def test_convert_json(self, mock_db_cls, mock_converter_cls):

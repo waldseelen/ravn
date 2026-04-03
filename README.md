@@ -1,86 +1,399 @@
 # RAVN
 
-RAVN is a desktop + CLI media manager. The desktop app is built with CustomTkinter, while the CLI is built with Click and reuses the same core services. Core download, convert, subtitle, playlist, torrent, and Phase 7 media-management flows are complete, including shared queue/history persistence and automatic media-library indexing for generated outputs. Phase 8 UX/navigation work is also complete: the desktop shell now uses primary workspaces (`Home`, `Download`, `Studio`, `Library`), Queue is exposed from a global right-side panel, Settings live as an independent lower-left sidebar utility workspace, compact theme/language toggles sit directly above Settings, `Ctrl+K` opens a command palette, and the shell adapts more cleanly across compact and wide desktop widths. Phase 5 build/packaging/distribution still remains open.
+RAVN is a desktop + CLI media application for **acquiring, processing, organizing, and reviewing media**.
+
+- **Desktop runtime:** CustomTkinter
+- **CLI runtime:** Click
+- **Primary external tools:** FFmpeg / FFprobe, yt-dlp, aria2c
+- **Current product state:** Phases 1–4C, Phase 6, Phase 7, and Phase 8 are complete
+- **Open major area:** Phase 5 build / packaging / distribution
+
+RAVN is no longer just a thin yt-dlp front-end. The project now behaves as a broader **media acquisition + studio + library** system built around shared runners, queue/history persistence, and automatic media-library registration.
 
 ## What RAVN Can Do
 
-- Download videos and audio from supported platforms via URL.
-- Fetch playlist metadata, sort/select items, filter by title/duration/popularity, apply range selection, and download only what you choose.
-- Apply download naming presets or custom filename tokens such as `{title}`, `{uploader}`, `{playlist}`, `{upload_date}`, and `{resolution}` from Settings without turning the default Download UI into a raw flag surface.
-- Run batch downloads (up to 50 URLs) through the queue.
-- Convert media formats with FFmpeg and track progress in real time.
-- Download/process/embed subtitles.
-- Automatically acquire preferred-language subtitles during downloads with fallback-language handling, optional auto-generated caption fallback, and optional auto-embed behavior for supported video outputs.
-- Mix audio tracks, concatenate media, overlay/PiP videos, and apply FFmpeg-based video filters from dedicated desktop tabs or the CLI.
-- Run comprehensive media utility operations: quick helpers (remux, extract-audio, mute, trim, preview-clip, thumbnail), audio utilities (volume, fade, bitrate, channels, silence-detect, loudnorm), video utilities (scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace), and smart helpers (blackdetect, scene-preview, scene-thumbnail) from the Utilities desktop tab or CLI.
-- Maintain a local SQLite media library with tags, collections, search filters, duplicate detection, and JSON/CSV export from the desktop UI or CLI.
-- Automatically add supported download, conversion, mixer, and filter outputs into the local media library.
-- Run mixer/filter/library jobs through the shared queue and review persisted download / conversion / Phase 7 operation history in the desktop UI.
-- Work from a grouped desktop shell with `Home`, `Download`, `Studio`, and `Library` workspaces.
-- Open Queue from a global shell panel, access Settings from an independent lower-left sidebar utility entry, and switch theme/language instantly from compact sidebar toggles.
-- Use quick shell actions for paste URL, torrent, convert file, library access, and queue access.
-- Trigger the global command palette with `Ctrl+K` for keyboard-first navigation and common actions.
-- Download / Studio / Library workspaces keep workflow guidance collapsed by default for cleaner progressive disclosure.
-- The shell adapts between compact and wide desktop widths with responsive sidebar/drawer sizing and shorter quick-action labels when space tightens.
-- Workspace switching now keeps views mounted and raises them in place for smoother transitions with less visible redraw flicker.
-- Theme switching now applies in place without a full shell rebuild; language switching refreshes shell/workspace text with lighter in-place updates.
-- Use shell-level keyboard shortcuts such as `Ctrl+Enter`, `Escape`, `Ctrl+L`, `Ctrl+K`, and `Ctrl+,` for fast actions and settings access.
-- Use CLI for automation (`download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, `utilities`).
+### 1. Media Acquisition
 
-## Torrent / Magnet Features
+RAVN can download media from supported online sources through a unified acquisition flow.
 
-Torrent support is fully integrated (Phase 6 complete):
+Supported acquisition behaviors include:
 
-- Magnet links and `.torrent` files are auto-detected in download flow.
-- Download modes:
-  - `FULL` (standard complete download)
-  - `SEQUENTIAL` (piece order optimized for early playback)
-  - `STREAM` (local HTTP stream endpoint + quick play action)
-- `.torrent` drag-and-drop to URL input is supported (with safe fallback when DnD backend is unavailable).
-- Dedicated torrent tab now shows a manager-style status table with torrent/file name, progress, total size, downloaded, remaining, speed, ETA, peers, and seeders.
-- Multiple torrents can be queued from the torrent tab, paused, resumed, auto-advanced one-by-one, and filtered by queued / paused / completed state.
-- Completed/discovered torrent payload files are shown as child rows under each torrent session.
-- aria2-backed progress and errors are surfaced to UI feedback/toasts.
-- `Open in Player` now prefers the primary downloaded media file and falls back safely when a stream URL is unavailable.
-- Torrent settings are available in UI (`aria2c path`, `seed time`, `max connections`).
-- CLI command available once the package is installed (`ravn torrent`) or directly from a source checkout via `python -m ravn_app.cli torrent ...`.
+- single-URL downloads
+- playlist metadata fetch + selective playlist download
+- batch downloads from multiline URL lists
+- magnet links and `.torrent` files
+- torrent download management through aria2
+- reusable acquisition presets:
+  - `Custom`
+  - `Music`
+  - `Podcast`
+  - `Archive`
+  - `Social Clip`
 
-## Status
+Acquisition features include:
 
-- Main entry point: python ravn.py
-- Primary desktop workspaces: home, download, studio, library
-- Queue is now exposed from a global right-side panel instead of primary navigation
-- Settings now open as an independent lower-left sidebar utility workspace instead of a floating drawer-triggered panel
-- Theme and language selectors were removed from the Settings page in favor of shell-level sidebar toggles
-- Download workspace supports single URL, playlist selection/sorting, playlist title-duration-popularity filtering with range selection, batch queue (up to 50), magnet/torrent flows, settings-backed filename presets/templates with safe post-download renaming, and downloader-side subtitle automation with preferred/fallback language handling
-- Download workspace now groups the classic downloader and torrent manager under one segmented shell
-- Studio workspace groups convert, subtitle, filters, and mixer tools
-- Library workspace groups media library and history views
-- Dedicated torrent surface still provides queueable session rows with live torrent name / progress / total size / downloaded / remaining / speed / ETA / peers / seeders tracking, per-file child rows, queued-paused-completed filtering, pause/resume controls, and improved player open fallback
-- Main media execution uses shared runners from ravn_app/core/runners/
-- Main window is a thin orchestrator for workspace composition, shell quick actions, command-palette routing, accessibility-aware utility panels, adaptive shell layout, tray integration, and main-thread callback pumping
-- Reusable download UI components live in ravn_app/ui/components/
-- Config and history use OS-aware directories (Windows: %APPDATA%/ravn, Linux: ~/.config/ravn)
-- Theme system is strict 2-theme: dark and light (legacy names are normalized)
-- Settings UI is compact one-page scroll layout and now includes downloader subtitle fallback / auto-generated / auto-embed controls alongside naming and metadata options
-- Playlist fetch/sort dialog includes selected total-size summary and high-contrast visibility fixes
-- Phase 7 desktop/media-management stack is active end-to-end (`AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, `MetadataHandler`, `mixer_tab.py`, `filters_tab.py`, `library_tab.py`, TaskQueue wiring, persisted operation history, automatic library indexing)
-- Phases 1-4C, Phase 6, Phase 7, and Phase 8 are complete; Phase 5 remains open in TASKS.md
+- quality intent selection (`Best`, `1080p`, `720p`, `480p`, audio-only behavior)
+- format selection (`MP4`, `WebM`, `MKV`, `MP3`, `M4A`, `AAC`, `FLAC`, `OPUS`, `WAV` depending on flow)
+- quality-based size estimation where source metadata allows it
+- safe filename templating with tokens such as:
+  - `{title}`
+  - `{uploader}`
+  - `{playlist}`
+  - `{upload_date}`
+  - `{resolution}`
+- naming presets:
+  - `standard`
+  - `clean`
+  - `playlist`
+- normalized post-download renaming
+- optional auto-sort folder routing by artist/channel metadata
+- preferred subtitle language selection
+- subtitle fallback language support
+- optional auto-generated subtitle fallback
+- optional downloader-side subtitle embedding
+- post-download automation pipeline:
+  - extract audio
+  - convert final output
+  - embed matching subtitle sidecars
+  - preserve original downloaded artifacts
+  - hand final outputs to library auto-add
+- metadata normalization and enrichment for acquired media
+- platform-aware library tags and structured acquisition metadata
+- robustness controls:
+  - archive-backed duplicate skipping
+  - resumable partial downloads
+  - fallback format retries
+  - optional bandwidth limits
+- collapsed advanced acquisition controls:
+  - browser-cookie auth handoff
+  - `cookies.txt` auth handoff
+  - fragment concurrency tuning
+  - fragment retry tuning
+  - socket timeout tuning
+
+### 2. Playlist Intelligence
+
+Playlist flow is no longer just “download all”. It supports:
+
+- playlist metadata fetch
+- sortable review dialog
+- checkbox-based partial selection
+- range selection
+- title filtering
+- duration filtering
+- popularity-aware filtering when metadata exists
+- selected-count and selected-total-size summaries
+- quality-aware summary calculations
+
+### 3. Torrent / Magnet Support
+
+Torrent support is a first-class capability.
+
+RAVN supports:
+
+- magnet URI detection
+- `.torrent` URL/file detection
+- drag-and-drop `.torrent` input when DnD backend is available
+- aria2-backed torrent downloading
+- torrent queueing from a dedicated UI surface
+- torrent modes:
+  - `FULL`
+  - `SEQUENTIAL`
+  - `STREAM`
+- pause / resume / complete filtering
+- per-session progress and metrics:
+  - progress
+  - total size
+  - downloaded
+  - remaining
+  - speed
+  - ETA
+  - peers
+  - seeders
+- per-file child rows under torrent sessions
+- open-in-player behavior with safe fallback to the best available target
+
+### 4. Studio / Processing Tools
+
+RAVN includes a broader FFmpeg-backed studio toolset.
+
+#### Convert
+- video/audio format conversion
+- codec + quality mapping
+- real-time FFmpeg progress reporting
+- queue integration
+- history persistence
+- optional auto-library registration
+
+#### Subtitle
+- subtitle download
+- subtitle processing
+- subtitle embedding
+- inline error display through `ErrorPanel`
+
+#### Filters
+- FFmpeg-based filter chains
+- queue integration
+- history persistence
+- library auto-add support
+
+#### Mixer
+- audio concatenation and mix-style workflows
+- video concatenation / composition workflows
+- queue integration
+- history persistence
+- library auto-add support
+
+#### Utilities
+RAVN includes a large utility-media helper set in both desktop UI and CLI.
+
+Current utility groups:
+
+- **Quick helpers**
+  - remux
+  - extract-audio
+  - mute
+  - trim
+  - preview clip
+  - thumbnail
+- **Audio utilities**
+  - volume
+  - fade
+  - bitrate
+  - channels
+  - silence-detect
+  - loudnorm
+- **Video utilities**
+  - scale
+  - crop
+  - pad
+  - rotate
+  - fps
+  - brightness / contrast / saturation
+  - blur / sharpen
+  - deinterlace
+- **Smart helpers**
+  - blackdetect
+  - scene-preview
+  - scene-thumbnail
+
+### 5. Media Library + History
+
+RAVN includes a local SQLite-backed media-library system.
+
+Capabilities include:
+
+- add media to a local library
+- automatic registration of supported outputs from:
+  - downloads
+  - conversions
+  - mixer workflows
+  - filter workflows
+  - utility workflows where applicable
+- tags
+- collections
+- search filters
+- duplicate detection
+- JSON export
+- CSV export
+- persisted history for:
+  - downloads
+  - conversions
+  - generic Phase 7 operations
+
+### 6. Queue, Shell, and UX
+
+The desktop shell was redesigned in Phase 8 and now provides a grouped workspace model.
+
+Primary desktop workspaces:
+
+- `Home`
+- `Download`
+- `Studio`
+- `Library`
+
+Shell capabilities include:
+
+- global right-side Queue panel
+- lower-left theme toggle
+- lower-left language toggle
+- lower-left Settings workspace entry
+- shell quick actions
+- command palette (`Ctrl+K`)
+- settings shortcut (`Ctrl+,`)
+- progressive-disclosure guidance panels
+- mounted workspace switching for lower flicker
+- lighter in-place language refresh
+- in-place theme application without full shell rebuild
+- adaptive sizing for compact and wide desktop widths
+
+Keyboard shortcuts currently active across feature surfaces and shell-level flows include:
+
+- `Ctrl+Enter`
+- `Escape`
+- `Ctrl+L`
+- `Ctrl+K`
+- `Ctrl+,`
+
+### 7. CLI Automation
+
+RAVN exposes a shared-core CLI for scripting and automation.
+
+Current CLI commands:
+
+- `download`
+- `convert`
+- `info`
+- `subtitle`
+- `history`
+- `torrent`
+- `mixer`
+- `library`
+- `filters`
+- `utilities`
+- `serve` placeholder
+
+The `download` CLI now mirrors the project’s intent-driven acquisition model instead of exposing a raw yt-dlp passthrough surface.
+
+That includes support for:
+
+- acquisition profiles
+- naming presets / filename templates
+- subtitle preferences
+- post-process automation
+- robustness controls
+- auth/tuning controls
+- JSON output with effective acquisition summaries
+
+## Desktop Information Architecture
+
+### Home
+- quick-start cards
+- recent activity snapshot
+- queue/library context
+- orientation surface for the app
+
+### Download
+- URL / playlist / batch acquisition
+- torrent manager surface
+- profile-driven acquisition controls
+- compact advanced settings via Settings workspace
+
+### Studio
+- Convert
+- Subtitle
+- Filters
+- Mixer
+- Utilities
+
+### Library
+- media library browsing and management
+- history review
+- export/search-oriented workflows
+
+## Current Status
+
+### Complete
+- Phase 1
+- Phase 2
+- Phase 3
+- Phase 4A
+- Phase 4B
+- Phase 4C
+- Phase 4D
+- Phase 6
+- Phase 7
+- Phase 8
+- yt-dlp acquisition-engine upgrade tasks `YTD-01` through `YTD-11`
+
+### Open
+- Phase 5 build / packaging / distribution
+
+## Technology Stack
+
+### Application
+- Python 3.9+
+- CustomTkinter
+- Click
+- SQLite
+
+### External Tools
+- FFmpeg / FFprobe
+- yt-dlp
+- aria2c
+
+### Optional / graceful-degradation pieces
+- `tkinterdnd2` for drag-and-drop
+- optional metadata-related runtime paths where available
+
+## Repository Layout
+
+```text
+ravn.py
+setup.py
+build.ps1
+ravn.spec
+ravn_app/
+  cli.py
+  core/
+    runners/
+    persistence/
+    config_paths.py
+    database.py
+    downloader.py
+    converter.py
+    subtitle_manager.py
+    torrent_downloader.py
+    media_helpers.py
+    download_naming.py
+    download_profiles.py
+    download_metadata.py
+    task_manager.py
+    i18n.py
+    logging_config.py
+    theme_catalog.py
+    app_builder.py
+  ui/
+    main_window.py
+    history_settings_tab.py
+    queue_panel.py
+    components/
+    tabs/
+  translations/
+    en.json
+    tr.json
+  utils/
+    ffmpeg_checker.py
+    metadata_handler.py
+    system_utils.py
+tests/
+docs/
+```
 
 ## Requirements
 
 - Python 3.9+
-- FFmpeg and FFprobe on PATH
-- `aria2c` installed separately for torrent/magnet support (`winget install aria2`, `brew install aria2`, or `apt install aria2`)
-- Packages from requirements.txt
+- FFmpeg and FFprobe on `PATH`
+- `aria2c` installed separately for torrent/magnet support
+- packages from `requirements.txt`
+
+Examples:
 
 ```bash
 pip install -r requirements.txt
 ```
 
+Torrent prerequisite examples:
+
+```bash
+winget install aria2
+brew install aria2
+sudo apt install aria2
+```
+
 ## Run
 
-Desktop app from a source checkout:
+### Desktop
 
 ```bash
 python ravn.py
@@ -92,40 +405,56 @@ Alternative module form:
 python -m ravn_app.ui.main_window
 ```
 
-Install the package locally if you want the `ravn` console command:
+### Install editable package
 
 ```bash
 pip install -e .
 ```
 
-CLI usage from a source checkout:
+### CLI examples
+
+Acquisition examples:
 
 ```bash
-python -m ravn_app.cli download "https://example.com/video" --quality 1080p --format mp4
-python -m ravn_app.cli convert input.mp4 --format mkv --quality high
-python -m ravn_app.cli torrent "magnet:?xt=urn:btih:..." --sequential
+python -m ravn_app.cli download "https://example.com/video" --profile archive --subtitle-lang en --postprocess-embed-subtitles --json
+python -m ravn_app.cli download "https://example.com/channel/track" --profile music --extract-audio --convert-to m4a --output ./downloads
+python -m ravn_app.cli download "https://example.com/video" --profile social-clip --format mp4 --quality 720p
+python -m ravn_app.cli download "https://example.com/video" --cookies-from-browser firefox --cookies-profile Default --json
 ```
 
-CLI usage after `pip install -e .` / packaged install:
+Other CLI examples:
 
 ```bash
+python -m ravn_app.cli convert input.mp4 --format mkv --quality high
+python -m ravn_app.cli torrent "magnet:?xt=urn:btih:..." --sequential
 ravn mixer audio --input intro.mp3 --input main.mp3 --crossfade 1.5 --output merged.mp3
 ravn mixer video clip1.mp4 clip2.mp4 --operation concat --output combined.mp4
 ravn library add ./video.mp4 --title "My Video" --tags work,tutorial
 ravn library search --query video --format mp4 --tags tutorial --json
 ravn filters input.mp4 --brightness 20 --contrast 1.2 --blur 2 --output filtered.mp4
+ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
 ```
 
-## Tests
+## Testing
 
 Verified on 2026-04-03:
 
-- Full baseline: `pytest -q` -> `557 passed, 1 skipped` (558 collected)
-- Targeted subtitle/download regression sweep: `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py` -> `115 passed, 1 skipped`
-- Targeted playlist/download regression sweep: `pytest -q tests/test_ui_logic.py tests/test_runners.py` -> `147 passed`
-- Targeted download/settings regression sweep: `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py` -> `137 passed, 1 skipped`
-- Targeted UI/i18n/design-token regression sweep: `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py` -> `108 passed`
-- Utilities desktop wiring and app startup follow-up were rechecked after Phase 7/8 regressions; `cmd.exe /c ".venv\Scripts\python.exe ravn.py"` returns without traceback in the current environment
+- Full baseline: `pytest -q` -> `578 passed, 1 skipped` (579 collected)
+- Targeted CLI + acquisition regression sweep:
+  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `245 passed, 1 skipped`
+- Targeted acquisition-engine regression sweep:
+  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `206 passed, 1 skipped`
+- Targeted playlist/download regression sweep:
+  - `pytest -q tests/test_ui_logic.py tests/test_runners.py`
+  - `147 passed`
+- Targeted download/settings regression sweep:
+  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py`
+  - `137 passed, 1 skipped`
+- Targeted UI/i18n/design-token regression sweep:
+  - `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py`
+  - `108 passed`
 
 Useful commands:
 
@@ -136,38 +465,31 @@ pytest --collect-only -q
 pytest tests/test_ui_logic.py -q
 ```
 
-## Build
+## Build / Packaging Reality
 
-```powershell
-./build.ps1 check
-./build.ps1 test
-./build.ps1 run
-```
+Build/distribution work exists but is **not finished**.
 
-PyInstaller-related files already exist in ravn.spec and ravn_app/core/app_builder.py.
+Current repo artifacts include:
 
-## Repository Layout
+- `build.ps1`
+- `ravn.spec`
+- `ravn_app/core/app_builder.py`
 
-```text
-ravn_app/
-  core/    media logic, runners, persistence, update, packaging
-  ui/      CustomTkinter shell, tabs, components, tokens
-  utils/   ffmpeg/file/system helpers
-tests/     unit and integration-style tests
-```
+However, Phase 5 remains open. Packaged delivery, bundled runtime validation, and distribution hardening should still be treated as in-progress work.
 
-## Documentation
+## Documentation Map
 
-- AGENTS.md - canonical shared agent context and workflow rules
-- CLAUDE.md - Claude Code compatibility entrypoint/addendum
-- ARCHITECTURE.md - system structure and design constraints
-- PROGRESS.md - validated implementation snapshot
-- TASKS.md - backlog and active workboard
-- docs/phase8_ux_navigation_overhaul.md - approved Phase 8 UX/navigation shell plan
+- `AGENTS.md` — canonical shared agent workflow guide
+- `CLAUDE.md` — Claude-oriented repo entrypoint and condensed engineering guidance
+- `ARCHITECTURE.md` — full system structure, runtime flows, and module map
+- `PROGRESS.md` — validated implementation snapshot
+- `TASKS.md` — backlog and task status board
+- `DEPLOY.md` — current packaging/distribution reality and Phase 5 checklist
+- `docs/phase8_ux_navigation_overhaul.md` — historical/approved Phase 8 shell plan
 
 ## Current Priorities
 
-1. Finish Phase 5 packaging and distribution pipeline.
+1. Finish Phase 5 packaging and distribution work.
 2. Validate bundled FFmpeg/runtime behavior in clean installer environments.
-3. Continue migrating auxiliary direct `subprocess` paths toward shared runner coverage.
-4. Maintain and harden the completed Phase 8 workspace shell as follow-up regressions or UX refinements appear.
+3. Continue migrating auxiliary direct `subprocess` usage toward shared runners where practical.
+4. Maintain and harden the completed workspace shell, acquisition pipeline, and media-library flows.

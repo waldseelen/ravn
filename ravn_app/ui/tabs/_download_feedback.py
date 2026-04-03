@@ -29,38 +29,50 @@ class FeedbackMixin:
         self._stop_processing_feedback()
         self.download_progress.set(1.0)
         self._download_progress_value = 1.0
-        files = ", ".join(result.output_files) if result.output_files else t("download.completedFallback")
-        self.download_status_label.configure(
-            text=t("download.downloadComplete", files=files),
-            text_color=Colors.STATUS_DONE,
-        )
-        self.animation_manager.animate_success_flash(
-            self.download_status_label,
-            duration=Motion.SLOW,
-            base_color=Colors.STATUS_DONE,
-            flash_color=Colors.SUCCESS_FLASH,
-        )
-        self._animate_download_completion_pulse()
+        robustness_metadata = (getattr(result, "metadata", {}) or {}).get("robustness", {}) or {}
+        archive_skipped = bool(robustness_metadata.get("archive_skipped"))
 
-        try:
-            self.bell()
-        except Exception:
-            pass
+        if archive_skipped:
+            self.download_status_label.configure(
+                text=t("download.downloadSkippedDuplicate"),
+                text_color=Colors.TEXT_MUTED,
+            )
+        else:
+            files = ", ".join(result.output_files) if result.output_files else t("download.completedFallback")
+            self.download_status_label.configure(
+                text=t("download.downloadComplete", files=files),
+                text_color=Colors.STATUS_DONE,
+            )
+            self.animation_manager.animate_success_flash(
+                self.download_status_label,
+                duration=Motion.SLOW,
+                base_color=Colors.STATUS_DONE,
+                flash_color=Colors.SUCCESS_FLASH,
+            )
+            self._animate_download_completion_pulse()
 
-        register_outputs = getattr(self, "_register_download_outputs", None)
-        if callable(register_outputs):
             try:
-                register_outputs(result)
+                self.bell()
             except Exception:
                 pass
 
-        if result.output_files:
-            NotificationManager.show_download_complete(Path(result.output_files[0]).name)
+            register_outputs = getattr(self, "_register_download_outputs", None)
+            if callable(register_outputs):
+                try:
+                    register_outputs(result)
+                except Exception:
+                    pass
+
+            if result.output_files:
+                NotificationManager.show_download_complete(Path(result.output_files[0]).name)
 
         toast_manager = self.toast_manager_getter()
         if toast_manager:
-            filename = Path(result.output_files[0]).name if result.output_files else t("common.unknown")
-            toast_manager.show_success(t("download.downloadComplete", files=filename))
+            if archive_skipped:
+                toast_manager.show_warning(t("download.downloadSkippedDuplicate"))
+            else:
+                filename = Path(result.output_files[0]).name if result.output_files else t("common.unknown")
+                toast_manager.show_success(t("download.downloadComplete", files=filename))
 
         self._set_button_loading_state(self.download_btn, is_loading=False)
         restore_text = getattr(self, "_active_btn_restore_text", f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")

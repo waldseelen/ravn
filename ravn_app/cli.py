@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from click.core import ParameterSource
 
+from ravn_app.core.download_profiles import apply_profile_overrides, get_download_profile, resolve_profile_output_dir
 from ravn_app.core.downloader import (
     DownloadFormat,
     DownloadQuality,
@@ -86,6 +88,13 @@ def _parse_csv_values(raw: Optional[str]) -> list[str]:
     return [item.strip() for item in str(raw or "").split(",") if item.strip()]
 
 
+def _option_was_provided(ctx: click.Context, name: str) -> bool:
+    try:
+        return ctx.get_parameter_source(name) not in {ParameterSource.DEFAULT, ParameterSource.DEFAULT_MAP}
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Quality / format mapping helpers
 # ---------------------------------------------------------------------------
@@ -106,6 +115,10 @@ _FORMAT_MAP = {
     "mkv": DownloadFormat.MKV,
     "mp3": DownloadFormat.MP3,
     "m4a": DownloadFormat.M4A,
+    "aac": DownloadFormat.AAC,
+    "flac": DownloadFormat.FLAC,
+    "opus": DownloadFormat.OPUS,
+    "wav": DownloadFormat.WAV,
 }
 
 _VIDEO_QUALITY_MAP = {
@@ -120,6 +133,214 @@ _CODEC_MAP = {
     "vp9": VideoCodec.VP9,
     "av1": VideoCodec.AV1,
 }
+
+_AUDIO_FORMAT_KEYS = {"mp3", "m4a", "aac", "flac", "opus", "wav"}
+_PROFILE_CHOICES = ["custom", "music", "podcast", "archive", "social-clip"]
+_NAMING_PRESET_CHOICES = ["standard", "clean", "playlist"]
+_SUBTITLE_FALLBACK_CHOICES = ["none", "tr", "en", "de", "fr", "es"]
+_AUDIO_BITRATE_CHOICES = ["best", "320k", "192k", "128k"]
+_POSTPROCESS_AUDIO_FORMAT_CHOICES = ["mp3", "m4a", "aac", "flac", "opus", "wav"]
+_POSTPROCESS_CONVERT_CHOICES = ["mp4", "mkv", "webm", "mp3", "m4a", "aac", "flac", "opus"]
+_COOKIES_BROWSER_CHOICES = ["chrome", "firefox", "edge", "safari", "brave", "chromium", "opera"]
+
+
+def _normalize_profile_key(value: str) -> str:
+    return str(value or "custom").strip().lower().replace("-", "_")
+
+
+def _quality_from_profile_label(label: str) -> DownloadQuality:
+    normalized = str(label or "").strip().lower()
+    if normalized in {"sadece ses", "audio only"}:
+        return DownloadQuality.AUDIO_ONLY
+    if normalized in {"1080p"}:
+        return DownloadQuality.HIGH_1080P
+    if normalized in {"720p"}:
+        return DownloadQuality.MEDIUM_720P
+    if normalized in {"480p", "360p"}:
+        return DownloadQuality.LOW_480P
+    return DownloadQuality.BEST
+
+
+def _quality_label_for_payload(value: DownloadQuality) -> str:
+    labels = {
+        DownloadQuality.BEST: "best",
+        DownloadQuality.HIGH_1080P: "1080p",
+        DownloadQuality.MEDIUM_720P: "720p",
+        DownloadQuality.LOW_480P: "480p",
+        DownloadQuality.AUDIO_ONLY: "audio-only",
+    }
+    return labels.get(value, "best")
+
+
+def _format_key_for_payload(value: DownloadFormat) -> str:
+    return value.extension.lower()
+
+
+def _audio_bitrate_for_download(value: str) -> str:
+    normalized = str(value or "best").strip().lower()
+    if normalized == "best":
+        return "0"
+    return normalized.upper()
+
+
+def _resolve_download_cli_settings(
+    ctx: click.Context,
+    *,
+    profile_key: str,
+    quality: str,
+    fmt: str,
+    output: Optional[Path],
+    audio_bitrate: str,
+    naming_preset: str,
+    filename_template: str,
+    subtitle_lang: Optional[str],
+    subtitle_fallback: str,
+    include_auto_generated: bool,
+    auto_embed_subtitles: bool,
+    extract_audio: bool,
+    extract_audio_format: str,
+    postprocess_audio_bitrate: str,
+    convert_to: Optional[str],
+    postprocess_embed_subtitles: bool,
+    enable_archive: bool,
+    detect_duplicates: bool,
+    continue_partial: bool,
+    format_fallback: bool,
+    rate_limit_kbps: int,
+    cookies_from_browser: Optional[str],
+    cookies_profile: str,
+    cookies_file: Optional[Path],
+    concurrent_fragments: int,
+    fragment_retries: int,
+    socket_timeout: int,
+) -> tuple[str, DownloadFormat, DownloadQuality, dict[str, object], str]:
+    profile = get_download_profile(profile_key)
+    base_output_dir = output or Path.home() / "Downloads" / "RAVN"
+    effective_output_dir = Path(resolve_profile_output_dir(str(base_output_dir), profile))
+    effective_output_dir.mkdir(parents=True, exist_ok=True)
+
+    effective_format_key = profile.format_key.lower() if profile.format_key else fmt.lower()
+    if _option_was_provided(ctx, "fmt"):
+        effective_format_key = fmt.lower()
+    format_type = _FORMAT_MAP[effective_format_key]
+
+    if format_type.extension.lower() in _AUDIO_FORMAT_KEYS:
+        effective_quality = DownloadQuality.AUDIO_ONLY
+    else:
+        effective_quality = _quality_from_profile_label(profile.quality_label)
+        if _option_was_provided(ctx, "quality"):
+            effective_quality = _QUALITY_MAP[quality.lower()]
+        elif profile.key == "custom":
+            effective_quality = _QUALITY_MAP[quality.lower()]
+
+    preferred_subtitle_language = subtitle_lang or profile.preferred_subtitle_language or "tr"
+    if not _option_was_provided(ctx, "subtitle_lang") and profile.key == "custom":
+        preferred_subtitle_language = subtitle_lang or "tr"
+
+    settings: dict[str, object] = {
+        "embed_metadata": True,
+        "embed_lyrics": True,
+        "auto_sort_enabled": False,
+        "auto_sort_mode": "artist",
+        "auto_subtitle_download": False,
+        "preferred_subtitle_language": preferred_subtitle_language,
+        "subtitle_fallback_language": subtitle_fallback,
+        "subtitle_include_auto_generated": include_auto_generated,
+        "auto_embed_subtitles": auto_embed_subtitles,
+        "naming_preset": naming_preset,
+        "filename_template": filename_template.strip(),
+        "postprocess_profile": {
+            "extract_audio": extract_audio,
+            "audio_format": extract_audio_format,
+            "audio_bitrate": postprocess_audio_bitrate,
+            "convert_enabled": bool(convert_to),
+            "convert_format": str(convert_to or ""),
+            "embed_subtitles": postprocess_embed_subtitles,
+        },
+        "robustness_profile": {
+            "enable_archive": enable_archive,
+            "detect_duplicates": detect_duplicates,
+            "continue_partial": continue_partial,
+            "format_fallback": format_fallback,
+            "rate_limit_kbps": max(0, int(rate_limit_kbps or 0)),
+        },
+        "advanced_profile": {
+            "cookies_mode": "none",
+            "cookies_browser": "chrome",
+            "cookies_profile": cookies_profile.strip(),
+            "cookies_file": str(cookies_file) if cookies_file else "",
+            "concurrent_fragments": max(1, int(concurrent_fragments or 1)),
+            "fragment_retries": max(0, int(fragment_retries or 0)),
+            "socket_timeout_seconds": max(0, int(socket_timeout or 0)),
+        },
+    }
+
+    settings = apply_profile_overrides(settings, profile)
+
+    if _option_was_provided(ctx, "naming_preset"):
+        settings["naming_preset"] = naming_preset
+    if _option_was_provided(ctx, "filename_template"):
+        settings["filename_template"] = filename_template.strip()
+    if _option_was_provided(ctx, "subtitle_lang"):
+        settings["preferred_subtitle_language"] = subtitle_lang or "tr"
+    if _option_was_provided(ctx, "subtitle_fallback"):
+        settings["subtitle_fallback_language"] = subtitle_fallback
+    if _option_was_provided(ctx, "include_auto_generated"):
+        settings["subtitle_include_auto_generated"] = include_auto_generated
+    if _option_was_provided(ctx, "auto_embed_subtitles"):
+        settings["auto_embed_subtitles"] = auto_embed_subtitles
+    if _option_was_provided(ctx, "extract_audio"):
+        settings["postprocess_profile"]["extract_audio"] = extract_audio
+    if _option_was_provided(ctx, "extract_audio_format"):
+        settings["postprocess_profile"]["audio_format"] = extract_audio_format
+    if _option_was_provided(ctx, "postprocess_audio_bitrate"):
+        settings["postprocess_profile"]["audio_bitrate"] = postprocess_audio_bitrate
+    if _option_was_provided(ctx, "convert_to"):
+        settings["postprocess_profile"]["convert_enabled"] = bool(convert_to)
+        settings["postprocess_profile"]["convert_format"] = str(convert_to or "")
+    if _option_was_provided(ctx, "postprocess_embed_subtitles"):
+        settings["postprocess_profile"]["embed_subtitles"] = postprocess_embed_subtitles
+
+    if cookies_from_browser and cookies_file:
+        raise click.ClickException("Choose either --cookies-from-browser or --cookies-file, not both.")
+    if cookies_profile and not cookies_from_browser:
+        raise click.ClickException("--cookies-profile requires --cookies-from-browser.")
+    if cookies_from_browser:
+        settings["advanced_profile"].update(
+            {
+                "cookies_mode": "browser",
+                "cookies_browser": cookies_from_browser,
+                "cookies_profile": cookies_profile.strip(),
+                "cookies_file": "",
+            }
+        )
+    elif cookies_file:
+        settings["advanced_profile"].update(
+            {
+                "cookies_mode": "file",
+                "cookies_file": str(cookies_file),
+                "cookies_profile": "",
+            }
+        )
+
+    effective_audio_bitrate = profile.audio_bitrate or _audio_bitrate_for_download(audio_bitrate)
+    if _option_was_provided(ctx, "audio_bitrate"):
+        effective_audio_bitrate = _audio_bitrate_for_download(audio_bitrate)
+    if format_type.extension.lower() in _AUDIO_FORMAT_KEYS:
+        settings["audio_bitrate"] = effective_audio_bitrate
+
+    summary = {
+        "profile": profile.key,
+        "format": _format_key_for_payload(format_type),
+        "quality": _quality_label_for_payload(effective_quality),
+        "output_dir": str(effective_output_dir),
+        "naming_preset": settings.get("naming_preset"),
+        "filename_template": settings.get("filename_template") or "",
+        "postprocess_profile": settings.get("postprocess_profile"),
+        "robustness_profile": settings.get("robustness_profile"),
+        "advanced_profile": settings.get("advanced_profile"),
+    }
+    return str(effective_output_dir), format_type, effective_quality, settings, json.dumps(summary, default=str)
 
 
 # ---------------------------------------------------------------------------
@@ -139,38 +360,163 @@ def cli():
 @cli.command("download")
 @click.argument("url")
 @click.option(
+    "--profile",
+    default="custom",
+    type=click.Choice(_PROFILE_CHOICES, case_sensitive=False),
+    show_default=True,
+    help="Acquisition preset (custom, music, podcast, archive, social-clip).",
+)
+@click.option(
     "--quality",
     default="best",
-    type=click.Choice(["360p", "480p", "720p", "1080p", "1440p", "2160p", "best"],
-                      case_sensitive=False),
+    type=click.Choice(["360p", "480p", "720p", "1080p", "1440p", "2160p", "best"], case_sensitive=False),
     show_default=True,
-    help="Download quality.",
+    help="Preferred quality override for video-oriented presets.",
 )
 @click.option(
     "--format", "fmt",
     default="mp4",
-    type=click.Choice(["mp4", "webm", "mkv", "mp3", "m4a"], case_sensitive=False),
+    type=click.Choice(list(_FORMAT_MAP.keys()), case_sensitive=False),
     show_default=True,
-    help="Output format.",
+    help="Preferred output format override.",
 )
+@click.option(
+    "--audio-bitrate",
+    default="best",
+    type=click.Choice(_AUDIO_BITRATE_CHOICES, case_sensitive=False),
+    show_default=True,
+    help="Downloader audio bitrate intent for audio-only outputs.",
+)
+@click.option(
+    "--naming-preset",
+    default="standard",
+    type=click.Choice(_NAMING_PRESET_CHOICES, case_sensitive=False),
+    show_default=True,
+    help="Naming preset used by the post-download naming pipeline.",
+)
+@click.option("--filename-template", default="", help="Optional filename template override, e.g. {playlist}/{title}.")
+@click.option("--subtitle-lang", default=None, help="Preferred subtitle language for downloader automation.")
+@click.option(
+    "--subtitle-fallback",
+    default="en",
+    type=click.Choice(_SUBTITLE_FALLBACK_CHOICES, case_sensitive=False),
+    show_default=True,
+    help="Fallback subtitle language (use 'none' to disable fallback).",
+)
+@click.option("--include-auto-generated/--no-include-auto-generated", default=True, show_default=True, help="Allow auto-generated subtitles as downloader fallback.")
+@click.option("--auto-embed-subtitles/--no-auto-embed-subtitles", default=False, show_default=True, help="Ask yt-dlp to embed subtitles during supported video downloads.")
+@click.option("--extract-audio", is_flag=True, default=False, help="Run post-download audio extraction after acquisition.")
+@click.option(
+    "--extract-audio-format",
+    default="mp3",
+    type=click.Choice(_POSTPROCESS_AUDIO_FORMAT_CHOICES, case_sensitive=False),
+    show_default=True,
+    help="Target format for the post-download extract-audio step.",
+)
+@click.option(
+    "--postprocess-audio-bitrate",
+    default="192k",
+    type=click.Choice(["128k", "192k", "320k"], case_sensitive=False),
+    show_default=True,
+    help="Audio bitrate used by post-download extract/convert steps.",
+)
+@click.option(
+    "--convert-to",
+    default=None,
+    type=click.Choice(_POSTPROCESS_CONVERT_CHOICES, case_sensitive=False),
+    help="Optional final conversion target after download.",
+)
+@click.option("--postprocess-embed-subtitles/--no-postprocess-embed-subtitles", default=False, show_default=True, help="Embed matching subtitle sidecars during the FFmpeg post-process pipeline.")
+@click.option("--archive/--no-archive", "enable_archive", default=True, show_default=True, help="Track completed downloads in the shared archive.")
+@click.option("--detect-duplicates/--no-detect-duplicates", default=True, show_default=True, help="Skip items already present in the shared archive.")
+@click.option("--continue-partial/--no-continue-partial", default=True, show_default=True, help="Resume partial downloads when possible.")
+@click.option("--format-fallback/--no-format-fallback", default=True, show_default=True, help="Retry with fallback format specs before failing.")
+@click.option("--rate-limit-kbps", default=0, type=int, show_default=True, help="Optional bandwidth limit in KB/s (0 = unlimited).")
+@click.option("--cookies-from-browser", default=None, type=click.Choice(_COOKIES_BROWSER_CHOICES, case_sensitive=False), help="Load authenticated cookies from a supported browser.")
+@click.option("--cookies-profile", default="", help="Optional browser profile/container name used with --cookies-from-browser.")
+@click.option("--cookies-file", default=None, type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Use an exported cookies.txt file for authenticated sources.")
+@click.option("--concurrent-fragments", default=1, type=int, show_default=True, help="Concurrent fragment downloads for segmented sources.")
+@click.option("--fragment-retries", default=0, type=int, show_default=True, help="Retry count for fragment failures.")
+@click.option("--socket-timeout", default=0, type=int, show_default=True, help="Socket timeout in seconds (0 = default).")
 @click.option(
     "--output",
     default=None,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Output directory (default: ~/Downloads/RAVN).",
+    help="Output directory base (profile subfolders still apply).",
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
-def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_json: bool):
-    """Download media from URL."""
-    output_dir = output or Path.home() / "Downloads" / "RAVN"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    dl_quality = _QUALITY_MAP[quality.lower()]
-    dl_format = _FORMAT_MAP[fmt.lower()]
+@click.pass_context
+def download_cmd(
+    ctx: click.Context,
+    url: str,
+    profile: str,
+    quality: str,
+    fmt: str,
+    audio_bitrate: str,
+    naming_preset: str,
+    filename_template: str,
+    subtitle_lang: Optional[str],
+    subtitle_fallback: str,
+    include_auto_generated: bool,
+    auto_embed_subtitles: bool,
+    extract_audio: bool,
+    extract_audio_format: str,
+    postprocess_audio_bitrate: str,
+    convert_to: Optional[str],
+    postprocess_embed_subtitles: bool,
+    enable_archive: bool,
+    detect_duplicates: bool,
+    continue_partial: bool,
+    format_fallback: bool,
+    rate_limit_kbps: int,
+    cookies_from_browser: Optional[str],
+    cookies_profile: str,
+    cookies_file: Optional[Path],
+    concurrent_fragments: int,
+    fragment_retries: int,
+    socket_timeout: int,
+    output: Optional[Path],
+    as_json: bool,
+):
+    """Download media from URL using intent-driven acquisition settings."""
+    try:
+        output_dir, dl_format, dl_quality, download_settings, summary_json = _resolve_download_cli_settings(
+            ctx,
+            profile_key=_normalize_profile_key(profile),
+            quality=quality,
+            fmt=fmt,
+            output=output,
+            audio_bitrate=audio_bitrate,
+            naming_preset=naming_preset,
+            filename_template=filename_template,
+            subtitle_lang=subtitle_lang,
+            subtitle_fallback=subtitle_fallback,
+            include_auto_generated=include_auto_generated,
+            auto_embed_subtitles=auto_embed_subtitles,
+            extract_audio=extract_audio,
+            extract_audio_format=extract_audio_format,
+            postprocess_audio_bitrate=postprocess_audio_bitrate,
+            convert_to=convert_to.lower() if convert_to else None,
+            postprocess_embed_subtitles=postprocess_embed_subtitles,
+            enable_archive=enable_archive,
+            detect_duplicates=detect_duplicates,
+            continue_partial=continue_partial,
+            format_fallback=format_fallback,
+            rate_limit_kbps=rate_limit_kbps,
+            cookies_from_browser=cookies_from_browser.lower() if cookies_from_browser else None,
+            cookies_profile=cookies_profile,
+            cookies_file=cookies_file,
+            concurrent_fragments=concurrent_fragments,
+            fragment_retries=fragment_retries,
+            socket_timeout=socket_timeout,
+        )
+    except click.ClickException as exc:
+        _error(exc.message, as_json)
 
     if not as_json:
         click.echo(_tr("cli.downloadStarting", url=url))
-        click.echo(_tr("cli.downloadStatus", quality=quality, format=fmt, output=str(output_dir)))
+        click.echo(_tr("cli.downloadStatus", quality=_quality_label_for_payload(dl_quality), format=_format_key_for_payload(dl_format), output=str(output_dir)))
+        click.echo(f"  preset: {_normalize_profile_key(profile)}")
 
     def _progress(percent: int, status: str) -> None:
         if not as_json:
@@ -184,24 +530,24 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
             format_type=dl_format,
             quality=dl_quality,
             progress_callback=_progress,
+            **download_settings,
         )
     except Exception as exc:
         _error(str(exc), as_json)
 
     if not as_json:
-        click.echo()  # newline after progress
+        click.echo()
 
     if not result.success:
         _error(result.error_message or _tr("cli.downloadFailed"), as_json)
 
-    # Persist to DB
     try:
         db = DatabaseManager()
         record = DownloadRecord(
             url=url,
             title=result.title or "",
-            format=fmt,
-            quality=quality,
+            format=_format_key_for_payload(dl_format),
+            quality=_quality_label_for_payload(dl_quality),
             file_path=result.output_files[0] if result.output_files else "",
             download_date=datetime.now().isoformat(),
             status="completed",
@@ -210,7 +556,7 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
         db.add_download(record)
         db.close()
     except Exception:
-        pass  # DB errors are non-fatal for CLI
+        pass
 
     payload = {
         "success": True,
@@ -218,6 +564,9 @@ def download_cmd(url: str, quality: str, fmt: str, output: Optional[Path], as_js
         "files": result.output_files,
         "title": result.title,
         "duration": result.duration,
+        "profile": _normalize_profile_key(profile),
+        "effective": json.loads(summary_json),
+        "metadata": getattr(result, "metadata", {}) or {},
     }
     if as_json:
         _output(payload, as_json=True)

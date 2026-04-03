@@ -52,7 +52,9 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.config_manager = ConfigManager()
         self.i18n = get_i18n(self.config_manager)
         self.platform_manager = PlatformManager()
-        self.downloader = YouTubeDownloader()
+        self.downloader = YouTubeDownloader(
+            ffmpeg_path=self.config_manager.get("ffmpeg_path", "ffmpeg"),
+        )
         self.task_queue = get_task_queue()
         self.queue_paused = False
         self.animation_manager = get_animation_manager()

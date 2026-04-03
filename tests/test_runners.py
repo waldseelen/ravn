@@ -800,6 +800,29 @@ class TestYtDlpRunner:
 
         assert result.success is True
         assert result.return_code == 0
+        assert result.metadata["archive_skipped"] is False
+
+    @patch('subprocess.Popen')
+    @patch('os.makedirs')
+    def test_download_success_marks_archive_skip_metadata(self, mock_makedirs, mock_popen):
+        """Archive-skip output should be exposed to higher download layers."""
+        mock_process = Mock()
+        mock_process.communicate.return_value = (
+            "[download] VIDEO123: has already been recorded in the archive",
+            "",
+        )
+        mock_process.returncode = 0
+        mock_popen.return_value = mock_process
+
+        runner = YtDlpRunner()
+        result = runner.download(
+            url="https://example.com/video",
+            output_dir="output"
+        )
+
+        assert result.success is True
+        assert result.metadata["archive_skipped"] is True
+        assert result.metadata["downloaded_files"] == []
 
     @patch('subprocess.Popen')
     @patch('os.makedirs')

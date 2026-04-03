@@ -1,678 +1,822 @@
 # ARCHITECTURE
 
-## Overview
+## 1. Purpose
 
-RAVN is a layered **desktop + CLI** media application.
+RAVN is a layered **desktop + CLI media application**.
 
-- The **desktop runtime** is built with CustomTkinter and now uses the Phase 8 workspace shell: a left sidebar, header, shell-level quick actions, a shared right-side Queue panel, and a lower-left utility area for theme/language toggles plus the Settings workspace entry.
-- The **CLI runtime** is built with Click and routes automation-oriented commands into the same core services used by the desktop app.
-- Primary external-tool execution is funneled through shared runner abstractions in `ravn_app/core/runners/`.
-- Persistence is split between:
-  - `ravn_history.db` for downloads / conversions / generic operations
-  - `media_library.db` for the local Phase 7 media catalog
-- Phase 5 build/distribution work remains open.
+It combines four major product areas under one codebase:
 
-Current desktop shell reality:
+1. **Acquisition** — download URLs, playlists, batches, torrents, and magnets
+2. **Studio processing** — convert, subtitle, filter, mix, and utility workflows
+3. **Organization** — history persistence and local media-library management
+4. **Shell / automation** — adaptive desktop navigation plus shared-core CLI access
 
-- Primary workspaces: `Home`, `Download`, `Studio`, `Library`
-- Global side panel: `Queue`
-- Lower-left sidebar utility area: theme toggle, language toggle, `Settings`
-- Shell quick-actions row: live
-- Command palette: live (`Ctrl+K`)
-- Workspace-level collapsed guidance panels: live
-- Phase 8 shell model: complete
+The architectural direction is intentionally:
 
-## Active Runtime Topology
+- **shared-core first**
+- **runner-driven external tool execution**
+- **thin shell orchestration**
+- **modular feature surfaces**
+- **OS-aware persistence paths**
+- **translation-key-based UI strings**
+
+Phase 5 build/distribution remains open, but the functional runtime architecture for desktop, CLI, queue, history, and media-library flows is already in place.
+
+---
+
+## 2. High-Level Runtime Model
+
+### Desktop runtime
+
+- Entry point: `ravn.py`
+- UI shell: `ravn_app/ui/main_window.py`
+- Desktop toolkit: CustomTkinter
+- Main interaction model:
+  - workspace shell
+  - feature tabs
+  - queue drawer
+  - settings workspace
+  - command palette
+
+### CLI runtime
+
+- Entry point: `ravn_app/cli.py`
+- CLI toolkit: Click
+- CLI philosophy:
+  - reuse shared services
+  - reuse shared runners
+  - expose product-level concepts, not raw upstream flag dumps
+  - support text and JSON output
+
+### External execution model
+
+All primary media/tool processes are intended to run through shared runners in:
+
+- `ravn_app/core/runners/ffmpeg.py`
+- `ravn_app/core/runners/ytdlp.py`
+- `ravn_app/core/runners/aria2.py`
+- `ravn_app/core/runners/audio_mixer.py`
+- `ravn_app/core/runners/video_mixer.py`
+
+### Persistence model
+
+Persistence is split into two SQLite domains plus config/data paths:
+
+- **history/config persistence**
+  - `ravn_app/core/database.py`
+  - history rows for downloads / conversions / generic operations
+- **media library persistence**
+  - `ravn_app/core/persistence/media_library.py`
+- **OS-aware directories**
+  - `ravn_app/core/config_paths.py`
+
+---
+
+## 3. Active Runtime Topology
 
 ```text
-Desktop entry
+Desktop
 ravn.py
   -> setup_logging()
   -> ensure_directories_exist()
   -> migrate_all_legacy_files()
-  -> ravn_app.ui.main_window.YouTubeDownloaderApp
-      -> sidebar shell
-          -> HomeWorkspace
-          -> DownloadWorkspace
-              -> DownloadTab
-              -> TorrentTab
-          -> StudioWorkspace
-              -> ConverterTab
-              -> SubtitleTab
-              -> FiltersTab
-              -> MixerTab
-              -> UtilitiesTab
-          -> LibraryWorkspace
-              -> LibraryTab
-              -> HistoryTab
-          -> Queue drawer shell
-              -> QueueTab
-                  -> QueuePanel
-          -> Settings workspace
-              -> history_settings_tab.SettingsTab
-      -> TaskQueue callback pump
-      -> UI callback queue
-      -> shared core services / runners / persistence
+  -> YouTubeDownloaderApp
+      -> shell composition
+      -> shared services
+      -> workspace host
+      -> queue drawer
+      -> settings workspace
+      -> task callback pump
+      -> deferred UI callback pump
 
-CLI entry
-setup.py console_script `ravn`
-  or python -m ravn_app.cli
-      -> Click command tree
-      -> shared core services / runners / persistence
+CLI
+python -m ravn_app.cli / console script `ravn`
+  -> Click command tree
+  -> shared core services
+  -> shared runner-backed operations
+  -> optional DB / library persistence
+  -> text or JSON output
 ```
 
-## Repository Skeleton
+---
+
+## 4. Repository Structure
 
 ```text
 ravn.py
 setup.py
 build.ps1
 ravn.spec
-docs/
-  phase8_ux_navigation_overhaul.md
+
 ravn_app/
   cli.py
   core/
-    runners/              # shared ffmpeg / yt-dlp / aria2 + mixer helpers
-    persistence/          # media library persistence + auto-sync helpers
-    app_builder.py        # packaging/build helpers
-    config_paths.py       # OS-aware config/data/cache paths + legacy migration helpers
-    converter.py          # FFmpeg conversion operations
-    database.py           # history DB + config persistence + schema migrations
-    download_naming.py    # filename preset/token helpers + safe post-download renaming
-    downloader.py         # yt-dlp-backed download orchestration
-    error_handler.py      # user-friendly error parsing
-    i18n.py               # translation lookup/runtime language selection
-    logging_config.py     # logging bootstrap
-    plugin_system.py      # extension surface (not central to current runtime)
-    platform_support.py   # platform helpers
-    subtitle_manager.py   # subtitle download/embed helpers
-    task_manager.py       # shared async queue/callback model
-    theme_catalog.py      # strict dark/light theme model
-    torrent_downloader.py # aria2-backed torrent orchestration
-    update_manager.py     # app update helpers
+    app_builder.py
+    animation_manager.py
+    audio_normalizer.py
+    config_paths.py
+    converter.py
+    database.py
+    download_metadata.py
+    download_naming.py
+    download_profiles.py
+    downloader.py
+    error_handler.py
+    i18n.py
+    logging_config.py
+    media_helpers.py
+    platform_support.py
+    plugin_system.py
+    subtitle_manager.py
+    task_manager.py
+    theme_catalog.py
+    torrent_downloader.py
+    update_manager.py
+    persistence/
+      library_sync.py
+      media_library.py
+    runners/
+      base.py
+      ffmpeg.py
+      ytdlp.py
+      aria2.py
+      audio_mixer.py
+      video_mixer.py
   ui/
-    components/           # reusable widgets
-    tabs/                 # workspace hosts + tab wrappers + feature tabs
-    advanced_features.py  # tray / notifications / theme helpers
-    converter_tab.py      # existing converter implementation
+    advanced_features.py
+    converter_tab.py
+    design_tokens.py
+    download_tab.py
     history_settings_tab.py
-    main_window.py        # main desktop shell
-    queue_panel.py        # queue UI
-    subtitle_tab.py       # existing subtitle implementation
-    ui_components.py      # shared UI helpers/widgets
+    main_window.py
+    queue_panel.py
+    subtitle_tab.py
+    ui_components.py
+    components/
+      collapsible_panel.py
+      command_palette.py
+      error_panel.py
+      playlist_item.py
+      playlist_sort_dialog.py
+      url_input.py
+    tabs/
+      _download_feedback.py
+      _download_playlist.py
+      converter_tab.py
+      download_tab.py
+      download_workspace.py
+      filters_tab.py
+      history_tab.py
+      home_workspace.py
+      library_tab.py
+      library_workspace.py
+      mixer_tab.py
+      queue_tab.py
+      settings_tab.py
+      studio_workspace.py
+      subtitle_tab.py
+      torrent_tab.py
+      utilities_tab.py
   translations/
     en.json
     tr.json
   utils/
     ffmpeg_checker.py
+    file_utils.py
     metadata_handler.py
     system_utils.py
+
 tests/
+docs/
 ```
 
-## Entry Surfaces
+---
 
-### 1. Desktop Entry
+## 5. Entry Surfaces
 
-- `ravn.py` is the GUI launcher.
-- Startup order is:
-  1. `setup_logging()`
-  2. `ensure_directories_exist()`
-  3. `migrate_all_legacy_files()`
-  4. delayed import of `YouTubeDownloaderApp`
-- The delayed UI import reduces noisy traceback behavior during early Ctrl+C interrupts.
+## 5.1 Desktop entry
 
-### 2. CLI Entry
+File: `ravn.py`
 
-- `ravn_app/cli.py` is the Click-based CLI surface.
-- It is reachable through:
-  - `python -m ravn_app.cli ...`
-  - installed console script `ravn ...` via `setup.py`
-- Current CLI surface includes:
-  - `download`
-  - `convert`
-  - `info`
-  - `subtitle`
-  - `history`
-  - `torrent`
-  - `mixer ...`
-  - `library ...`
-  - `filters`
-  - `utilities ...`
-  - `serve` placeholder
-- CLI commands support human-readable output plus `--json` where implemented.
+Startup order:
 
-## Layer Model
+1. `setup_logging()`
+2. `ensure_directories_exist()`
+3. `migrate_all_legacy_files()`
+4. delayed import of `YouTubeDownloaderApp`
 
-### 1. Shell / UI Orchestration Layer
+Why this matters:
 
-Primary orchestrator: `ravn_app/ui/main_window.py`
+- logging is initialized before most runtime actions
+- config/data/cache directories exist before service startup
+- old config/history files can migrate before normal persistence begins
+- delayed UI import reduces noisy early-interrupt behavior
 
-`YouTubeDownloaderApp` is intentionally a thin shell that owns application-wide concerns and composes feature modules. It is responsible for:
+## 5.2 CLI entry
 
-- creating shared services:
-  - `DatabaseManager`
-  - `ConfigManager`
-  - i18n runtime
-  - `PlatformManager`
-  - `YouTubeDownloader`
-  - global `TaskQueue`
-  - `MediaLibraryAutoAdder`
-- applying the active theme
-- composing the desktop shell:
-  - left sidebar
-  - header
-  - header quick actions
-  - main workspace host
-  - shared drawer shell
-  - footer status area
-  - lower-left utility toggles for theme/language plus Settings access
-- switching workspaces and drawers
-- routing shell-level shortcuts and command-palette actions
-- tray integration and close-to-tray behavior
-- pumping task callbacks and deferred UI callbacks on the main thread
-- rebuilding visible UI when language or theme changes at runtime, including tray/menu text refresh for live language switching
+File: `ravn_app/cli.py`
 
-#### Current Shell Composition
+Current CLI surface:
 
-- **Sidebar navigation**
-  - `Home`
-  - `Download`
-  - `Studio`
-  - `Library`
-- **Header utility actions**
-  - Command Palette button
-  - Queue button with live pending/running count
-- **Header quick actions**
-  - Paste URL
-  - Add Torrent
-  - Convert File
-  - Open Library
-- **Shared drawer shell**
-  - Queue drawer
-- **Sidebar utility area**
-  - Theme toggle
-  - Language toggle
-  - Settings opens as an independent workspace
-- **Footer**
-  - shell-level status text
+- `download`
+- `convert`
+- `info`
+- `subtitle`
+- `history`
+- `torrent`
+- `mixer`
+- `library`
+- `filters`
+- `utilities`
+- `serve` placeholder
 
-#### Global Shortcuts
+CLI design rule:
 
-`main_window.py` currently binds shell-level shortcuts for the visible feature surface:
+- the CLI should map to the same product concepts used by the desktop app
+- especially for acquisition, the CLI should prefer:
+  - profiles
+  - naming presets/templates
+  - subtitle preferences
+  - post-process controls
+  - robustness controls
+  - auth/tuning controls
+- and avoid becoming a raw yt-dlp passthrough surface
 
-- `Ctrl+Enter`
-- `Escape`
-- `Ctrl+L`
-- `Ctrl+K` -> open Command Palette
-- `Ctrl+,` -> open Settings workspace
+---
 
-Shortcut routing is delegated to the currently visible feature widget where applicable, and drawer open/close now restores focus more predictably at the shell level.
+## 6. Layer Model
 
-#### Adaptive Layout Behavior
+## 6.1 Shell / orchestration layer
 
-The shell currently applies lightweight adaptive behavior rather than a full responsive-layout subsystem:
+Primary file: `ravn_app/ui/main_window.py`
 
-- content paddings are bounded to keep the main stage from stretching too wide
-- the shell targets compact / standard / wide max-content bands instead of one fixed width
-- sidebar width adapts between compact and wide desktop sizes
-- drawer width grows through multiple steps instead of staying fixed
-- quick-action and command-palette button labels shorten in tighter widths to avoid unnecessary header crowding
-- primary workspaces stay mounted in a shared host and switch via in-place raising rather than repeated unmount/remount cycles, reducing visible redraw flash during navigation
-- theme changes now apply without a full shell rebuild, while runtime language changes use a lighter in-place refresh path for shell/workspace text
+`YouTubeDownloaderApp` acts as a **thin application shell**.
 
-### 2. Workspace Layer
+Responsibilities:
 
-The top-level app experience is now grouped by user intent rather than exposing every feature as a first-class top navigation item.
+- create shared services
+- apply theme + i18n state
+- compose the workspace shell
+- wire shell-level quick actions
+- expose queue drawer access
+- expose settings workspace access
+- route shell-level shortcuts
+- manage tray integration and close-to-tray behavior
+- pump task callbacks on the main thread
+- refresh visible UI for theme/language changes
 
-#### `HomeWorkspace`
+Shared services created here typically include:
+
+- `DatabaseManager`
+- `ConfigManager`
+- i18n runtime
+- `PlatformManager`
+- `YouTubeDownloader`
+- `TaskQueue`
+- `MediaLibraryAutoAdder`
+
+## 6.2 Workspace layer
+
+The Phase 8 shell groups features by user intent.
+
+### Home workspace
 
 File: `ravn_app/ui/tabs/home_workspace.py`
 
 Responsibilities:
 
-- dashboard landing screen
-- quick-start cards into major workflows
-- summary cards backed by `DatabaseManager.get_statistics()` and `TaskQueue` counts
-- recent activity list built from recent downloads and generic operations
+- landing/dashboard surface
+- orientation for first-run / return usage
+- recent activity / summary cards
+- quick access into major flows
 
-#### `DownloadWorkspace`
+### Download workspace
 
-File: `ravn_app/ui/tabs/download_workspace.py`
+Files:
 
-Responsibilities:
-
-- grouped entry point for:
-  - URL downloads
-  - playlist workflows
-  - batch downloads
-  - torrent workflows
-- segmented navigation switches between:
-  - shared `DownloadTab` for URL / playlist / batch modes
-  - dedicated `TorrentTab` for torrent manager behavior
-- batch mode is toggled by synchronizing internal state on the reused `DownloadTab`
-
-#### `StudioWorkspace`
-
-File: `ravn_app/ui/tabs/studio_workspace.py`
+- `ravn_app/ui/tabs/download_workspace.py`
+- `ravn_app/ui/tabs/download_tab.py`
+- `ravn_app/ui/tabs/torrent_tab.py`
+- `ravn_app/ui/tabs/_download_feedback.py`
+- `ravn_app/ui/tabs/_download_playlist.py`
 
 Responsibilities:
 
-- grouped media-processing workspace
-- internal `CTkTabview` sub-navigation for:
-  - Convert
-  - Subtitle
-  - Filters
-  - Mixer
-  - Utilities
-- reuses existing feature modules instead of rewriting tool logic
+- URL download flow
+- playlist acquisition flow
+- batch acquisition flow
+- torrent manager flow
+- compact profile selector
+- UI feedback and progress handling
+- playlist fetch / selection / filtering / summary logic
 
-Important nuance:
+### Studio workspace
 
-- `ConverterTab` and `SubtitleTab` are older standalone feature implementations reused inside the new workspace shell.
-- `FiltersTab`, `MixerTab`, and `UtilitiesTab` are newer Phase 7+ queue-aware modules.
+Files:
 
-#### `LibraryWorkspace`
-
-File: `ravn_app/ui/tabs/library_workspace.py`
+- `ravn_app/ui/converter_tab.py`
+- `ravn_app/ui/subtitle_tab.py`
+- `ravn_app/ui/tabs/filters_tab.py`
+- `ravn_app/ui/tabs/mixer_tab.py`
+- `ravn_app/ui/tabs/utilities_tab.py`
+- `ravn_app/ui/tabs/studio_workspace.py`
 
 Responsibilities:
 
-- grouped library-oriented workspace
-- internal `CTkTabview` sub-navigation for:
-  - Library
-  - History
-- `LibraryTab` handles media-library management
-- `HistoryTab` is a compatibility wrapper around `history_settings_tab.HistoryTab`
+- conversion workflows
+- subtitle workflows
+- filter workflows
+- mixer workflows
+- broad utility-helper workflows
 
-### 3. Feature UI Layer
+### Library workspace
 
-Feature logic lives below the shell/workspace level.
+Files:
 
-#### Download / Torrent
+- `ravn_app/ui/tabs/library_tab.py`
+- `ravn_app/ui/history_settings_tab.py` (`HistoryTab`)
+- `ravn_app/ui/tabs/library_workspace.py`
 
-- `tabs/download_tab.py`
-  - classic downloader logic
-  - URL metadata fetch
-  - playlist selection/sorting integration
-  - playlist dialog filtering / range-selection orchestration
-  - batch mode handling
-  - queue integration for batch work
-- `tabs/torrent_tab.py`
-  - dedicated torrent manager UI
-  - session rows with progress / speed / ETA / peers / seeders
-  - queued / paused / completed session handling
-  - pause / resume / open behavior
-  - child rows for discovered payload files
+Responsibilities:
 
-#### Media Processing
+- local media library browsing and management
+- history review
+- search / export / collections-oriented flows
 
-- `ui/converter_tab.py`
-  - main converter implementation
-  - wrapped by `ui/tabs/converter_tab.py`
-- `ui/subtitle_tab.py`
-  - main subtitle implementation
-  - wrapped by `ui/tabs/subtitle_tab.py`
-- `tabs/filters_tab.py`
-  - FFmpeg-based filter workflows
-  - queue-aware Phase 7 operations UI
-- `tabs/mixer_tab.py`
-  - audio/video mixing workflows
-  - queue-aware Phase 7 operations UI
-- `tabs/utilities_tab.py`
-  - comprehensive media utility helpers (24 operations across 4 categories)
-  - quick helpers: remux, extract-audio, mute, trim, preview-clip, thumbnail
-  - audio utilities: volume, fade, bitrate, channels, silence-detect, loudnorm
-  - video utilities: scale, crop, pad, rotate, fps, color, blur/sharpen, deinterlace
-  - smart helpers: blackdetect, scene-preview, scene-thumbnail
-  - queue-aware Phase 7+ operations UI
-  - auto-library registration support
+### Queue + settings surfaces
 
-#### Library / History / Settings
+Files:
 
-- `tabs/library_tab.py`
-  - local media catalog browsing
-  - import/search/filter/export
-  - collection-aware library operations
-- `ui/history_settings_tab.py`
-  - compact one-page settings implementation
-  - history implementation reused through wrappers
-- `tabs/history_tab.py`
-  - wrapper around `history_settings_tab.HistoryTab`
-- `tabs/settings_tab.py`
-  - wrapper around `history_settings_tab.SettingsTab`
-- `tabs/queue_tab.py`
-  - wrapper that hosts `QueuePanel`
-- `ui/queue_panel.py`
-  - queue visualization widgets
-  - polls `TaskQueue` state and renders item cards
+- `ravn_app/ui/queue_panel.py`
+- `ravn_app/ui/tabs/queue_tab.py`
+- `ravn_app/ui/history_settings_tab.py` (`SettingsTab`)
+- `ravn_app/ui/tabs/settings_tab.py`
 
-#### Shared UI Components
+Responsibilities:
 
-- `ui/components/error_panel.py`
-  - inline user-friendly error box with details toggle
-- `ui/components/playlist_sort_dialog.py`
-  - sortable playlist picker with selected-count / selected-size summary
-  - title / duration / popularity filtering plus range-based selection helpers
-- `ui/components/playlist_item.py`
-  - playlist row widget
-- `ui/components/url_input.py`
-  - URL input row helpers
-- `ui/ui_components.py`
-  - shared helpers and primitives such as `ToastManager`, `Tooltip`, `style_combo`, `style_entry`, `bind_focus_ring`, `set_button_loading_state`
+- global queue visibility
+- queued/running/completed task display
+- cancel/open-folder actions
+- compact settings page with scroll-based organization
 
-### 4. Core Services Layer
+## 6.3 Core service layer
 
-#### Process Runners
+Core services contain product logic and orchestration.
 
-Directory: `ravn_app/core/runners/`
+### `downloader.py`
 
-- `base.py`
-  - `BaseRunner`
-  - shared availability lookup, process lifecycle, cancel behavior, timeout handling, and normalized `RunnerResult`
-- `ffmpeg.py`
-  - `FFmpegRunner`
-- `ytdlp.py`
-  - `YtDlpRunner`
-- `aria2.py`
-  - `Aria2Runner`
-  - torrent progress parsing via `TorrentProgressSnapshot`
-- `audio_mixer.py`
-  - `AudioMixerRunner`
-- `video_mixer.py`
-  - `VideoMixerRunner`
+The acquisition orchestrator.
 
-#### Domain Services
+Responsibilities:
 
+- map product-level acquisition intent to yt-dlp behavior
+- resolve format/quality selections
+- apply naming presets/templates
+- apply auto-sort output routing
+- apply subtitle-download preferences
+- apply post-download automation pipeline
+- attach normalized/enriched metadata for downstream consumers
+- apply robustness controls
+- apply collapsed advanced acquisition settings
+- return final outputs suitable for history/library flows
+
+Important supporting structures inside the acquisition stack:
+
+- `download_profiles.py`
+  - reusable acquisition presets
+  - profile-to-settings override resolution
+  - output-subdir resolution
 - `download_naming.py`
-  - filename preset definitions
-  - safe token expansion/sanitization
-  - post-download rename orchestration on top of the baseline yt-dlp title template
-- `downloader.py`
-  - yt-dlp-backed media download orchestration for the download UI and CLI
-  - applies auto-sort output-dir routing plus post-download naming presets/templates
-- `converter.py`
-  - FFmpeg-backed conversion/domain logic
-- `subtitle_manager.py`
-  - subtitle download/embed helpers using FFmpeg + yt-dlp
-  - preferred/fallback language resolution helpers for downloader-side subtitle automation
-- `torrent_downloader.py`
-  - high-level torrent orchestration built on `Aria2Runner`
-  - mode semantics:
-    - `FULL`
-    - `SEQUENTIAL`
-    - `STREAM`
-- `task_manager.py`
-  - global thread-safe task queue
-  - worker threads
-  - queued callback dispatch back to the UI thread
-  - cancellation hooks
-  - Phase 7 task types:
-    - `mixer_audio`
-    - `mixer_video`
-    - `apply_filters`
-    - `library_scan`
-    - `utilities_operation`
-- `media_helpers.py`
-   - comprehensive FFmpeg-backed media utility operations
-   - 24 operations across 4 categories:
-     - quick helpers: remux, extract-audio, mute, trim, preview-clip, thumbnail
-     - audio utilities: volume, fade, bitrate, channels, silence-detect, loudnorm
-     - video utilities: scale, crop, pad, rotate, fps, brightness/contrast/saturation, blur/sharpen, deinterlace
-     - smart helpers: blackdetect, scene-preview, scene-thumbnail
-   - uses `FFmpegRunner` for consistent process execution
-   - returns `RunnerResult` with metadata and summaries
-- `database.py`
-  - download / conversion / operation history persistence
-  - config JSON persistence via `ConfigManager`
-  - schema versioning + migrations for the history database
-- `persistence/media_library.py`
-  - separate SQLite media catalog
-  - tags, collections, search history, stats, export
-- `persistence/library_sync.py`
-  - `MediaLibraryAutoAdder`
-  - config-gated auto-registration of generated outputs
-- `error_handler.py`
-  - user-facing FFmpeg / yt-dlp / aria2 error normalization
-- `config_paths.py`
-  - OS-aware config/data/cache paths
-  - legacy file discovery + migration helpers
-- `theme_catalog.py`
-  - strict `dark` / `light` theme model with alias normalization
-- `i18n.py`
-  - runtime translation lookup and language switching
-- `logging_config.py`
-  - logging bootstrap
-- `plugin_system.py`
-  - plugin/discovery scaffolding exists as an extension boundary, but it is not central to the current runtime shell
+  - naming presets
+  - token expansion
+  - sanitization
+  - post-download rename behavior
+- `download_metadata.py`
+  - title/uploader normalization
+  - source/platform detection
+  - library-tag derivation
+  - structured acquisition payload generation
 
-### 5. Utility Layer
+### `converter.py`
 
-- `utils/metadata_handler.py`
-  - metadata extraction via FFprobe
-  - lightweight tag/thumbnail helpers
-  - used by media-library flows and auto-registration
-- `utils/ffmpeg_checker.py`
-  - FFmpeg availability helpers
-- `utils/system_utils.py`
-  - miscellaneous OS/system helpers
+Responsibilities:
 
-## Process Execution Model
+- FFmpeg-backed conversion settings + orchestration
+- codec/quality mapping
+- shared conversion behavior used by UI and CLI
 
-### Shared Runner Path
+### `subtitle_manager.py`
 
-Primary media execution paths are intentionally consolidated around `ravn_app/core/runners/`:
+Responsibilities:
 
-- `converter.py` -> `FFmpegRunner`
-- `downloader.py` -> `YtDlpRunner`
-- `audio_normalizer.py` -> `FFmpegRunner`
-- `subtitle_manager.py` -> `FFmpegRunner` + `YtDlpRunner`
-- `torrent_downloader.py` -> `Aria2Runner`
-- `runners/audio_mixer.py` -> `FFmpegRunner`
-- `runners/video_mixer.py` -> `FFmpegRunner`
+- downloader-side subtitle argument construction
+- subtitle embedding helpers
+- subtitle-related post-processing support
 
-### Queue-Backed vs Direct Feature Execution
+### `torrent_downloader.py`
 
-The current system mixes older direct feature implementations with newer queue-backed flows:
+Responsibilities:
 
-- **Queue-backed**
-  - batch downloads
-  - filters
-  - mixer
-  - library scan/import style operations
-- **Direct / legacy-style feature execution**
-  - converter tab flow
-  - subtitle tab flow
-  - some UI-triggered OS-open helpers
+- aria2-backed torrent orchestration
+- torrent mode routing (`FULL`, `SEQUENTIAL`, `STREAM`)
+- stream URL handling
+- payload discovery
 
-This is an intentional transitional architecture: new shell composition reuses working feature modules rather than rewriting all execution paths at once.
+### `media_helpers.py`
 
-### Remaining Direct `subprocess` Usage
+Responsibilities:
 
-Outside the shared runner package, direct `subprocess` usage still exists in a few auxiliary or OS-integration paths, including examples such as:
+- FFmpeg-backed utility operations
+- reusable helper functions for media workflows
+- utility command implementation for desktop + CLI
 
-- shell/file-open helpers in:
-  - `ui/main_window.py`
-  - `ui/tabs/library_tab.py`
-  - `ui/tabs/download_tab.py`
-  - `ui/tabs/torrent_tab.py`
-- utility/build/platform modules such as:
-  - `utils/system_utils.py`
-  - `utils/ffmpeg_checker.py`
-  - `core/app_builder.py`
-  - `core/platform_support.py`
-  - `core/update_manager.py`
-  - parts of `core/animation_manager.py`
+### `database.py`
 
-This cleanup is tracked in `TASKS.md` as `[MNT-01]`.
-It is real architectural debt, but it is mostly outside the critical shared media runner path.
+Responsibilities:
 
-## Persistence Model
+- config persistence
+- history persistence
+- schema migration support
+- download/conversion/operation queries
+- app statistics used by shell surfaces
 
-### 1. Config + History Persistence
+### `task_manager.py`
 
-Managed through `config_paths.py` and `database.py`.
+Responsibilities:
 
-- config file path: OS-aware JSON config
-- history DB path: OS-aware SQLite database
-- startup ensures directories exist before app init
-- legacy root-level files are migrated on startup
+- async queue model
+- task status/result handling
+- callback scheduling/pumping support
+- generic operation compatibility across multiple feature surfaces
 
-`DatabaseManager` currently owns:
+## 6.4 Runner layer
 
-- `downloads` table
-- `conversions` table
-- `favorites` table
-- `playlists` table
-- `operations` table for generic Phase 7 work
-- `schema_version` + `migration_history`
+The runner layer centralizes subprocess execution and parsing.
 
-Current history DB schema version is managed in code through `LATEST_SCHEMA_VERSION = 3`.
+### `runners/base.py`
+- base process-runner abstraction
+- result normalization
 
-### 2. Media Library Persistence
+### `runners/ffmpeg.py`
+- FFmpeg / FFprobe execution
+- real-time progress parsing via `-progress pipe:1`
 
-Managed through `ravn_app/core/persistence/media_library.py`.
+### `runners/ytdlp.py`
+- yt-dlp command construction
+- retry behavior
+- deterministic downloaded-file discovery
+- archive-skip detection metadata
 
-Separate DB concerns from the history DB:
+### `runners/aria2.py`
+- aria2c process execution for torrent/magnet flows
 
-- media items
-- tags
-- collections
-- collection items
-- search history
-- export helpers
-- library statistics
+### `runners/audio_mixer.py`
+- audio mixing/concat helpers
 
-This keeps the local searchable media catalog independent from download/conversion history.
+### `runners/video_mixer.py`
+- video composition/concat/filter-adjacent helpers
 
-### 3. Auto-Library Registration
+## 6.5 Persistence + library layer
 
-`MediaLibraryAutoAdder` acts as the bridge between generated outputs and the media catalog.
+### `persistence/media_library.py`
+- local media library database
+- add/search/tag/collection/export behavior
 
-Flow:
+### `persistence/library_sync.py`
+- auto-add / registration helpers for successful outputs
+- library synchronization support across feature flows
 
-1. desktop feature completes work
-2. shell schedules background auto-registration thread
-3. `MediaLibraryAutoAdder` normalizes source type and checks config flags
-4. `MetadataHandler` enriches media record data
-5. successful registration schedules UI refresh callbacks for:
-   - `LibraryTab`
-   - `HomeWorkspace`
+## 6.6 UI component layer
 
-## Configuration / Theme / I18N Model
+Reusable UI components live under `ravn_app/ui/components/`.
 
-### Configuration
+Examples:
 
-`ConfigManager` persists a JSON configuration file and validates loaded values against the schema in `config_paths.py`.
+- `error_panel.py`
+- `playlist_sort_dialog.py`
+- `playlist_item.py`
+- `url_input.py`
+- `collapsible_panel.py`
+- `command_palette.py`
 
-Notable config properties:
+Shared styling helpers live in:
 
-- legacy flat settings still supported
-- download acquisition settings include flat naming keys such as `download_naming_preset` and `download_filename_template`
-- subtitle automation settings remain flat and include `auto_subtitle_download`, `preferred_subtitle_language`, `subtitle_fallback_language`, `subtitle_include_auto_generated`, and `auto_embed_subtitles`
-- nested sections now exist for:
-  - `mixer`
-  - `library`
-  - `filters`
-- torrent settings remain flat today (`aria2c_path`, seed/max connection values)
+- `ravn_app/ui/ui_components.py`
+
+Design tokens live in:
+
+- `ravn_app/ui/design_tokens.py`
+
+## 6.7 Infrastructure / support layer
+
+### `config_paths.py`
+- OS-aware config/data/cache paths
+- default config generation
+- schema validation
+- legacy-file migration helpers
+
+### `i18n.py`
+- runtime translation lookup
+- language switching
+- app-wide translation interface
+
+### `theme_catalog.py`
+- strict canonical theme IDs
+- legacy-name normalization to `dark` / `light`
+
+### `logging_config.py`
+- structured logging bootstrap
+
+### `error_handler.py`
+- user-friendly external-tool error parsing
+
+### `platform_support.py`
+- platform helpers and environment-specific behavior
+
+### `update_manager.py`
+- app update helpers
+
+### `plugin_system.py`
+- plugin/extension boundary scaffold
+- not central to current runtime
+
+---
+
+## 7. Desktop Shell Composition
+
+Current shell reality:
+
+- primary workspaces:
+  - `Home`
+  - `Download`
+  - `Studio`
+  - `Library`
+- global queue side panel
+- lower-left theme toggle
+- lower-left language toggle
+- lower-left Settings workspace entry
+- shell quick actions
+- command palette (`Ctrl+K`)
+- settings shortcut (`Ctrl+,`)
+
+Shell-level shortcuts currently active:
+
+- `Ctrl+Enter`
+- `Escape`
+- `Ctrl+L`
+- `Ctrl+K`
+- `Ctrl+,`
+
+Adaptive shell behaviors:
+
+- bounded content widths
+- adaptive sidebar width
+- adaptive queue drawer width
+- shorter quick-action labels on tighter widths
+- mounted workspace switching to reduce redraw flicker
+- in-place theme/language refresh behavior where possible
+
+---
+
+## 8. Configuration Model
+
+Primary config/persistence path logic lives in `ravn_app/core/config_paths.py`.
+
+### OS-aware directory model
+
+- Windows:
+  - config: `%APPDATA%/ravn/`
+  - data: `%APPDATA%/ravn/data/`
+  - cache: `%LOCALAPPDATA%/ravn/cache/`
+- macOS:
+  - config/data under `~/Library/Application Support/ravn/`
+  - cache under `~/Library/Caches/ravn/`
+- Linux:
+  - config under `~/.config/ravn/`
+  - data under `~/.local/share/ravn/`
+  - cache under `~/.cache/ravn/`
+
+### Important config domains
+
+Flat/high-level keys include items such as:
+
+- `default_download_path`
+- `default_format`
+- `default_quality`
+- `theme`
+- `language`
+- `ffmpeg_path`
+- subtitle defaults
+- auto-sort / metadata toggles
+
+Nested config sections include:
+
+- `download_postprocess`
+  - extract audio / convert / subtitle-embed automation
+- `download_robustness`
+  - archive / duplicate / partial / fallback / rate-limit settings
+- `download_advanced`
+  - cookie/auth handoff and fragment/network tuning
+- `mixer`
+- `library`
+- `filters`
+
+The download archive path is also managed centrally through `config_paths.py`.
+
+---
+
+## 9. Core Runtime Flows
+
+## 9.1 URL acquisition flow
+
+1. User starts a desktop or CLI download.
+2. Product-level choices resolve into format/quality/profile settings.
+3. `YouTubeDownloader` optionally prefetches source metadata when needed.
+4. Naming, subtitle, robustness, and advanced settings are resolved.
+5. `YtDlpRunner` executes the yt-dlp command.
+6. Downloaded artifacts are discovered deterministically.
+7. Post-download renaming runs.
+8. Supporting subtitle/thumbnail artifacts are split from primary media outputs.
+9. Optional post-download automation pipeline runs:
+   - extract audio
+   - convert
+   - subtitle embed
+10. Metadata enrichment attaches normalized/acquisition/library metadata.
+11. Result returns to UI/CLI.
+12. Success may persist history and may auto-register outputs into `MediaLibrary`.
+
+## 9.2 Playlist acquisition flow
+
+1. User fetches playlist metadata.
+2. `YtDlpRunner.extract_playlist_entries()` collects playlist items.
+3. Playlist UI builds selection rows and summary state.
+4. User filters/sorts/selects/range-selects entries.
+5. Selected entries are downloaded with the same shared acquisition settings stack.
+
+## 9.3 Torrent flow
+
+1. Source is detected as magnet / `.torrent`.
+2. `TorrentDownloader` routes the request to aria2.
+3. Mode semantics remain stable:
+   - `FULL`
+   - `SEQUENTIAL`
+   - `STREAM`
+4. Progress snapshots update UI rows and metrics.
+5. Payload discovery surfaces child rows/files.
+6. Success may expose a player-open action or discovered target file.
+
+## 9.4 Studio processing flow
+
+1. User starts convert/subtitle/filter/mixer/utility work.
+2. Feature surface builds normalized settings.
+3. Work is submitted through shared runner/core helpers.
+4. Progress and completion flow through `TaskQueue` and main-thread callback pumping.
+5. Results are persisted to history where supported.
+6. Successful outputs may auto-register into `MediaLibrary`.
+
+## 9.5 Library registration flow
+
+1. A feature finishes with a successful media output.
+2. Auto-add callback or sync helper prepares metadata.
+3. `MediaLibrary` receives output path + tags + metadata.
+4. Library views and related shell summaries refresh as needed.
+
+## 9.6 CLI flow
+
+1. Click parses arguments.
+2. Command handlers normalize product-level settings.
+3. Shared core modules/runners execute the work.
+4. Optional DB/library persistence runs where supported.
+5. Output is emitted in text or JSON.
+6. For `download`, JSON output may include effective acquisition-profile summaries.
+
+---
+
+## 10. Acquisition Engine Detail
+
+The acquisition engine is one of the most important architectural areas in the repo.
+
+### Intent-driven acquisition features now implemented
+
+- reusable acquisition profiles
+- naming presets and template tokens
+- playlist intelligence and partial selection
+- subtitle automation
+- post-download automation pipeline
+- normalized metadata enrichment
+- robustness controls
+- collapsed advanced power-user settings
+- CLI parity for the same concepts
+
+### Why this matters architecturally
+
+Instead of scattering yt-dlp flags through UI callbacks, RAVN now centralizes acquisition behavior in core orchestration:
+
+- product-level UI/CLI inputs are translated into shared core settings
+- the runner layer stays focused on process execution
+- history/library integration sees normalized outputs/metadata
+- desktop and CLI stay aligned around the same concepts
+
+---
+
+## 11. History, Queue, and Background Execution
+
+### Queue model
+
+`ravn_app/core/task_manager.py` provides the shared async task model.
+
+Capabilities include:
+
+- queued / running / completed states
+- callback pumping
+- cancellation hooks
+- heterogeneous result support
+
+### History model
+
+`ravn_app/core/database.py` persists:
+
+- downloads
+- conversions
+- generic operations
+
+History is surfaced in the desktop Library workspace and is also reachable via CLI.
+
+---
+
+## 12. i18n and Theme Constraints
+
+### i18n
+
+All user-facing UI strings should be translation-key based.
+
+Current locale files:
+
+- `ravn_app/translations/en.json`
+- `ravn_app/translations/tr.json`
 
 ### Theme
 
-- theme IDs normalize to `dark` or `light`
-- legacy aliases are accepted but canonicalized
-- shell and feature surfaces rely on `design_tokens.py` + `ThemeManager`
+Theme policy is intentionally strict:
 
-### Internationalization
+- only canonical theme IDs: `dark`, `light`
+- legacy aliases normalize back to those canonical IDs
+- no uncontrolled theme proliferation
 
-- all new user-facing strings should resolve through translation keys
-- supported language packs:
-  - `ravn_app/translations/tr.json`
-  - `ravn_app/translations/en.json`
-- `main_window.refresh_i18n()` rebuilds the visible shell so language changes apply at runtime
+---
 
-## Main Runtime Flows
+## 13. Validation Snapshot
 
-### Desktop Startup Flow
+Verified on 2026-04-03:
 
-1. `ravn.py` initializes logging and storage directories.
-2. Legacy config/history files are migrated if needed.
-3. `YouTubeDownloaderApp` creates shared managers/services.
-4. The shell composes workspaces and drawers.
-5. A recurring `after(...)` pump processes:
-   - `TaskQueue` callbacks
-   - deferred UI callbacks
-   - header queue-count refresh
-   - periodic Home dashboard refresh
+- full-suite baseline:
+  - `pytest -q`
+  - `578 passed, 1 skipped` (`579` collected)
+- targeted CLI + acquisition regression sweep:
+  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `245 passed, 1 skipped`
+- targeted acquisition-engine regression sweep:
+  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `206 passed, 1 skipped`
 
-### Navigation Flow
+Treat these as the current validated documentation snapshot.
 
-1. Sidebar switches primary workspaces.
-2. Queue button opens the shared drawer shell with `QueueTab`.
-3. Lower-left Settings entry or `Ctrl+,` opens the dedicated Settings workspace.
-4. `Escape` closes the active queue drawer before delegating to feature-level cancel behavior.
+---
 
-### Download Flow
+## 14. Architectural Strengths
 
-1. User lands in `DownloadWorkspace`.
-2. Workspace mode selects `url`, `playlist`, `batch`, or `torrent`.
-3. Non-torrent modes reuse `DownloadTab`.
-4. Torrent mode mounts `TorrentTab`.
-5. Media work flows to `YouTubeDownloader` or `TorrentDownloader`.
-6. Playlist selection can be refined in the shared dialog through title/duration/popularity filters plus range-based selection before the final download set is approved.
-7. `YouTubeDownloader` may resolve subtitle automation rules (preferred/fallback language, optional auto-generated fallback, optional auto-embed) before dispatching yt-dlp.
-8. `YouTubeDownloader` may apply auto-sort routing plus naming preset/template post-processing before final file registration.
-9. Progress/error/success updates return through callbacks to the UI.
-10. Successful outputs may be auto-added into `MediaLibrary`.
+Current strengths of the codebase:
 
-### Studio Flow
+- strong shared-runner model for major external processes
+- acquisition logic moved toward reusable core orchestration
+- thin desktop shell with grouped workspaces
+- queue/history/library integration across more workflows than before
+- OS-aware persistence paths
+- strict i18n/theme policies
+- clear separation between feature UIs and lower-level media execution paths
 
-1. User opens `StudioWorkspace`.
-2. Internal tabview routes to Convert / Subtitle / Filters / Mixer / Utilities.
-3. Convert/subtitle reuse existing feature implementations.
-4. Filters/mixer/utilities use Phase 7+ runner helpers and queue-backed workflows.
-5. Completed outputs may be persisted into generic operation history and optionally auto-added to the media library.
+---
 
-### Library Flow
+## 15. Architectural Debt / Open Areas
 
-1. User opens `LibraryWorkspace`.
-2. `LibraryTab` interacts with `MediaLibrary` for import/search/collections/export.
-3. History subview reads persisted rows from `DatabaseManager`.
-4. Home dashboard and library views refresh when new outputs are auto-registered.
+Known or acknowledged open areas:
 
-### CLI Flow
+- Phase 5 packaging/distribution is still incomplete
+- some auxiliary code paths still call `subprocess` directly outside the shared-runner ideal
+- packaging/build scripts/spec files exist but are not yet the finished cross-platform distribution story
+- some compatibility wrappers remain in `ui/` while `ui/tabs/` hosts the newer workspace-oriented structure
+- `plugin_system.py` exists as an extension boundary but is not central to the active product runtime
 
-1. Click parses command-line arguments.
-2. CLI command calls shared core modules/runners.
-3. Optional DB/library persistence is applied where the command supports it.
-4. Output is emitted as text or JSON.
+---
 
-## Testing Snapshot
+## 16. Source-of-Truth Relationship
 
-Last documented validated baseline remains:
+When substantial implementation changes occur, the docs should stay aligned in this order:
 
-- full-suite baseline: `557 passed, 1 skipped` (`558` collected)
-- targeted Phase 7 / queue / library regression sweep: `191 passed`
-- targeted UI/config sweep: `87 passed`
-- targeted torrent/UI sweep: `153 passed`
+1. `TASKS.md`
+2. `PROGRESS.md`
+3. `ARCHITECTURE.md`
+4. `README.md`
+5. `CLAUDE.md` / `AGENTS.md` guidance where applicable
 
-Treat these as the last recorded validation snapshot, not a guarantee about unverified working-tree changes.
-
-## Architectural Debt
-
-- Some feature implementations still live in root `ui/` while `ui/tabs/` provides compatibility wrappers around them.
-- `history_settings_tab.py` still contains two concerns (history + settings) that are now surfaced separately through wrappers/drawers.
-- Direct `subprocess` usage outside shared runners is still present and tracked as `[MNT-01]`.
-- Plugin surface area is split between `core/plugin_system.py` and legacy plugin stubs in `database.py`; this is not yet a clean single extension boundary.
-- Phase 8 shell work is complete; future changes should be treated as follow-up refinements rather than unfinished shell migration.
-- Build/distribution automation (Phase 5) remains open.
-
-## Guidance
-
-- Keep `main_window.py` thin; compose features there, but keep feature logic in `ui/tabs/` and reusable pieces in `ui/components/`.
-- Prefer shared runners for new external-tool execution paths.
-- Reuse existing feature modules when evolving shell/navigation structure instead of cloning logic.
-- Keep UI thread boundaries explicit: worker threads should report back through queued callbacks, not mutate widgets directly.
-- Keep user-facing strings translation-key based in both TR and EN packs.
-- Keep theme behavior constrained to canonical `dark` / `light` IDs.
-- When architecture boundaries move, keep `README.md`, `PROGRESS.md`, `TASKS.md`, and `AGENTS.md` synchronized with this file.
+This file should remain the main **system-structure document**: module map, runtime topology, layering, persistence, and flow-level design.

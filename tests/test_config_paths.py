@@ -217,10 +217,16 @@ class TestDefaultConfig:
         assert 'auto_embed_subtitles' in config
         assert 'download_naming_preset' in config
         assert 'download_filename_template' in config
+        assert 'download_postprocess' in config
+        assert 'download_robustness' in config
+        assert 'download_advanced' in config
         assert 'mixer' in config
         assert 'library' in config
         assert 'filters' in config
         assert config['download_naming_preset'] == 'standard'
+        assert config['download_postprocess']['extract_audio'] is False
+        assert config['download_robustness']['enable_archive'] is True
+        assert config['download_advanced']['cookies_mode'] == 'none'
         assert config['library']['auto_add_downloads'] is True
         assert config['library']['auto_add_filter_output'] is True
 

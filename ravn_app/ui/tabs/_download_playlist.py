@@ -259,16 +259,22 @@ class PlaylistMixin:
 
         from ravn_app.ui.tabs import download_tab as download_tab_module
 
-        quality_map = getattr(download_tab_module, "_QUALITY_MAP", {})
-        format_map = getattr(download_tab_module, "_FORMAT_MAP", {})
-        quality = quality_map.get(self.quality_menu.get(), DownloadQuality.BEST)
-        format_type = format_map.get(self.format_menu.get(), DownloadFormat.MP4)
+        if hasattr(self, "_resolve_effective_download_selection"):
+            format_type, quality, _audio_bitrate = self._resolve_effective_download_selection(prefer_music=False)
+        else:
+            quality_map = getattr(download_tab_module, "_QUALITY_MAP", {})
+            format_map = getattr(download_tab_module, "_FORMAT_MAP", {})
+            quality = quality_map.get(self.quality_menu.get(), DownloadQuality.BEST)
+            format_type = format_map.get(self.format_menu.get(), DownloadFormat.MP4)
 
-        default_path = self.config_manager.get(
-            "default_download_path",
-            str(Path.home() / "Downloads" / "RAVN"),
-        )
-        output_dir = str(Path(default_path))
+        if hasattr(self, "_resolve_download_output_dir"):
+            output_dir = self._resolve_download_output_dir()
+        else:
+            default_path = self.config_manager.get(
+                "default_download_path",
+                str(Path.home() / "Downloads" / "RAVN"),
+            )
+            output_dir = str(Path(default_path))
 
         self._start_playlist_download(selected_entries, output_dir, format_type, quality)
 

@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 from ravn_app.core.persistence import LibraryRegistrationResult
 from ravn_app.core.task_manager import TaskResult, TaskStatus
 from ravn_app.core.converter import AudioBitrate, VideoQuality
+from ravn_app.core.i18n import t
 from ravn_app.core.runners import TorrentProgressSnapshot
 from ravn_app.ui.converter_tab import ConverterTab
 from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
@@ -31,6 +32,7 @@ class _FakeEntry:
     def __init__(self, value=""):
         self.value = value
         self.focused = False
+        self.config = {}
 
     def get(self):
         return self.value
@@ -44,16 +46,23 @@ class _FakeEntry:
     def focus_set(self):
         self.focused = True
 
+    def configure(self, **kwargs):
+        self.config.update(kwargs)
+
 
 class _FakeCombo:
     def __init__(self, value):
         self.value = value
+        self.config = {}
 
     def get(self):
         return self.value
 
     def set(self, value):
         self.value = value
+
+    def configure(self, **kwargs):
+        self.config.update(kwargs)
 
 
 class _FakeLabel:
@@ -144,6 +153,30 @@ class _FakeConfig:
             "auto_sort_mode": "artist",
             "download_naming_preset": "standard",
             "download_filename_template": "",
+            "download_postprocess": {
+                "extract_audio": False,
+                "audio_format": "mp3",
+                "audio_bitrate": "192k",
+                "convert_enabled": False,
+                "convert_format": "mkv",
+                "embed_subtitles": False,
+            },
+            "download_robustness": {
+                "enable_archive": True,
+                "detect_duplicates": True,
+                "continue_partial": True,
+                "format_fallback": True,
+                "rate_limit_kbps": 0,
+            },
+            "download_advanced": {
+                "cookies_mode": "browser",
+                "cookies_browser": "firefox",
+                "cookies_profile": "default-release",
+                "cookies_file": "",
+                "concurrent_fragments": 3,
+                "fragment_retries": 12,
+                "socket_timeout_seconds": 45,
+            },
         }
         return defaults.get(key, default)
 
@@ -203,6 +236,18 @@ class _FakeProgressBar:
 
     def pack_forget(self):
         self.calls.append({"pack_forget": True})
+
+
+class _FakeToast:
+    def __init__(self):
+        self.successes = []
+        self.warnings = []
+
+    def show_success(self, message):
+        self.successes.append(message)
+
+    def show_warning(self, message):
+        self.warnings.append(message)
 
 
 class _FakeShortcutTab:
@@ -455,6 +500,24 @@ class TestSettingsAndHistoryLogic:
         tab.auto_sort_mode_combo = _FakeCombo("Sanatçı")
         tab.naming_preset_combo = _FakeCombo("clean")
         tab.filename_template_entry = _FakeEntry("{uploader}/{title}")
+        tab.postprocess_extract_audio_var = _FakeVar(True)
+        tab.postprocess_audio_format_combo = _FakeCombo("MP3")
+        tab.postprocess_audio_bitrate_combo = _FakeCombo("320k")
+        tab.postprocess_convert_var = _FakeVar(True)
+        tab.postprocess_convert_format_combo = _FakeCombo("MKV")
+        tab.postprocess_embed_subtitles_var = _FakeVar(True)
+        tab.download_archive_var = _FakeVar(True)
+        tab.download_duplicate_var = _FakeVar(True)
+        tab.download_continue_partial_var = _FakeVar(True)
+        tab.download_format_fallback_var = _FakeVar(True)
+        tab.download_rate_limit_entry = _FakeEntry("512")
+        tab.download_cookie_mode_combo = _FakeCombo(t("settings.downloadAdvancedCookiesBrowser"))
+        tab.download_cookie_browser_combo = _FakeCombo("firefox")
+        tab.download_cookie_profile_entry = _FakeEntry("default-release")
+        tab.download_cookie_file_entry = _FakeEntry("")
+        tab.download_concurrent_fragments_entry = _FakeEntry("4")
+        tab.download_fragment_retries_entry = _FakeEntry("9")
+        tab.download_socket_timeout_entry = _FakeEntry("60")
         tab.close_behavior_combo = _FakeCombo("Sistem Çekmecesine Küçült")
 
         import ravn_app.ui.history_settings_tab as module
@@ -480,6 +543,9 @@ class TestSettingsAndHistoryLogic:
         assert "auto_sort_mode" in keys
         assert "download_naming_preset" in keys
         assert "download_filename_template" in keys
+        assert "download_postprocess" in keys
+        assert "download_robustness" in keys
+        assert "download_advanced" in keys
 
 
 class TestPlaylistSortDialogLogic:
@@ -634,6 +700,40 @@ class TestPhase7TabLogic:
         )
         assert summary == ["contrast=1.2", "grayscale"]
 
+    def test_download_behavior_settings_apply_selected_profile(self):
+        tab = DownloadTab.__new__(DownloadTab)
+        tab.config_manager = _FakeConfig()
+        tab.download_profile_menu = _FakeCombo(t("download.profileMusic"))
+
+        settings = tab._get_download_behavior_settings()
+
+        assert settings["naming_preset"] == "clean"
+        assert settings["embed_metadata"] is True
+        assert settings["auto_sort_enabled"] is True
+        assert settings["audio_bitrate"] == "320K"
+        assert settings["robustness_profile"]["enable_archive"] is True
+        assert settings["advanced_profile"]["cookies_mode"] == "browser"
+        assert settings["advanced_profile"]["concurrent_fragments"] == 3
+
+    def test_settings_advanced_cookie_mode_updates_widget_state(self):
+        tab = SettingsTab.__new__(SettingsTab)
+        tab.download_cookie_mode_combo = _FakeCombo(t("settings.downloadAdvancedCookiesBrowser"))
+        tab.download_cookie_browser_combo = _FakeCombo("chrome")
+        tab.download_cookie_profile_entry = _FakeEntry("Default")
+        tab.download_cookie_file_entry = _FakeEntry("")
+
+        tab._update_download_advanced_controls_state()
+
+        assert tab.download_cookie_browser_combo.config["state"] == "normal"
+        assert tab.download_cookie_profile_entry.config["state"] == "normal"
+        assert tab.download_cookie_file_entry.config["state"] == "disabled"
+
+        tab.download_cookie_mode_combo.set(t("settings.downloadAdvancedCookiesFile"))
+        tab._update_download_advanced_controls_state()
+
+        assert tab.download_cookie_browser_combo.config["state"] == "disabled"
+        assert tab.download_cookie_file_entry.config["state"] == "normal"
+
     def test_download_register_outputs_uses_library_callback(self):
         tab = DownloadTab.__new__(DownloadTab)
         captured = []
@@ -644,6 +744,7 @@ class TestPhase7TabLogic:
                 output_files=["C:/media/output.mp4", ""],
                 url="https://example.com/watch?v=1",
                 title="Example Output",
+                metadata={"library_tags": ["downloaded", "youtube"]},
             )
         )
 
@@ -653,10 +754,75 @@ class TestPhase7TabLogic:
                 {
                     "source_type": "download",
                     "title": "Example Output",
-                    "metadata": {"source_url": "https://example.com/watch?v=1"},
+                    "tags": ["downloaded", "youtube"],
+                    "metadata": {
+                        "library_tags": ["downloaded", "youtube"],
+                        "source_url": "https://example.com/watch?v=1",
+                    },
                 },
             )
         ]
+
+    def test_download_success_duplicate_skip_shows_warning_without_registering_outputs(self):
+        tab = DownloadTab.__new__(DownloadTab)
+        toast = _FakeToast()
+        tab._stop_processing_feedback = Mock()
+        tab.download_progress = _FakeProgressBar()
+        tab.download_status_label = _FakeLabel()
+        tab.animation_manager = SimpleNamespace(animate_success_flash=Mock())
+        tab._animate_download_completion_pulse = Mock()
+        tab._register_download_outputs = Mock()
+        tab.toast_manager_getter = lambda: toast
+        tab._set_button_loading_state = Mock()
+        tab.download_btn = _FakeActionButton(text="Download")
+        tab._active_btn_restore_text = "Download"
+        tab.after = lambda *_args, **_kwargs: "after-1"
+
+        tab._on_download_success(
+            SimpleNamespace(
+                output_files=[],
+                metadata={"robustness": {"archive_skipped": True}},
+            )
+        )
+
+        assert tab.download_progress.values[-1] == 1.0
+        assert tab.download_status_label.calls[-1]["text"] == t("download.downloadSkippedDuplicate")
+        tab._register_download_outputs.assert_not_called()
+        assert toast.warnings == [t("download.downloadSkippedDuplicate")]
+        assert toast.successes == []
+
+    def test_download_success_registers_outputs_and_shows_success_toast(self):
+        tab = DownloadTab.__new__(DownloadTab)
+        toast = _FakeToast()
+        tab._stop_processing_feedback = Mock()
+        tab.download_progress = _FakeProgressBar()
+        tab.download_status_label = _FakeLabel()
+        tab.animation_manager = SimpleNamespace(animate_success_flash=Mock())
+        tab._animate_download_completion_pulse = Mock()
+        tab._register_download_outputs = Mock()
+        tab.toast_manager_getter = lambda: toast
+        tab._set_button_loading_state = Mock()
+        tab.download_btn = _FakeActionButton(text="Download")
+        tab._active_btn_restore_text = "Download"
+        tab.bell = Mock()
+        tab.after = lambda *_args, **_kwargs: "after-1"
+
+        import ravn_app.ui.tabs._download_feedback as feedback_module
+        original_notify = feedback_module.NotificationManager.show_download_complete
+        try:
+            feedback_module.NotificationManager.show_download_complete = lambda *_args, **_kwargs: None
+            tab._on_download_success(
+                SimpleNamespace(
+                    output_files=["C:/media/output.mp4"],
+                    metadata={"robustness": {"archive_skipped": False}},
+                )
+            )
+        finally:
+            feedback_module.NotificationManager.show_download_complete = original_notify
+
+        tab._register_download_outputs.assert_called_once()
+        assert toast.successes
+        assert tab.download_btn.cget("text") == "Download"
 
     def test_mixer_task_complete_triggers_library_auto_add(self):
         tab = MixerTab.__new__(MixerTab)
@@ -1236,6 +1402,22 @@ class TestMainWindowLogic:
         app._show_download_error.assert_called_once()
         app._start_playlist_fetch.assert_not_called()
         app._start_single_download.assert_not_called()
+
+    def test_toggle_batch_mode_handles_missing_shared_fetch_button(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.batch_mode_var = _FakeVar(True)
+        app.url_input_row = _FakeLabel()
+        app.batch_url_frame = _FakeLabel()
+        app.info_label = _FakeLabel()
+        app.platform_manager = _FakeBadgeManager({"icon": "?", "label": "Unknown", "color": "#666", "platform": "unknown"})
+        app._video_fetch_btn = _FakeButton()
+        app._music_fetch_btn = _FakeButton()
+        app._set_button_loading_state = Mock()
+
+        app._toggle_batch_mode()
+
+        assert any("pack_forget" in call for call in app.url_input_row.calls)
+        assert app._set_button_loading_state.call_count == 2
 
     def test_fetch_download_data_starts_playlist_fetch(self):
         app = DownloadTab.__new__(DownloadTab)

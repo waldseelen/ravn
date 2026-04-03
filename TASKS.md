@@ -13,9 +13,6 @@ and most specific instruction.
 After completing all eligible tasks, update AGENT.md, CLAUDE.md, and PROGRESS.md briefly and
 accurately based on this session.
 
-
-
-
 ## Patch Proposal — yt-dlp Acquisition Engine Upgrade
 
 This proposal is high-value and aligns extremely well with the current architecture. The right direction is **not** to expose more raw `yt-dlp` flags; it is to turn the current downloader into an intent-driven acquisition pipeline that plugs into queue/history/library flows.
@@ -101,14 +98,14 @@ Prioritize intent-driven features over raw flag exposure:
 - [x] **[YTD-01]** Add filename templating + naming presets that build on the current fixed `%(title)s.%(ext)s` baseline and existing auto-sort support; include safe token expansion, sanitization, and preset examples such as standard, clean, and playlist-structured naming
 - [x] **[YTD-02]** Extend playlist workflow with partial-download intelligence beyond the current checkbox/sort baseline: add range download plus title/duration filtering and optional popularity-based filtering where source metadata allows it
 - [x] **[YTD-03]** Upgrade downloader-side subtitle automation using the existing config baseline: preferred-language selection, fallback logic, optional auto-download, and optional auto-embed behavior coordinated with `SubtitleTab` and existing settings
-- [ ] **[YTD-04]** Add a post-download automation pipeline that chains into existing capabilities (audio extract, convert, subtitle embed, rename, library add) using current runners/task/history infrastructure instead of separate ad-hoc flows
-- [ ] **[YTD-05]** Add metadata enrichment/normalization for acquired media on top of the current metadata embedding helpers: title cleanup, uploader normalization, extra tags, and persisted structured metadata suitable for `MediaLibrary`
-- [ ] **[YTD-06]** Add reusable download profiles (for example music, podcast, archive, social clip) that bundle format intent, naming, output path, post-process, and subtitle behavior into one-click presets
-- [ ] **[YTD-07]** Improve robustness controls beyond the current retry baseline: fallback format selection, partial recovery behavior, archive tracking, duplicate detection, and optional bandwidth/rate-limit controls appropriate for queue-based desktop use
-- [ ] **[YTD-08]** Add advanced-but-collapsed acquisition settings for cookies/auth, fragment tuning, and similar power-user controls without regressing the simplified default Download UX
-- [ ] **[YTD-09]** Extend CLI support so the same acquisition concepts are scriptable from `ravn` with consistent flags/presets and JSON output where appropriate, rather than merely mirroring raw `yt-dlp` flags one-to-one
-- [ ] **[YTD-10]** Add/update tests for filename templating, playlist filtering/range behavior, subtitle automation, post-process chaining, retry/archive/duplicate handling, metadata persistence, and Download workspace interactions
-- [ ] **[YTD-11]** When implementation begins, update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and translations so the downloader is documented as an intent-driven acquisition pipeline rather than only a thin `yt-dlp` front-end
+- [x] **[YTD-04]** Add a post-download automation pipeline that chains into existing capabilities (audio extract, convert, subtitle embed, rename, library add) using current runners/task/history infrastructure instead of separate ad-hoc flows
+- [x] **[YTD-05]** Add metadata enrichment/normalization for acquired media on top of the current metadata embedding helpers: title cleanup, uploader normalization, extra tags, and persisted structured metadata suitable for `MediaLibrary`
+- [x] **[YTD-06]** Add reusable download profiles (for example music, podcast, archive, social clip) that bundle format intent, naming, output path, post-process, and subtitle behavior into one-click presets
+- [x] **[YTD-07]** Improve robustness controls beyond the current retry baseline: fallback format selection, partial recovery behavior, archive tracking, duplicate detection, and optional bandwidth/rate-limit controls appropriate for queue-based desktop use
+- [x] **[YTD-08]** Add advanced-but-collapsed acquisition settings for cookies/auth, fragment tuning, and similar power-user controls without regressing the simplified default Download UX
+- [x] **[YTD-09]** Extend CLI support so the same acquisition concepts are scriptable from `ravn` with consistent flags/presets and JSON output where appropriate, rather than merely mirroring raw `yt-dlp` flags one-to-one
+- [x] **[YTD-10]** Add/update tests for filename templating, playlist filtering/range behavior, subtitle automation, post-process chaining, retry/archive/duplicate handling, metadata persistence, and Download workspace interactions
+- [x] **[YTD-11]** When implementation begins, update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and translations so the downloader is documented as an intent-driven acquisition pipeline rather than only a thin `yt-dlp` front-end
 
 ### Guardrails
 
@@ -172,9 +169,4 @@ Prioritize intent-driven features over raw flag exposure:
 - `ravn\_app/translations/tr.json` + `ravn\_app/translations/en.json`
   - new labels, preset names, and helper descriptions
 
-
-
-
-
-
-
+  FINISHING TASKS... MOVE TO DEPLOY.md 

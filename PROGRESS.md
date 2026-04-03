@@ -4,108 +4,220 @@
 
 Verified on 2026-04-03.
 
-## Confirmed
+This file is the validated implementation snapshot for the current repository state.
 
-- Repository structure is stable: app entrypoint, layered core, modular UI, tests, build scripts, and packaging spec are present.
-- Main media execution paths are consolidated around `ravn_app/core/runners/` (`FFmpegRunner`, `YtDlpRunner`, `Aria2Runner`).
-- Phase 7 core helpers are now present: `AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, and `MetadataHandler`.
-- Queue/callback infrastructure is active in `ravn_app/core/task_manager.py`, including callback pumping from `main_window.py` and running-task cancellation hooks.
+---
+
+## Confirmed Repository Reality
+
+### Core platform/runtime
+
+- Repository structure is stable: desktop entrypoint, CLI entrypoint, layered core, modular UI, tests, build script, and PyInstaller spec are present.
+- Main external-tool execution paths are consolidated around shared runners in `ravn_app/core/runners/`.
 - Structured logging is centralized in `ravn_app/core/logging_config.py`.
-- User-facing FFmpeg/yt-dlp/aria2 error parsing exists in `ravn_app/core/error_handler.py`.
-- OS-aware config path resolution and startup migration are active (`ravn_app/core/config_paths.py` + `ravn.py`).
-- Download flow is wired end-to-end with background threads and UI-safe `after(...)` callbacks.
-- Playlist metadata and quality-based size estimation are active.
-- Playlist dialog now supports title/duration filtering, popularity-aware filtering when metadata is available, visible-row bulk actions, and range-based selection before download.
-- Downloader subtitle automation is now active through settings-backed preferred/fallback language resolution, optional auto-generated caption fallback, and optional auto-embed behavior for supported video downloads.
-- Downloader naming presets/templates are now active through settings-backed config, safe token expansion, and post-download renaming (`standard`, `clean`, `playlist` + custom token templates).
-- CLI is implemented in `ravn_app/cli.py` with `--json` support and commands for `torrent`, `mixer`, `library`, and `filters`.
-- Drag-and-drop uses `tkinterdnd2` when available and falls back safely.
-- Real-time FFmpeg progress parsing via `-progress pipe:1` is active in runner layer.
-- Queue panel visualizes queued/running/completed tasks and supports cancel/open-folder actions.
-- Batch download mode supports multiline URLs (up to 50) and integrates with `TaskQueue`.
-- Theme system is strict two-theme (`dark`, `light`) with legacy alias normalization.
-- Settings UI is compact one-page scroll layout.
-- Playlist fetch/sort dialog shows selected item count + selected total size and has high-contrast visibility fixes.
-- Config defaults now include nested `mixer`, `library`, and `filters` sections, and an OS-aware `media_library.db` path helper exists.
+- OS-aware config/data/cache path handling and legacy migration are active through `ravn_app/core/config_paths.py` and `ravn.py`.
+- Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
+- Theme system is strict two-theme (`dark`, `light`) with legacy normalization.
+- Localization is active through `ravn_app/core/i18n.py` and `ravn_app/translations/`.
 
-## Recent UX/Settings Consolidation
+### Desktop shell / UX
 
-- `ravn_app/ui/main_window.py` refactored into a thin orchestration shell.
-- Download-specific logic moved to `ravn_app/ui/tabs/download_tab.py`.
-- Reusable UI primitives extracted under `ravn_app/ui/components/`:
-  - `error_panel.py`
-  - `playlist_item.py`
-  - `url_input.py`
-- Compatibility wrapper added at `ravn_app/ui/download_tab.py`.
-- `ravn_app/ui/tabs/` namespace now hosts tab modules/wrappers for cleaner structure.
-- Fetch overlap guards and processing-feedback timer safety were added to avoid UI race conditions.
-- Settings screen remains compact and scrollable without nested settings sub-tabs.
-- Download settings now expose naming presets and an optional custom filename template field without expanding the default Download workspace surface.
-- Subtitle settings now expose fallback-language, auto-generated-caption, and auto-embed controls; `SubtitleTab` also picks up the configured subtitle language defaults.
-- Playlist sort dialog action bar layout and table header contrast were improved for visibility.
-- Playlist sort dialog now exposes partial-download controls for title/duration/popularity filtering and range selection without adding a second playlist screen.
-- `download_tab.py` refactored to use a progressive disclosure linear flow, removing static dual columns.
-- `converter_tab.py` refactored to use a progressive disclosure linear flow with collapsible advanced settings.
-- `subtitle_tab.py` refactored to use a progressive disclosure segmented button layout, removing static dual columns.
-- `history_settings_tab.py` layouts bounded to max widths to prevent horizontal stretching.
-- New Phase 7 tab modules added under `ravn_app/ui/tabs/`: `mixer_tab.py`, `filters_tab.py`, and `library_tab.py`.
+- The desktop shell is grouped into workspaces: `Home`, `Download`, `Studio`, `Library`.
+- Queue is exposed through a global right-side panel/drawer instead of top-level navigation.
+- Settings are exposed as an independent lower-left utility/workspace entry.
+- Theme/language toggles live directly in the shell sidebar utility area.
+- Shell-level command palette is active via `Ctrl+K`.
+- Shell-level settings shortcut is active via `Ctrl+,`.
+- Workspace guidance panels use progressive disclosure.
+- The shell uses mounted workspace switching to reduce redraw flicker.
+- Theme and language changes use lighter in-place refresh behavior than earlier shell rebuild patterns.
 
-## Phase Completion
+### Acquisition / download stack
 
-- **Phase 1** — Complete (main media path stabilization).
-- **Phase 2** — Complete (config relocation, error messages, drag & drop, CLI).
-- **Phase 3** — Complete (platform support expansion, DB migrations, tests, system tray).
-- **Phase 4A** — Complete (core GUI completeness).
-- **Phase 4B** — Complete (design system + interaction improvements).
-- **Phase 4C.1–4C.7** — Complete (brand, iconography, transitions, feedback, polish, accessibility).
-- **Phase 4D** — Complete (responsive layout, theme parity, settings consolidation, playlist UX, tooltips, tray behavior toggle).
-- **Phase 5** — Open (build/packaging, distribution).
-- **Phase 6** — Complete (torrent/magnet integration, Aria2Runner, TorrentDownloader, streaming).
-- **Phase 7 (core / CLI + UI + queue/history + utilities)** — Complete (`AudioMixerRunner`, `VideoMixerRunner`, `MediaLibrary`, `MetadataHandler`, CLI integration, dedicated Mixer / Filters / Library tabs, queue/history persistence, and comprehensive utility media helpers are complete).
+- Download flow is wired end-to-end with background execution and UI-safe callback scheduling.
+- Single URL, playlist, batch (up to 50 URLs), and torrent/magnet flows are active.
+- Playlist flow supports title/duration filtering, popularity-aware filtering where metadata exists, visible-row bulk actions, and range-based selection.
+- Download naming presets/templates are active through `download_naming.py`.
+- Downloader subtitle automation is active through preferred/fallback language selection, optional auto-generated fallback, and optional auto-embed behavior.
+- Post-download automation is active through `download_postprocess`.
+- Metadata normalization/enrichment is active through `download_metadata.py`.
+- Reusable acquisition profiles are active through `download_profiles.py`.
+- Robustness controls are active through `download_robustness`.
+- Collapsed advanced acquisition settings are active through `download_advanced`.
+- CLI download flow now exposes the same intent-driven acquisition concepts instead of raw yt-dlp flag mirroring.
 
-## Phase 6 — Torrent / Magnet Integration
+### Queue / history / library
 
-- **6A** `Aria2Runner` — `ravn_app/core/runners/aria2.py` ✅
-- **6B** `TorrentDownloader` — `ravn_app/core/torrent_downloader.py` ✅
-- **6C** `parse_aria2c_error` — `ravn_app/core/error_handler.py` ✅
-- **6D** URL Router + Drag-Drop — `download_tab.py` ✅
-- **6E** Settings (aria2c_path, seed_time, max_connections) ✅
-- **6F** CLI `ravn torrent` komutu ✅
-- **6G** Stream UI (`torrent_mode_selector`, stream action, open player) ✅
-- **6H** Documentation ✅
+- Queue/callback infrastructure is active in `ravn_app/core/task_manager.py`.
+- Queue panel supports queued/running/completed visibility and cancel/open-folder actions.
+- History UI aggregates downloads, conversions, and generic Phase 7 operation records.
+- `MediaLibrary` and auto-library registration are active.
+- Successful supported outputs from download/convert/mixer/filter/utility flows can register into the local media library.
+
+### Studio / media tools
+
+- Conversion flow is active through FFmpeg-backed shared logic.
+- Subtitle processing/embed flows are active.
+- Filters and mixer feature tabs are active in desktop + CLI form.
+- Utilities workflow is active with 24 FFmpeg-backed helper operations across quick/audio/video/smart categories.
+- FFmpeg real-time progress parsing is active.
+- `ErrorPanel` is integrated into converter and subtitle tabs.
+
+### Torrent stack
+
+- `Aria2Runner` is active.
+- `TorrentDownloader` is active.
+- Torrent modes remain stable: `FULL`, `SEQUENTIAL`, `STREAM`.
+- Torrent UI exposes queueable rows, progress metrics, pause/resume controls, filters, and payload child rows.
+
+---
+
+## Acquisition Engine Status
+
+The yt-dlp acquisition-engine upgrade is fully landed.
+
+Completed tasks:
+
+- `YTD-01` filename templating + naming presets
+- `YTD-02` playlist partial selection/filtering/range support
+- `YTD-03` subtitle automation upgrade
+- `YTD-04` post-download automation pipeline
+- `YTD-05` metadata enrichment / normalization
+- `YTD-06` reusable download profiles
+- `YTD-07` robustness controls
+- `YTD-08` collapsed advanced acquisition settings
+- `YTD-09` CLI acquisition parity
+- `YTD-10` expanded tests for acquisition behavior
+- `YTD-11` documentation sync
+
+Resulting acquisition capabilities now include:
+
+- reusable profiles (`Custom`, `Music`, `Podcast`, `Archive`, `Social Clip`)
+- naming presets and token templates
+- subtitle preferences + fallback + embed behavior
+- post-download automation
+- normalized acquisition metadata for library registration
+- duplicate skipping via archive tracking
+- partial recovery/resume support
+- fallback format retries
+- optional rate limits
+- browser/cookies.txt auth handoff
+- fragment/network tuning
+- CLI scripting of the same concepts
+
+---
+
+## UX / Settings Consolidation Reality
+
+Recent validated UX/settings realities:
+
+- `main_window.py` is a thin shell orchestrator.
+- Download-specific logic lives in `ravn_app/ui/tabs/download_tab.py`.
+- Reusable widgets live under `ravn_app/ui/components/`.
+- Settings remain compact and scrollable rather than nested across many sub-tabs.
+- Download settings now expose:
+  - naming presets/templates
+  - subtitle preferences
+  - post-download automation
+  - reliability controls
+  - collapsed advanced acquisition controls
+- Download workspace exposes a compact profile selector instead of a second downloader screen.
+- Playlist sort dialog keeps selected-count/size summaries and visibility-focused table styling.
+- `history_settings_tab.py` width/spacing behavior was tightened to avoid layout stretch issues.
+
+---
+
+## Phase Completion Status
+
+- **Phase 1** — Complete
+- **Phase 2** — Complete
+- **Phase 3** — Complete
+- **Phase 4A** — Complete
+- **Phase 4B** — Complete
+- **Phase 4C** — Complete
+- **Phase 4D** — Complete
+- **Phase 5** — Open
+- **Phase 6** — Complete
+- **Phase 7** — Complete
+- **Phase 8** — Complete
+
+---
 
 ## Validation Status
 
-- Current full-suite baseline (2026-04-03): `pytest -q` -> `557 passed, 1 skipped` (subtitle automation follow-up verification).
-- Subtitle/download regression sweep (2026-04-03): `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py` -> `115 passed, 1 skipped`.
-- Playlist/download regression sweep (2026-04-03): `pytest -q tests/test_ui_logic.py tests/test_runners.py` -> `147 passed`.
-- Download/settings regression sweep (2026-04-03): `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py` -> `137 passed, 1 skipped`.
-- Phase 7 targeted regression sweep (2026-04-03): Utilities desktop wiring, translation coverage, and UI token validation were rechecked; targeted UI/i18n/design-token sweep passes alongside the full suite.
+Verified on 2026-04-03:
+
+- Full suite:
+  - `pytest -q`
+  - `578 passed, 1 skipped` (`579` collected)
+- CLI + acquisition regression sweep:
+  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `245 passed, 1 skipped`
+- Acquisition-engine regression sweep:
+  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
+  - `206 passed, 1 skipped`
+- Playlist/download regression sweep:
+  - `pytest -q tests/test_ui_logic.py tests/test_runners.py`
+  - `147 passed`
+- Download/settings regression sweep:
+  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py`
+  - `137 passed, 1 skipped`
+- UI/i18n/design-token regression sweep:
+  - `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py`
+  - `108 passed`
+
+---
 
 ## Functional Highlights
 
-- Single video quality-based size estimation is active; estimates update on quality change.
-- ID3 metadata embedding options are supported for MP3/M4A workflows.
-- Auto-sort by channel/uploader structure is supported in download output templates.
-- Download output naming now supports preset-driven or custom token-driven post-download renaming with safe sanitization and nested playlist-style folder layouts.
-- Playlist selection/sorting supports clearer metrics, title/duration/popularity filtering, range-based partial selection, and visibility-focused table styling.
-- Download acquisition can now request the preferred subtitle language first, fall back to a configured alternate language, optionally accept auto-generated captions, and embed downloaded subtitle tracks when supported.
-- Torrent mode handling remains stable (`FULL`, `SEQUENTIAL`, `STREAM`).
-- Shared `style_combo`/`style_entry` helpers centralized in `ui_components.py`.
-- Keyboard shortcuts active: `Ctrl+Enter` (action), `Escape` (cancel), `Ctrl+L` (clear).
-- `ErrorPanel` integrated into converter and subtitle tabs for user-friendly error display.
-- Focus ring animation active on all input fields.
-- `Spacing.*` design tokens applied consistently across UI components.
-- Phase 7 CLI can now mix audio, composite video, apply filter chains, manage a local media library, and export library data.
-- Dedicated Phase 7 desktop tabs now exist for Mixer, Filters, Library, and Utilities workflows in `ravn_app/ui/tabs/` and are wired into `main_window.py`.
-- Phase 7 tabs now submit work through `TaskQueue`, persist generic `operations` history rows, and surface those records in the History UI alongside downloads and conversions.
-- Phase 7 task types are active in `TaskType` and no longer placeholder-only.
-- **Comprehensive Utility Media Helpers** (Phase 7 / UTL-01 through UTL-10): 24 FFmpeg-backed operations across four categories (quick helpers, audio utilities, video utilities, smart helpers) are now available both in desktop UI (`utilities_tab.py` within Studio workspace) and CLI (`ravn utilities` command). All operations support queue integration, history persistence, and auto-library registration.
-- **Phase 1.1 Micro-interactions**: All `CTkButton` widgets have `hover_color` token applied; Treeview rows highlight on mouse motion; progress bars use `Colors.ACCENT` for visual consistency.
-- **Shell Smoothness / Theme Polish (POL-UX-01 through POL-UX-06)**: Eliminated theme toggle flash by replacing all transparent container backgrounds with stable semantic colors (`Colors.BG_PRIMARY`, `Colors.BG_SURFACE`). Added pre-transition background stabilization in `_apply_theme_preference()` to prevent white flash during dark ↔ light theme changes. Verified no full-shell rebuild on theme toggle; `refresh_i18n()` already uses in-place text updates without destroying widgets.
+### Acquisition
+- quality-based size estimation
+- naming presets/templates with sanitization
+- subtitle preference + fallback behavior
+- post-download automation pipeline
+- metadata normalization + library tags
+- reusable acquisition profiles
+- robustness controls
+- collapsed advanced acquisition controls
+- CLI parity for intent-driven acquisition
 
-## Documentation Sync
+### Processing / studio
+- conversion
+- subtitle processing/embed
+- filters
+- mixer
+- utilities helpers
+- queue/history integration
+- optional library auto-add
 
-- Architecture and project docs were synchronized with current UI/core structure.
-- Stale references to pre-refactor layout and legacy docs were removed.
-- Canonical project guidance is now centered in `CLAUDE.md` (with `README.md`, `ARCHITECTURE.md`, and `TASKS.md` kept in sync).
+### Organization
+- local media library
+- search/tags/collections/export
+- aggregated history for downloads/conversions/operations
+
+### Shell / UX
+- grouped workspace shell
+- queue drawer
+- settings workspace entry
+- command palette
+- compact utility toggles
+- adaptive layout behavior
+
+---
+
+## Open Reality / Remaining Work
+
+The main open project area is still **Phase 5 build/packaging/distribution**.
+
+Current build/distribution artifacts exist (`build.ps1`, `ravn.spec`, `app_builder.py`), but the packaged delivery story is not yet finished or fully validated across clean environments.
+
+---
+
+## Documentation Sync State
+
+Repository documentation was refreshed and aligned around the current runtime model:
+
+- `README.md` now acts as the comprehensive user/project overview
+- `ARCHITECTURE.md` now focuses on system structure, module boundaries, and runtime flows
+- `DEPLOY.md` now reflects current packaging/distribution reality instead of stale planning fragments
+- `CLAUDE.md` remains the compact engineering entrypoint/addendum

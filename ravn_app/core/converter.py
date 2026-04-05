@@ -6,7 +6,6 @@ Desteklenen codec'ler: H.264, H.265, VP8, VP9, AV1 (video), AAC, MP3, Opus, Vorb
 
 import os
 import json
-import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Callable
 from enum import Enum

@@ -4,7 +4,6 @@ FFmpegRunner üzerinden çalışır
 """
 
 import os
-import subprocess
 import json
 import logging
 from pathlib import Path

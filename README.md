@@ -5,8 +5,8 @@ RAVN is a desktop + CLI media application for **acquiring, processing, organizin
 - **Desktop runtime:** CustomTkinter
 - **CLI runtime:** Click
 - **Primary external tools:** FFmpeg / FFprobe, yt-dlp, aria2c
-- **Current product state:** Phases 1–4C, Phase 6, Phase 7, and Phase 8 are complete
-- **Open major area:** Phase 5 build / packaging / distribution
+- **Current product state:** Phases 1–4D, Phase 5A, Phase 5B, Phase 5C, Phase 5D, Phase 5E, Phase 6, Phase 7, and Phase 8 are complete
+- **Open major area:** Phase 5F build / packaging / distribution follow-up work after the completed Phase 5E optimization closeout
 
 RAVN is no longer just a thin yt-dlp front-end. The project now behaves as a broader **media acquisition + studio + library** system built around shared runners, queue/history persistence, and automatic media-library registration.
 
@@ -18,6 +18,7 @@ RAVN can download media from supported online sources through a unified acquisit
 
 Supported acquisition behaviors include:
 
+- a unified smart source bar for URLs, playlists, batches, magnets, and `.torrent` files
 - single-URL downloads
 - playlist metadata fetch + selective playlist download
 - batch downloads from multiline URL lists
@@ -75,7 +76,7 @@ Acquisition features include:
 
 Playlist flow is no longer just “download all”. It supports:
 
-- playlist metadata fetch
+- playlist metadata fetch with staged detail enrichment
 - sortable review dialog
 - checkbox-based partial selection
 - range selection
@@ -118,6 +119,7 @@ RAVN supports:
 RAVN includes a broader FFmpeg-backed studio toolset.
 
 #### Convert
+
 - video/audio format conversion
 - codec + quality mapping
 - real-time FFmpeg progress reporting
@@ -126,18 +128,21 @@ RAVN includes a broader FFmpeg-backed studio toolset.
 - optional auto-library registration
 
 #### Subtitle
+
 - subtitle download
 - subtitle processing
 - subtitle embedding
 - inline error display through `ErrorPanel`
 
 #### Filters
+
 - FFmpeg-based filter chains
 - queue integration
 - history persistence
 - library auto-add support
 
 #### Mixer
+
 - audio concatenation and mix-style workflows
 - video concatenation / composition workflows
 - queue integration
@@ -145,6 +150,7 @@ RAVN includes a broader FFmpeg-backed studio toolset.
 - library auto-add support
 
 #### Utilities
+
 RAVN includes a large utility-media helper set in both desktop UI and CLI.
 
 Current utility groups:
@@ -194,8 +200,10 @@ Capabilities include:
 - collections
 - search filters
 - duplicate detection
+- bounded recent-search history
 - JSON export
 - CSV export
+- large library exports streamed in batches instead of one large in-memory materialization
 - persisted history for:
   - downloads
   - conversions
@@ -215,17 +223,22 @@ Primary desktop workspaces:
 Shell capabilities include:
 
 - global right-side Queue panel
+- smart download-source routing with manual override when detection should be forced
 - lower-left theme toggle
 - lower-left language toggle
 - lower-left Settings workspace entry
 - shell quick actions
 - command palette (`Ctrl+K`)
 - settings shortcut (`Ctrl+,`)
+- dependency-health summary in `Home` and detailed tool status in `Settings`
 - progressive-disclosure guidance panels
 - mounted workspace switching for lower flicker
+- taskbar-aware, active-monitor-aware startup centering on desktop launch
 - lighter in-place language refresh
 - in-place theme application without full shell rebuild
 - adaptive sizing for compact and wide desktop widths
+- task-snapshot-driven Home/Queue refreshes where practical instead of fixed high-frequency polling
+- in-place Home summary-card updates
 
 Keyboard shortcuts currently active across feature surfaces and shell-level flows include:
 
@@ -268,18 +281,23 @@ That includes support for:
 ## Desktop Information Architecture
 
 ### Home
+
 - quick-start cards
 - recent activity snapshot
 - queue/library context
 - orientation surface for the app
 
 ### Download
-- URL / playlist / batch acquisition
-- torrent manager surface
+
+- one shared source area for URLs / playlists / batches / torrents
+- auto-detected media / playlist / batch / torrent routing with manual override chips
+- `Video` / `Audio` output switching on the shared media surface
+- torrent manager surface when torrent input is active
 - profile-driven acquisition controls
 - compact advanced settings via Settings workspace
 
 ### Studio
+
 - Convert
 - Subtitle
 - Filters
@@ -287,6 +305,7 @@ That includes support for:
 - Utilities
 
 ### Library
+
 - media library browsing and management
 - history review
 - export/search-oriented workflows
@@ -294,6 +313,7 @@ That includes support for:
 ## Current Status
 
 ### Complete
+
 - Phase 1
 - Phase 2
 - Phase 3
@@ -301,28 +321,37 @@ That includes support for:
 - Phase 4B
 - Phase 4C
 - Phase 4D
+- Phase 5A — runtime dependency health / toolchain UX
+- Phase 5B — shared-runner convergence / runtime process cleanup
+- Phase 5C — UX hardening / scalability investigation
+- Phase 5D — codebase cleanup / wrapper / extension-boundary clarity
+- Phase 5E — optimization / clean code / dead code cleanup
 - Phase 6
 - Phase 7
 - Phase 8
 - yt-dlp acquisition-engine upgrade tasks `YTD-01` through `YTD-11`
 
 ### Open
-- Phase 5 build / packaging / distribution
+
+- Phase 5F build / packaging / distribution follow-up track
 
 ## Technology Stack
 
 ### Application
+
 - Python 3.9+
 - CustomTkinter
 - Click
 - SQLite
 
 ### External Tools
+
 - FFmpeg / FFprobe
 - yt-dlp
 - aria2c
 
 ### Optional / graceful-degradation pieces
+
 - `tkinterdnd2` for drag-and-drop
 - optional metadata-related runtime paths where available
 
@@ -355,10 +384,13 @@ ravn_app/
     app_builder.py
   ui/
     main_window.py
-    history_settings_tab.py
+    converter_tab.py          # legacy-compatible implementation module
+    download_tab.py           # legacy-compatible alias to ui/tabs/download_tab.py
+    history_settings_tab.py   # shared legacy-compatible implementation module
+    subtitle_tab.py           # legacy-compatible implementation module
     queue_panel.py
     components/
-    tabs/
+    tabs/                     # canonical desktop feature import surfaces
   translations/
     en.json
     tr.json
@@ -368,14 +400,33 @@ ravn_app/
     system_utils.py
 tests/
 docs/
+tools/
+  phase5e_benchmarks.py
 ```
+
+Desktop feature note:
+
+- `ravn_app.ui.tabs.*` is the canonical import namespace for active desktop feature modules.
+- Legacy `ravn_app.ui.*` feature modules are retained only as compatibility surfaces where noted above.
+- `ravn_app.core.plugin_system` is experimental only and is not auto-loaded by the desktop app or CLI.
 
 ## Requirements
 
+**For detailed dependency information, installation instructions, and troubleshooting, see [DEPENDENCIES.md](DEPENDENCIES.md).**
+
+### Quick Overview
+
+**Required:**
+
 - Python 3.9+
-- FFmpeg and FFprobe on `PATH`
-- `aria2c` installed separately for torrent/magnet support
-- packages from `requirements.txt`
+- FFmpeg and FFprobe (for video/audio processing)
+- yt-dlp (for media downloads)
+- Python packages from `requirements.txt`
+
+**Optional:**
+
+- aria2c (for torrent/magnet support)
+- tkinterdnd2 (for drag-and-drop functionality)
 
 Examples:
 
@@ -390,6 +441,10 @@ winget install aria2
 brew install aria2
 sudo apt install aria2
 ```
+
+**Tool Health Check:**
+
+RAVN includes built-in dependency checking. After launch, check Settings (Ctrl+,) → "Tool Status and Dependencies" to see which tools are available and which features require missing tools.
 
 ## Run
 
@@ -437,24 +492,26 @@ ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
 
 ## Testing
 
-Verified on 2026-04-03:
+Verified on 2026-04-05:
 
-- Full baseline: `pytest -q` -> `578 passed, 1 skipped` (579 collected)
-- Targeted CLI + acquisition regression sweep:
-  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `245 passed, 1 skipped`
-- Targeted acquisition-engine regression sweep:
-  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `206 passed, 1 skipped`
-- Targeted playlist/download regression sweep:
-  - `pytest -q tests/test_ui_logic.py tests/test_runners.py`
-  - `147 passed`
-- Targeted download/settings regression sweep:
-  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py`
-  - `137 passed, 1 skipped`
-- Targeted UI/i18n/design-token regression sweep:
-  - `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py`
-  - `108 passed`
+- Full baseline:
+  - `pytest -q`
+  - `633 passed, 1 skipped` (`634` collected)
+- Required UI logic sweep:
+  - `pytest -q tests/test_ui_logic.py`
+  - `87 passed`
+- Required UI components + builder sweep:
+  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
+  - `37 passed`
+- Required config/database sweep:
+  - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
+  - `58 passed`
+- Targeted Phase 5E optimization sweep:
+  - `pytest -q tests/test_media_library.py tests/test_library_sync.py tests/test_task_manager.py tests/test_database_manager.py tests/test_ui_logic.py`
+  - `145 passed`
+- Phase 5E benchmark harness:
+  - `python tools/phase5e_benchmarks.py --output docs/phase5e_benchmark_results.json`
+  - benchmark artifact refreshed successfully
 
 Useful commands:
 
@@ -475,7 +532,7 @@ Current repo artifacts include:
 - `ravn.spec`
 - `ravn_app/core/app_builder.py`
 
-However, Phase 5 remains open. Packaged delivery, bundled runtime validation, and distribution hardening should still be treated as in-progress work.
+However, Phase 5 remains open. Current packaging work should be treated as a **Windows-first release track** after runtime hardening, dependency UX, and remaining architecture cleanup are in acceptable shape.
 
 ## Documentation Map
 
@@ -483,13 +540,19 @@ However, Phase 5 remains open. Packaged delivery, bundled runtime validation, an
 - `CLAUDE.md` — Claude-oriented repo entrypoint and condensed engineering guidance
 - `ARCHITECTURE.md` — full system structure, runtime flows, and module map
 - `PROGRESS.md` — validated implementation snapshot
-- `TASKS.md` — backlog and task status board
-- `DEPLOY.md` — current packaging/distribution reality and Phase 5 checklist
-- `docs/phase8_ux_navigation_overhaul.md` — historical/approved Phase 8 shell plan
+- `TASKS.md` — backlog, hardening roadmap, and Phase 5 Windows release plan
+- `OPTIMIZATIONS.md` — completed Phase 5E optimization / cleanup checklist
+- `docs/phase5b_subprocess_audit.md` — shared-runner convergence audit and subprocess classification record
+- `docs/phase5e_optimization_baseline.md` — first landed Phase 5E optimization slice, evidence, and deliberate non-changes
+- `docs/phase5e_dead_code_audit.md` — Phase 5E dead-code / wrapper audit closeout
+- `docs/phase5e_benchmark_closeout.md` — repeatable benchmark methodology and measured closeout summary
+- `docs/phase5e_benchmark_results.json` — raw Phase 5E benchmark artifact
+- `docs/phase5c_ux_scalability.md` — UX hardening, hotspot measurements, and scalability mitigation record
+- `docs/phase5d_wrapper_boundary_clarity.md` — canonical desktop import surfaces, wrapper inventory, and experimental plugin-boundary decision
 
 ## Current Priorities
 
-1. Finish Phase 5 packaging and distribution work.
-2. Validate bundled FFmpeg/runtime behavior in clean installer environments.
-3. Continue migrating auxiliary direct `subprocess` usage toward shared runners where practical.
-4. Maintain and harden the completed workspace shell, acquisition pipeline, and media-library flows.
+1. Complete the remaining Windows-only Phase 5 packaging/release pipeline.
+2. Maintain and harden the completed workspace shell, acquisition pipeline, staged playlist metadata flow, media-library flows, dependency-health UX, shared-runner boundaries, canonical desktop import surfaces, and measured list-heavy UI paths.
+3. Use the completed Phase 5E docs/benchmarks as the optimization baseline for packaging validation.
+4. Avoid reintroducing parallel execution paths or implying unsupported plugin behavior.

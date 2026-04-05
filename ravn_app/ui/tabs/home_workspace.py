@@ -7,6 +7,7 @@ from typing import Any, Callable, Iterable, Optional
 import customtkinter as ctk
 
 from ravn_app.core.i18n import t
+from ravn_app.core.tool_health import get_tool_health_checker
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 
 
@@ -16,29 +17,37 @@ class _SummaryCard(ctk.CTkFrame):
         super().__init__(parent, **kwargs)
         self.configure(corner_radius=Sizes.CORNER_MD)
 
-        ctk.CTkLabel(
+        self.title_label = ctk.CTkLabel(
             self,
             text=title,
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.XS))
+        )
+        self.title_label.pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.XS))
 
-        ctk.CTkLabel(
+        self.value_label = ctk.CTkLabel(
             self,
             text=value,
             font=Fonts.TITLE,
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x", padx=Spacing.MD)
+        )
+        self.value_label.pack(fill="x", padx=Spacing.MD)
 
-        ctk.CTkLabel(
+        self.subtitle_label = ctk.CTkLabel(
             self,
             text=subtitle,
             font=Fonts.SMALL,
             text_color=Colors.TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", padx=Spacing.MD, pady=(Spacing.XS, Spacing.MD))
+        )
+        self.subtitle_label.pack(fill="x", padx=Spacing.MD, pady=(Spacing.XS, Spacing.MD))
+
+    def update_content(self, title: str, value: str, subtitle: str) -> None:
+        self.title_label.configure(text=title)
+        self.value_label.configure(text=value)
+        self.subtitle_label.configure(text=subtitle)
 
 
 class _ActionCard(ctk.CTkButton):
@@ -97,28 +106,98 @@ class HomeWorkspace(ctk.CTkFrame):
         self._build_ui()
         self.refresh_dashboard()
 
+    def _build_tool_health_summary(self) -> None:
+        """Build compact tool health status banner."""
+        checker = get_tool_health_checker()
+        summary = checker.get_health_summary()
+        
+        # Only show if there are issues or user wants to see it
+        if summary['overall_status'] == 'critical' or summary['overall_status'] == 'degraded':
+            health_frame = ctk.CTkFrame(
+                self,
+                fg_color=Colors.WARNING_BG if summary['overall_status'] == 'degraded' else Colors.ERROR,
+                border_width=1,
+                border_color=Colors.WARNING if summary['overall_status'] == 'degraded' else Colors.ERROR,
+                corner_radius=Sizes.CORNER_MD
+            )
+            health_frame.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.MD))
+            
+            inner = ctk.CTkFrame(health_frame, fg_color="transparent")
+            inner.pack(fill="x", padx=Spacing.MD, pady=Spacing.SM)
+            
+            if summary['overall_status'] == 'critical':
+                icon = Icons.ERROR
+                status_text = t("home.toolHealthCritical")
+                status_color = Colors.ERROR
+            else:
+                icon = Icons.WARNING
+                status_text = t("home.toolHealthDegraded")
+                status_color = Colors.WARNING
+            
+            ctk.CTkLabel(
+                inner,
+                text=f"{icon}  {status_text}",
+                font=Fonts.LABEL_BOLD,
+                text_color=status_color,
+                anchor="w"
+            ).pack(anchor="w")
+            
+            # Show missing tools
+            if summary['missing_required']:
+                missing_text = t("home.toolHealthMissingRequired", tools=", ".join(summary['missing_required']))
+                ctk.CTkLabel(
+                    inner,
+                    text=missing_text,
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w",
+                    wraplength=1000
+                ).pack(anchor="w", pady=(Spacing.XS, 0))
+            
+            if summary['missing_optional']:
+                missing_text = t("home.toolHealthMissingOptional", tools=", ".join(summary['missing_optional']))
+                ctk.CTkLabel(
+                    inner,
+                    text=missing_text,
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w",
+                    wraplength=1000
+                ).pack(anchor="w", pady=(Spacing.XS, 0))
+            
+            # Show affected features
+            if summary['unavailable_features']:
+                features_text = t(
+                    "home.toolHealthUnavailableFeatures",
+                    features=", ".join(summary['unavailable_features'][:5])
+                )
+                if len(summary['unavailable_features']) > 5:
+                    features_text += f" +{len(summary['unavailable_features']) - 5} more"
+                
+                ctk.CTkLabel(
+                    inner,
+                    text=features_text,
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w",
+                    wraplength=1000
+                ).pack(anchor="w", pady=(Spacing.XS, 0))
+            
+            # Help link
+            ctk.CTkLabel(
+                inner,
+                text=t("home.toolHealthHelp"),
+                font=Fonts.SMALL,
+                text_color=Colors.TEXT_MUTED,
+                anchor="w"
+            ).pack(anchor="w", pady=(Spacing.SM, 0))
+
     def _build_ui(self) -> None:
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=Spacing.LG, pady=(Spacing.LG, Spacing.MD))
-
-        ctk.CTkLabel(
-            header,
-            text=t("home.title"),
-            font=Fonts.TITLE,
-            text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            header,
-            text=t("home.subtitle"),
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        ).pack(anchor="w", pady=(Spacing.XS, 0))
+        # Tool health summary
+        self._build_tool_health_summary()
 
         quick_actions = ctk.CTkFrame(self, fg_color="transparent")
-        quick_actions.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.MD))
+        quick_actions.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.MD))
 
         ctk.CTkLabel(
             quick_actions,
@@ -213,25 +292,25 @@ class HomeWorkspace(ctk.CTkFrame):
         active = len(self.task_queue.get_active_tasks())
         completed = len(self.task_queue.get_completed_tasks())
 
-        self._replace_summary_card(
+        self._update_summary_card(
             "downloads",
             t("home.cardDownloads"),
             str(stats.get("total_downloads", 0)),
             t("home.cardDownloadsDetail", success=stats.get("successful_downloads", 0)),
         )
-        self._replace_summary_card(
+        self._update_summary_card(
             "conversions",
             t("home.cardConversions"),
             str(stats.get("total_conversions", 0)),
             t("home.cardConversionsDetail"),
         )
-        self._replace_summary_card(
+        self._update_summary_card(
             "operations",
             t("home.cardOperations"),
             str(stats.get("total_operations", 0)),
             t("home.cardOperationsDetail"),
         )
-        self._replace_summary_card(
+        self._update_summary_card(
             "queue",
             t("home.cardQueue"),
             str(active + pending),
@@ -251,16 +330,11 @@ class HomeWorkspace(ctk.CTkFrame):
 
         self._render_recent_entries(entries[:6])
 
-    def _replace_summary_card(self, key: str, title: str, value: str, subtitle: str) -> None:
+    def _update_summary_card(self, key: str, title: str, value: str, subtitle: str) -> None:
         card = self._summary_cards.get(key)
         if card is None:
             return
-        parent = card.master
-        grid_info = card.grid_info()
-        card.destroy()
-        new_card = _SummaryCard(parent, title=title, value=value, subtitle=subtitle)
-        new_card.grid(**grid_info)
-        self._summary_cards[key] = new_card
+        card.update_content(title=title, value=value, subtitle=subtitle)
 
     def _render_recent_entries(self, entries: Iterable[tuple[str, str]]) -> None:
         if self._recent_frame is None:

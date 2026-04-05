@@ -4,8 +4,9 @@ Sistem işlemleri - Executables, platform algılama
 
 import os
 import sys
-import subprocess
 from shutil import which
+
+from ravn_app.core.runners.ffmpeg import FFmpegRunner
 
 
 def find_executable(name):
@@ -47,18 +48,7 @@ def get_ffmpeg_version():
     Returns:
         str: FFmpeg versiyonu veya None
     """
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            # İlk satırı döndür
-            return result.stdout.split('\n')[0]
-    except Exception:
-        pass
-    return None
+    return FFmpegRunner().get_version()
 
 
 def get_platform():

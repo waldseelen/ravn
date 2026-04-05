@@ -9,6 +9,7 @@ import threading
 import tkinter as tk
 import webbrowser
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable, Dict, Optional
 
 import customtkinter as ctk
@@ -34,6 +35,7 @@ class TorrentTab(ctk.CTkFrame):
         parent,
         config_manager: Any,
         toast_manager_getter: Callable[[], Any],
+        use_embedded_workspace_source_bar: bool = False,
         **kwargs,
     ):
         kwargs.setdefault("fg_color", "transparent")
@@ -42,6 +44,7 @@ class TorrentTab(ctk.CTkFrame):
 
         self.config_manager = config_manager
         self.toast_manager_getter = toast_manager_getter
+        self._embedded_workspace_source_bar = bool(use_embedded_workspace_source_bar)
 
         aria2c_path = self.config_manager.get("aria2c_path", "aria2c")
         self._downloader = TorrentDownloader(aria2c_path)
@@ -55,6 +58,7 @@ class TorrentTab(ctk.CTkFrame):
         self._session_order: list[str] = []
         self._download_queue = __import__("collections").deque()
         self._active_filter_key = "all"
+        self._perf_metrics: Dict[str, Dict[str, Any]] = {}
 
         self._setup_ui()
         self._check_aria2c()
@@ -66,7 +70,9 @@ class TorrentTab(ctk.CTkFrame):
     def _setup_ui(self):
         # ── Header ────────────────────────────────────────────────────
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.SM))
+        self._header_frame = header
+        if not self._embedded_workspace_source_bar:
+            header.pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.SM))
 
         ctk.CTkLabel(
             header,
@@ -106,7 +112,9 @@ class TorrentTab(ctk.CTkFrame):
 
         # ── Source input ───────────────────────────────────────────────
         source_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE, corner_radius=Sizes.CORNER_MD)
-        source_frame.pack(fill="x", padx=Spacing.MD, pady=Spacing.XS)
+        self._source_frame = source_frame
+        if not self._embedded_workspace_source_bar:
+            source_frame.pack(fill="x", padx=Spacing.MD, pady=Spacing.XS)
 
         ctk.CTkLabel(
             source_frame,
@@ -476,6 +484,38 @@ class TorrentTab(ctk.CTkFrame):
     def _on_row_double_click(self, _event=None):
         self._open_stream_in_player()
 
+    def set_source_text(self, value: str) -> None:
+        """Mirror workspace source text into the torrent source entry."""
+        self._source_entry.delete(0, "end")
+        if value:
+            first_line = next((line.strip() for line in str(value).splitlines() if line.strip()), str(value).strip())
+            if first_line:
+                self._source_entry.insert(0, first_line)
+
+    def get_source_text(self) -> str:
+        return str(self._source_entry.get() or "")
+
+    def focus_source_input(self) -> None:
+        self._source_entry.focus_set()
+
+    def _on_ctrl_enter(self, event=None):
+        if not self.winfo_viewable():
+            return
+        self._start_download()
+
+    def _on_ctrl_l(self, event=None):
+        if not self.winfo_viewable():
+            return
+        self._source_entry.delete(0, "end")
+        return "break"
+
+    def _on_escape(self, event=None):
+        if not self.winfo_viewable():
+            return
+        if self._active_download_id is not None:
+            self._cancel_download()
+            return "break"
+
     # ------------------------------------------------------------------
     # Download logic
     # ------------------------------------------------------------------
@@ -837,13 +877,32 @@ class TorrentTab(ctk.CTkFrame):
             row["queue_state"] = "queued"
             self._update_download_row(queued_id, status=f"Queued #{position}", queue_state="queued")
 
+    def _record_perf_metric(self, name: str, *, item_count: int, duration_seconds: float, **extra: Any) -> None:
+        metrics = getattr(self, "_perf_metrics", None)
+        if metrics is None:
+            metrics = {}
+            self._perf_metrics = metrics
+        metrics[name] = {
+            "item_count": int(item_count),
+            "duration_ms": round(float(duration_seconds) * 1000.0, 3),
+            **extra,
+        }
+
     def _apply_session_filter(self) -> None:
+        started = perf_counter()
         tree = getattr(self, "_downloads_tree", None)
         if tree is None:
             return
 
         active_filter = getattr(self, "_active_filter_key", "all")
         session_ids = getattr(self, "_session_order", list(self._download_rows.keys()))
+
+        file_rows_by_parent: Dict[str, list[str]] = {}
+        for file_iid, file_row in getattr(self, "_file_rows", {}).items():
+            parent_id = file_row.get("parent_id")
+            if not parent_id:
+                continue
+            file_rows_by_parent.setdefault(str(parent_id), []).append(file_iid)
 
         for session_id in session_ids:
             row = self._download_rows.get(session_id, {})
@@ -853,13 +912,19 @@ class TorrentTab(ctk.CTkFrame):
             else:
                 tree.detach(session_id)
 
-            for file_iid, file_row in getattr(self, "_file_rows", {}).items():
-                if file_row.get("parent_id") != session_id:
-                    continue
+            for file_iid in file_rows_by_parent.get(session_id, []):
                 if matches:
                     tree.move(file_iid, session_id, "end")
                 else:
                     tree.detach(file_iid)
+
+        self._record_perf_metric(
+            "torrent_session_filter",
+            item_count=len(session_ids),
+            duration_seconds=perf_counter() - started,
+            file_row_count=len(getattr(self, "_file_rows", {})),
+            active_filter=active_filter,
+        )
 
     def _selected_open_target(self) -> Optional[str]:
         selected = self._get_selected_download_id()

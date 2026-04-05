@@ -274,19 +274,79 @@ class YouTubeDownloader:
             logger.error(f"Bilgi alınamadı: {e}")
             raise Exception(f"Bilgi alınamadı: {str(e)}")
 
-    def extract_playlist_entries(self, url: str, quality_label: str = "En İyi") -> List[Dict[str, Any]]:
-        """Playlist içeriğini seçili kaliteye göre detaylarıyla getir."""
+    def extract_playlist_entries(
+        self,
+        url: str,
+        quality_label: str = "En İyi",
+        *,
+        with_details: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Get playlist entries, optionally including quality/detail metadata."""
         try:
-            # Detaylı bilgileri al (boyut, çözünürlük, format) - kaliteye göre seç.
             entries = self._runner.extract_playlist_entries(
                 url,
-                with_details=True,
+                with_details=with_details,
                 quality_label=quality_label,
             )
             return entries if entries else []
         except Exception as e:
             logger.error(f"Playlist bilgisi alınamadı: {e}")
             return []
+
+    @staticmethod
+    def merge_playlist_entry_detail_fields(
+        base_entries: List[Dict[str, Any]],
+        detailed_entries: List[Dict[str, Any]],
+    ) -> int:
+        """Merge deferred playlist detail fields into the currently displayed entry list."""
+        if not base_entries or not detailed_entries:
+            return 0
+
+        detail_keys = (
+            "album",
+            "channel",
+            "uploader",
+            "view_count",
+            "like_count",
+            "upload_date",
+            "filesize_mb",
+            "resolution",
+            "format_note",
+            "size_by_quality_mb",
+            "resolution_by_quality",
+            "format_note_by_quality",
+        )
+
+        def identity(entry: Dict[str, Any], index: int) -> tuple[Any, ...]:
+            return (
+                entry.get("url") or "",
+                entry.get("title") or "",
+                float(entry.get("duration") or 0.0),
+                index,
+            )
+
+        detail_by_identity = {
+            identity(entry, index): entry
+            for index, entry in enumerate(detailed_entries)
+        }
+
+        merged_count = 0
+        for index, entry in enumerate(base_entries):
+            detail_entry = detail_by_identity.get(identity(entry, index))
+            if detail_entry is None:
+                continue
+
+            updated = False
+            for key in detail_keys:
+                if key in detail_entry:
+                    value = detail_entry.get(key)
+                    if entry.get(key) != value:
+                        entry[key] = value
+                        updated = True
+            if updated:
+                merged_count += 1
+
+        return merged_count
 
     def get_video_format_options(self) -> Dict[str, Dict]:
         """Desteklenen format seçenekleri"""

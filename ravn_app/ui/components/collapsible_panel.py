@@ -18,7 +18,7 @@ class CollapsiblePanel(ctk.CTkFrame):
         self._expanded = expanded
 
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.SM))
+        header.pack(fill="x", padx=Spacing.MD, pady=(Spacing.SM, Spacing.XS))
 
         text_col = ctk.CTkFrame(header, fg_color="transparent")
         text_col.pack(side="left", fill="x", expand=True)
@@ -46,8 +46,8 @@ class CollapsiblePanel(ctk.CTkFrame):
             header,
             text="",
             command=self.toggle,
-            width=96,
-            height=Sizes.BTN_HEIGHT_LG,
+            width=88,
+            height=Sizes.BTN_HEIGHT_SM,
             fg_color=Colors.BG_CARD,
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
@@ -74,7 +74,7 @@ class CollapsiblePanel(ctk.CTkFrame):
         if self._expanded:
             self.toggle_button.configure(text=f"▾ {t('workspaceGuides.hide')}")
             if initial or not self.body.winfo_manager():
-                self.body.pack(fill="x", padx=Spacing.MD, pady=(0, Spacing.MD))
+                self.body.pack(fill="x", padx=Spacing.MD, pady=(0, Spacing.SM))
         else:
             self.toggle_button.configure(text=f"▸ {t('workspaceGuides.show')}")
             if self.body.winfo_manager():

@@ -24,6 +24,7 @@ This file is the validated implementation snapshot for the current repository st
 
 - The desktop shell is grouped into workspaces: `Home`, `Download`, `Studio`, `Library`.
 - Queue is exposed through a global right-side panel/drawer instead of top-level navigation.
+- Desktop startup centering now uses taskbar-aware usable bounds and prefers the active monitor on Windows.
 - Settings are exposed as an independent lower-left utility/workspace entry.
 - Theme/language toggles live directly in the shell sidebar utility area.
 - Shell-level command palette is active via `Ctrl+K`.
@@ -171,6 +172,7 @@ Verified on 2026-04-03:
 ## Functional Highlights
 
 ### Acquisition
+
 - quality-based size estimation
 - naming presets/templates with sanitization
 - subtitle preference + fallback behavior
@@ -182,6 +184,7 @@ Verified on 2026-04-03:
 - CLI parity for intent-driven acquisition
 
 ### Processing / studio
+
 - conversion
 - subtitle processing/embed
 - filters
@@ -191,11 +194,13 @@ Verified on 2026-04-03:
 - optional library auto-add
 
 ### Organization
+
 - local media library
 - search/tags/collections/export
 - aggregated history for downloads/conversions/operations
 
 ### Shell / UX
+
 - grouped workspace shell
 - queue drawer
 - settings workspace entry
@@ -207,9 +212,9 @@ Verified on 2026-04-03:
 
 ## Open Reality / Remaining Work
 
-The main open project area is still **Phase 5 build/packaging/distribution**.
+The main open project area is still **Phase 5 release readiness and Windows packaging**.
 
-Current build/distribution artifacts exist (`build.ps1`, `ravn.spec`, `app_builder.py`), but the packaged delivery story is not yet finished or fully validated across clean environments.
+Current build/distribution artifacts exist (`build.ps1`, `ravn.spec`, `app_builder.py`), but the packaged delivery story is not yet finished. The current documented direction is to harden runtime/tooling behavior first, then complete a **Windows-only** packaging/release pipeline.
 
 ---
 
@@ -219,5 +224,5 @@ Repository documentation was refreshed and aligned around the current runtime mo
 
 - `README.md` now acts as the comprehensive user/project overview
 - `ARCHITECTURE.md` now focuses on system structure, module boundaries, and runtime flows
-- `DEPLOY.md` now reflects current packaging/distribution reality instead of stale planning fragments
+- `TASKS.md` now also carries the active hardening + Windows release roadmap
 - `CLAUDE.md` remains the compact engineering entrypoint/addendum

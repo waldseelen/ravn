@@ -2,13 +2,9 @@
 VideoAnalyzer testleri
 """
 
-import pytest
-import os
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import subprocess
+from unittest.mock import patch
 
 from ravn_app.core.converter import VideoAnalyzer, VideoInfo
 
@@ -87,10 +83,8 @@ class TestVideoAnalyzer:
         result = analyzer.analyze("/nonexistent/file.mp4")
         assert result is None
 
-    @patch('subprocess.run')
-    def test_analyze_successful(self, mock_run):
+    def test_analyze_successful(self):
         """Başarılı analiz test edilir"""
-        # Mock ffprobe çıktısı
         mock_output = {
             "format": {
                 "duration": "120.5",
@@ -113,14 +107,9 @@ class TestVideoAnalyzer:
             ]
         }
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(mock_output)
-        )
-
         analyzer = VideoAnalyzer()
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp, patch.object(analyzer._runner, 'probe', return_value=mock_output):
             result = analyzer.analyze(tmp.name)
 
             assert result is not None
@@ -133,33 +122,23 @@ class TestVideoAnalyzer:
             assert result.video_codec == "h264"
             assert result.audio_codec == "aac"
 
-    @patch('subprocess.run')
-    def test_analyze_ffprobe_error(self, mock_run):
+    def test_analyze_ffprobe_error(self):
         """FFprobe hatası durumunda None döndürüldüğü test edilir"""
-        mock_run.return_value = MagicMock(returncode=1, stdout="")
-
         analyzer = VideoAnalyzer()
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp, patch.object(analyzer._runner, 'probe', return_value=None):
             result = analyzer.analyze(tmp.name)
             assert result is None
 
-    @patch('subprocess.run')
-    def test_analyze_invalid_json(self, mock_run):
-        """Geçersiz JSON çıktısı durumunda None döndürüldüğü test edilir"""
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="invalid json"
-        )
-
+    def test_analyze_invalid_probe_payload(self):
+        """Geçersiz probe sonucu durumunda None döndürüldüğü test edilir"""
         analyzer = VideoAnalyzer()
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp, patch.object(analyzer._runner, 'probe', side_effect=ValueError("invalid json")):
             result = analyzer.analyze(tmp.name)
             assert result is None
 
-    @patch('subprocess.run')
-    def test_analyze_fps_fraction(self, mock_run):
+    def test_analyze_fps_fraction(self):
         """FPS kesir formatında doğru şekilde hesaplandığı test edilir"""
         mock_output = {
             "format": {
@@ -179,22 +158,15 @@ class TestVideoAnalyzer:
             ]
         }
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(mock_output)
-        )
-
         analyzer = VideoAnalyzer()
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp, patch.object(analyzer._runner, 'probe', return_value=mock_output):
             result = analyzer.analyze(tmp.name)
 
             assert result is not None
-            # 24000/1001 ≈ 23.976
             assert abs(result.fps - 23.976) < 0.01
 
-    @patch('subprocess.run')
-    def test_analyze_missing_streams(self, mock_run):
+    def test_analyze_missing_streams(self):
         """Eksik akış bilgisi durumunda test edilir"""
         mock_output = {
             "format": {
@@ -205,14 +177,9 @@ class TestVideoAnalyzer:
             "streams": []
         }
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(mock_output)
-        )
-
         analyzer = VideoAnalyzer()
 
-        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.mp4') as tmp, patch.object(analyzer._runner, 'probe', return_value=mock_output):
             result = analyzer.analyze(tmp.name)
 
             assert result is not None

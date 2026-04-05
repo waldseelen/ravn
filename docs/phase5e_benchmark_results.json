@@ -1,0 +1,56 @@
+{
+  "media_library": {
+    "list_media": {
+      "optimized_statement_count": 2,
+      "legacy_statement_count": 121,
+      "optimized_elapsed_ms": 1.407,
+      "legacy_elapsed_ms": 4.831
+    },
+    "search_media": {
+      "statement_count": 4,
+      "elapsed_ms": 3.501,
+      "result_count": 80
+    },
+    "statistics": {
+      "statement_count": 4,
+      "elapsed_ms": 0.361,
+      "total_items": 180
+    },
+    "export_memory": {
+      "streamed_peak_kib": 703.806,
+      "materialized_peak_kib": 795.273,
+      "streamed_elapsed_ms": 30.927,
+      "materialized_elapsed_ms": 17.972
+    }
+  },
+  "auto_add_batch": {
+    "batched_elapsed_ms": 317.964,
+    "naive_elapsed_ms": 653.903,
+    "batched_peak_kib": 228.896,
+    "naive_peak_kib": 2685.438,
+    "batched_handler_count": 1,
+    "naive_handler_count": 80
+  },
+  "playlist_fetch": {
+    "initial_flat_fetch_ms": 1.095,
+    "initial_flat_peak_kib": 113.512,
+    "full_detail_fetch_ms": 23.175,
+    "full_detail_peak_kib": 408.419,
+    "merge_elapsed_ms": 0.325,
+    "merged_entry_count": 140
+  },
+  "idle_home": {
+    "optimized_idle_loop_ms": 0.479,
+    "legacy_idle_loop_ms": 1.041,
+    "optimized_refresh_counts": {
+      "header": 0,
+      "home": 0,
+      "queue": 0
+    },
+    "legacy_refresh_counts": {
+      "header": 5000,
+      "home": 5000,
+      "queue": 5000
+    }
+  }
+}

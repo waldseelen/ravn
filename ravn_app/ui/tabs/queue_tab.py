@@ -22,10 +22,18 @@ class QueueTab(ctk.CTkFrame):
         super().__init__(parent, **kwargs)
         self.configure(fg_color=Colors.BG_PRIMARY)
 
-        queue_panel = QueuePanel(
+        self.queue_panel = QueuePanel(
             self,
             on_cancel_task=on_cancel_task,
             on_open_folder=on_open_folder,
             fg_color="transparent",
         )
-        queue_panel.pack(fill="both", expand=True)
+        self.queue_panel.pack(fill="both", expand=True)
+
+    def refresh_queue(self, force: bool = False) -> None:
+        """Refresh the hosted queue panel."""
+        self.queue_panel.refresh_tasks(force=force)
+
+    def clear_completed(self) -> None:
+        """Forward completed-task cleanup to the hosted queue panel."""
+        self.queue_panel.clear_completed()

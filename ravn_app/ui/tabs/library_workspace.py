@@ -42,34 +42,13 @@ class LibraryWorkspace(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
-
-        self.title_label = ctk.CTkLabel(
-            header,
-            text=t("libraryWorkspace.title"),
-            font=Fonts.TITLE,
-            text_color=Colors.TEXT_PRIMARY,
-            anchor="w",
-        )
-        self.title_label.pack(anchor="w")
-
-        self.subtitle_label = ctk.CTkLabel(
-            header,
-            text=t("libraryWorkspace.subtitle"),
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        )
-        self.subtitle_label.pack(anchor="w", pady=(Spacing.XS, 0))
-
         self.guide_panel = CollapsiblePanel(
             self,
             title=t("libraryWorkspace.guideTitle"),
             subtitle=t("libraryWorkspace.guideSubtitle"),
             expanded=False,
         )
-        self.guide_panel.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.MD))
+        self.guide_panel.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
         guide_body = self.guide_panel.content_frame()
         self._guide_labels = []
         for key in (

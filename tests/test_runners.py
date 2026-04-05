@@ -143,8 +143,7 @@ class TestFFmpegRunner:
         version = runner.get_version()
         assert version is None
 
-    @patch('subprocess.run')
-    def test_probe_success(self, mock_run):
+    def test_probe_success(self):
         """Test FFprobe successful analysis"""
         mock_data = {
             "format": {
@@ -156,21 +155,17 @@ class TestFFmpegRunner:
                 {"codec_type": "audio", "codec_name": "aac"}
             ]
         }
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout=json.dumps(mock_data)
-        )
         runner = FFmpegRunner()
 
-        with patch('os.path.exists', return_value=True):
+        with patch('os.path.exists', return_value=True), patch.object(runner, 'run_ffprobe_json', return_value=mock_data) as mock_probe:
             result = runner.probe("test.mp4")
 
         assert result is not None
         assert "format" in result
         assert "streams" in result
+        mock_probe.assert_called_once()
 
-    @patch('subprocess.run')
-    def test_probe_file_not_found(self, mock_run):
+    def test_probe_file_not_found(self):
         """Test FFprobe with non-existent file"""
         runner = FFmpegRunner()
 
@@ -179,19 +174,14 @@ class TestFFmpegRunner:
 
         assert result is None
 
-    @patch('subprocess.run')
-    def test_get_duration(self, mock_run):
+    def test_get_duration(self):
         """Test getting media duration"""
         mock_data = {
             "format": {"duration": "120.5"}
         }
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout=json.dumps(mock_data)
-        )
         runner = FFmpegRunner()
 
-        with patch('os.path.exists', return_value=True):
+        with patch.object(runner, 'probe', return_value=mock_data):
             duration = runner.get_duration("test.mp4")
 
         assert duration == 120.5
@@ -206,6 +196,19 @@ class TestFFmpegRunner:
         runner = FFmpegRunner()
         assert runner.check_codec_support("libx264") is True
         assert runner.check_codec_support("nonexistent") is False
+
+    def test_run_ffprobe_json_success(self):
+        runner = FFmpegRunner()
+        payload = {"codecs": [{"name": "aac"}]}
+        with patch.object(runner, 'run_ffprobe', return_value=RunnerResult(success=True, return_code=0, stdout=json.dumps(payload))):
+            result = runner.run_ffprobe_json(["-codecs", "-of", "json"])
+        assert result == payload
+
+    def test_run_ffprobe_json_failure(self):
+        runner = FFmpegRunner()
+        with patch.object(runner, 'run_ffprobe', return_value=RunnerResult(success=False, return_code=1, error_message="boom")):
+            result = runner.run_ffprobe_json(["-codecs", "-of", "json"])
+        assert result is None
 
     def test_run_input_not_found(self):
         """Test run with non-existent input file"""
@@ -751,6 +754,43 @@ class TestYtDlpRunner:
         assert len(entries) == 1
         assert entries[0]["resolution"] == "Audio"
         assert entries[0]["filesize_mb"] == 8.0
+
+    @patch('subprocess.run')
+    def test_extract_playlist_entries_uses_quality_hint_when_size_and_bitrate_are_missing(self, mock_run):
+        """Playlist rows should still get an approximate size when yt-dlp omits exact size metadata."""
+        mock_data = {
+            "webpage_url": "https://www.youtube.com/playlist?list=PL123",
+            "entries": [
+                {
+                    "id": "abc123",
+                    "title": "Video 1",
+                    "duration": 7200,
+                    "formats": [
+                        {
+                            "format_id": "22",
+                            "width": 1280,
+                            "height": 720,
+                            "vcodec": "avc1",
+                            "acodec": "mp4a",
+                            "format_note": "720p"
+                        }
+                    ],
+                }
+            ],
+        }
+        mock_run.return_value = Mock(returncode=0, stdout=json.dumps(mock_data))
+
+        runner = YtDlpRunner()
+        entries = runner.extract_playlist_entries(
+            "https://www.youtube.com/playlist?list=PL123",
+            with_details=True,
+            quality_label="720p",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["resolution"] == "1280x720"
+        assert entries[0]["filesize_mb"] > 0
+        assert entries[0]["size_by_quality_mb"]["720p"] == 0.0
 
     def test_extract_downloaded_files(self):
         """Test extracting downloaded file paths from output"""

@@ -281,6 +281,47 @@ class YtDlpRunner(BaseRunner):
         return round(total_mb, 2)
 
     @classmethod
+    def _estimate_filesize_mb_from_quality_hint(
+        cls,
+        quality_label: str,
+        duration: Any,
+        selected_format: Optional[Dict[str, Any]],
+    ) -> float:
+        """Estimate playlist entry size from coarse quality hints when yt-dlp omits exact size/bitrate."""
+        duration_seconds = cls._to_float(duration)
+        if duration_seconds <= 0:
+            return 0.0
+
+        quality = str(quality_label or "En İyi")
+        audio_only = quality == "Sadece Ses"
+        height = int(cls._to_float((selected_format or {}).get("height")))
+
+        if audio_only:
+            target_kbps = 160.0
+        else:
+            if height >= 1440:
+                target_kbps = 9000.0
+            elif height >= 1080:
+                target_kbps = 5000.0
+            elif height >= 720:
+                target_kbps = 2800.0
+            elif height >= 480:
+                target_kbps = 1400.0
+            elif height > 0:
+                target_kbps = 800.0
+            elif quality == "1080p":
+                target_kbps = 5000.0
+            elif quality == "720p":
+                target_kbps = 2800.0
+            elif quality == "480p":
+                target_kbps = 1400.0
+            else:
+                target_kbps = 2800.0
+
+        estimated_bytes = (duration_seconds * target_kbps * 1000) / 8
+        return round(estimated_bytes / (1024 * 1024), 2)
+
+    @classmethod
     def compute_size_by_quality(cls, info: Dict[str, Any]) -> Dict[str, Any]:
         """
         Compute per-quality size/resolution maps from a raw yt-dlp info dict.
@@ -301,7 +342,14 @@ class YtDlpRunner(BaseRunner):
             if not selected:
                 continue
 
-            size_by_quality[quality_label] = cls._estimate_filesize_mb(selected, duration)
+            estimated_size_mb = cls._estimate_filesize_mb(selected, duration)
+            if estimated_size_mb <= 0:
+                estimated_size_mb = cls._estimate_filesize_mb_from_quality_hint(
+                    quality_label,
+                    duration,
+                    selected,
+                )
+            size_by_quality[quality_label] = estimated_size_mb
 
             if quality_label == "Sadece Ses":
                 resolution_by_quality[quality_label] = "Audio"
@@ -535,6 +583,13 @@ class YtDlpRunner(BaseRunner):
                 # keep quality-specific resolution/note and only fallback for size.
                 if selected_size is None or selected_size <= 0.0:
                     selected_size = size_by_quality.get("En İyi", 0.0)
+                if selected_size is None or selected_size <= 0.0:
+                    selected = self._pick_format_for_quality(formats, quality_label)
+                    selected_size = self._estimate_filesize_mb_from_quality_hint(
+                        quality_label,
+                        duration,
+                        selected,
+                    )
 
                 if not selected_resolution:
                     selected_resolution = resolution_by_quality.get("En İyi", "Unknown")

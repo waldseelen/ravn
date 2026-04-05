@@ -1,4 +1,4 @@
-"""Top-level tab views."""
+"""Canonical desktop feature/tab import surfaces."""
 
 from ravn_app.ui.tabs.converter_tab import ConverterTab
 from ravn_app.ui.tabs.download_tab import DownloadTab

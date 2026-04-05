@@ -4,20 +4,25 @@ SQLite-backed media library persistence for Phase 7 media-management features.
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from ravn_app.core.config_paths import ensure_directories_exist, get_media_library_file_path
+from ravn_app.core.persistence._media_library_export import MediaLibraryExporter
+from ravn_app.core.persistence._media_library_rows import MediaLibraryRowMapper
+from ravn_app.core.persistence._media_library_stats import MediaLibraryStatsCache
 from ravn_app.utils.metadata_handler import MetadataHandler
 
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SEARCH_HISTORY_LIMIT = 100
+DEFAULT_EXPORT_BATCH_SIZE = 500
 
 
 @dataclass
@@ -78,14 +83,23 @@ class MediaLibrary:
         self,
         db_path: Optional[str] = None,
         metadata_handler: Optional[MetadataHandler] = None,
+        *,
+        search_history_limit: int = DEFAULT_SEARCH_HISTORY_LIMIT,
+        export_batch_size: int = DEFAULT_EXPORT_BATCH_SIZE,
     ) -> None:
         ensure_directories_exist()
         self.db_path = str(Path(db_path) if db_path else get_media_library_file_path())
         self.metadata_handler = metadata_handler or MetadataHandler()
+        self.search_history_limit = max(int(search_history_limit or 0), 0)
+        self.export_batch_size = max(int(export_batch_size or 1), 1)
+
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._create_tables()
+        self._row_mapper = MediaLibraryRowMapper(self.conn, self._build_media_record)
+        self._stats_cache = MediaLibraryStatsCache(self.conn, self._count_duplicate_groups)
+        self._exporter = MediaLibraryExporter(self.iter_media, self.list_collections, self.get_statistics)
 
     def _create_tables(self) -> None:
         cursor = self.conn.cursor()
@@ -160,6 +174,13 @@ class MediaLibrary:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_media_items_size ON media_items(size)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_media_items_duration ON media_items(duration)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_media_id_tag ON tags(media_id, tag)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_collection_items_collection_position ON collection_items(collection_id, position)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at DESC, id DESC)"
+        )
         self.conn.commit()
 
     @staticmethod
@@ -215,30 +236,45 @@ class MediaLibrary:
         media_id = int(cursor.lastrowid)
         self._replace_tags(media_id, normalized_tags)
         self.conn.commit()
+        self._invalidate_stats_cache()
         return media_id
 
     def get_media(self, media_id: int) -> Optional[MediaItemRecord]:
         """Fetch a single media item by id."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM media_items WHERE id = ?", (media_id,))
-        row = cursor.fetchone()
-        return self._row_to_media_item(row) if row else None
+        rows = self._load_media_rows("SELECT * FROM media_items WHERE id = ?", (media_id,))
+        items = self._map_media_rows_to_records(rows)
+        return items[0] if items else None
 
     def get_media_by_path(self, file_path: str) -> Optional[MediaItemRecord]:
         """Fetch a single media item by file path."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM media_items WHERE file_path = ?", (str(Path(file_path).resolve()),))
-        row = cursor.fetchone()
-        return self._row_to_media_item(row) if row else None
+        rows = self._load_media_rows(
+            "SELECT * FROM media_items WHERE file_path = ?",
+            (str(Path(file_path).resolve()),),
+        )
+        items = self._map_media_rows_to_records(rows)
+        return items[0] if items else None
 
     def list_media(self, limit: int = 100, offset: int = 0) -> list[MediaItemRecord]:
         """List media items ordered by most recently added."""
-        cursor = self.conn.cursor()
-        cursor.execute(
+        rows = self._load_media_rows(
             "SELECT * FROM media_items ORDER BY added_at DESC LIMIT ? OFFSET ?",
             (limit, offset),
         )
-        return [self._row_to_media_item(row) for row in cursor.fetchall()]
+        return self._map_media_rows_to_records(rows)
+
+    def iter_media(self, *, batch_size: Optional[int] = None) -> Iterable[MediaItemRecord]:
+        """Yield media items in batches to avoid large one-shot materialization."""
+        page_size = max(int(batch_size or self.export_batch_size), 1)
+        offset = 0
+        while True:
+            batch = self.list_media(limit=page_size, offset=offset)
+            if not batch:
+                return
+            for item in batch:
+                yield item
+            if len(batch) < page_size:
+                return
+            offset += len(batch)
 
     def update_media(
         self,
@@ -270,14 +306,21 @@ class MediaLibrary:
         if tags is not None:
             self._replace_tags(media_id, self._normalize_tags(tags))
         self.conn.commit()
-        return cursor.rowcount > 0 or tags is not None
+
+        changed = cursor.rowcount > 0 or tags is not None
+        if changed:
+            self._invalidate_stats_cache()
+        return changed
 
     def delete_media(self, media_id: int) -> bool:
         """Delete a media item from the library."""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM media_items WHERE id = ?", (media_id,))
         self.conn.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+        if deleted:
+            self._invalidate_stats_cache()
+        return deleted
 
     def search_media(
         self,
@@ -288,6 +331,7 @@ class MediaLibrary:
         filters = filters or MediaSearchFilters()
         conditions: list[str] = []
         params: list[Any] = []
+        normalized_filter_tags = self._normalize_tags(filters.tags)
 
         if query:
             like_value = f"%{query}%"
@@ -314,12 +358,12 @@ class MediaLibrary:
         if filters.date_to:
             conditions.append("m.added_at <= ?")
             params.append(filters.date_to)
-        if filters.tags:
-            placeholders = ",".join("?" for _ in filters.tags)
+        if normalized_filter_tags:
+            placeholders = ",".join("?" for _ in normalized_filter_tags)
             conditions.append(
                 f"EXISTS (SELECT 1 FROM tags t WHERE t.media_id = m.id AND t.tag IN ({placeholders}))"
             )
-            params.extend(self._normalize_tags(filters.tags))
+            params.extend(normalized_filter_tags)
 
         sort_columns = {
             "added_at": "m.added_at",
@@ -332,10 +376,9 @@ class MediaLibrary:
         order_column = sort_columns.get(filters.sort_by, "m.added_at")
         order_direction = "DESC" if filters.sort_desc else "ASC"
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        params.extend([filters.limit])
+        params.append(filters.limit)
 
-        cursor = self.conn.cursor()
-        cursor.execute(
+        rows = self._load_media_rows(
             f"""
             SELECT m.*
             FROM media_items m
@@ -345,7 +388,7 @@ class MediaLibrary:
             """,
             params,
         )
-        items = [self._row_to_media_item(row) for row in cursor.fetchall()]
+        items = self._map_media_rows_to_records(rows)
         self._record_search(query=query, filters=filters, result_count=len(items))
         return items
 
@@ -360,14 +403,20 @@ class MediaLibrary:
             (media_id, normalized_tag[0]),
         )
         self.conn.commit()
-        return cursor.rowcount > 0
+        added = cursor.rowcount > 0
+        if added:
+            self._invalidate_stats_cache()
+        return added
 
     def remove_tag(self, media_id: int, tag: str) -> bool:
         """Remove a tag from a media item."""
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM tags WHERE media_id = ? AND tag = ?", (media_id, tag.strip().lower()))
         self.conn.commit()
-        return cursor.rowcount > 0
+        removed = cursor.rowcount > 0
+        if removed:
+            self._invalidate_stats_cache()
+        return removed
 
     def create_collection(
         self,
@@ -382,6 +431,7 @@ class MediaLibrary:
             (name, description, self._utc_now_iso(), thumbnail),
         )
         self.conn.commit()
+        self._invalidate_stats_cache()
         return int(cursor.lastrowid)
 
     def rename_collection(self, collection_id: int, new_name: str) -> bool:
@@ -396,7 +446,10 @@ class MediaLibrary:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
         self.conn.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+        if deleted:
+            self._invalidate_stats_cache()
+        return deleted
 
     def list_collections(self) -> list[CollectionRecord]:
         """Return all collections ordered by name."""
@@ -419,12 +472,14 @@ class MediaLibrary:
             (collection_id, media_id, position),
         )
         self.conn.commit()
-        return cursor.rowcount > 0
+        changed = cursor.rowcount > 0
+        if changed:
+            self._invalidate_stats_cache()
+        return changed
 
     def get_collection_items(self, collection_id: int) -> list[MediaItemRecord]:
         """Return media items for a collection in stored order."""
-        cursor = self.conn.cursor()
-        cursor.execute(
+        rows = self._load_media_rows(
             """
             SELECT m.*
             FROM collection_items ci
@@ -434,7 +489,7 @@ class MediaLibrary:
             """,
             (collection_id,),
         )
-        return [self._row_to_media_item(row) for row in cursor.fetchall()]
+        return self._map_media_rows_to_records(rows)
 
     def detect_duplicates(self) -> list[list[MediaItemRecord]]:
         """Detect likely duplicate media groups by size, duration, and format."""
@@ -450,7 +505,7 @@ class MediaLibrary:
         )
         duplicate_groups: list[list[MediaItemRecord]] = []
         for row in cursor.fetchall():
-            cursor.execute(
+            rows = self._load_media_rows(
                 """
                 SELECT * FROM media_items
                 WHERE size = ? AND ROUND(COALESCE(duration, 0), 3) = ? AND format = ?
@@ -458,86 +513,24 @@ class MediaLibrary:
                 """,
                 (row["size"], row["duration_key"], row["format"]),
             )
-            items = [self._row_to_media_item(item_row) for item_row in cursor.fetchall()]
+            items = self._map_media_rows_to_records(rows)
             if len(items) > 1:
                 duplicate_groups.append(items)
         return duplicate_groups
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self, *, force_refresh: bool = False) -> dict[str, Any]:
         """Return aggregate library statistics."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT COUNT(*), COALESCE(SUM(size), 0), COALESCE(SUM(duration), 0) FROM media_items")
-        total_items, total_size, total_duration = cursor.fetchone()
-        cursor.execute(
-            "SELECT format, COUNT(*) AS count FROM media_items GROUP BY format ORDER BY count DESC, format ASC"
-        )
-        formats = {row["format"]: row["count"] for row in cursor.fetchall()}
-        cursor.execute("SELECT COUNT(*) FROM collections")
-        collection_count = cursor.fetchone()[0]
-        return {
-            "total_items": int(total_items or 0),
-            "total_size": int(total_size or 0),
-            "total_duration": float(total_duration or 0.0),
-            "formats": formats,
-            "collections": int(collection_count or 0),
-            "duplicate_groups": len(self.detect_duplicates()),
-        }
+        return self._stats_cache.get(force_refresh=force_refresh)
 
     def export_library(self, export_format: str, output_file: str) -> bool:
         """Export library data as JSON or CSV."""
-        export_format = export_format.strip().lower()
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        media_items = self.list_media(limit=100000, offset=0)
-        if export_format == "json":
-            payload = {
-                "media_items": [asdict(item) for item in media_items],
-                "collections": [asdict(collection) for collection in self.list_collections()],
-                "statistics": self.get_statistics(),
-            }
-            with open(output_path, "w", encoding="utf-8") as handle:
-                json.dump(payload, handle, indent=2, ensure_ascii=False)
-            return True
-
-        if export_format == "csv":
-            with open(output_path, "w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(
-                    handle,
-                    fieldnames=[
-                        "id",
-                        "file_path",
-                        "title",
-                        "format",
-                        "duration",
-                        "size",
-                        "width",
-                        "height",
-                        "fps",
-                        "sample_rate",
-                        "codec",
-                        "bitrate",
-                        "created_at",
-                        "added_at",
-                        "thumbnail",
-                        "tags",
-                    ],
-                )
-                writer.writeheader()
-                for item in media_items:
-                    row = asdict(item)
-                    row["tags"] = ",".join(item.tags)
-                    row.pop("metadata", None)
-                    writer.writerow(row)
-            return True
-
-        raise ValueError("Unsupported export format. Use 'json' or 'csv'.")
+        return self._exporter.export(export_format, output_file)
 
     def get_recent_searches(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return recent search history rows."""
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT * FROM search_history ORDER BY searched_at DESC LIMIT ?",
+            "SELECT * FROM search_history ORDER BY searched_at DESC, id DESC LIMIT ?",
             (limit,),
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -558,26 +551,38 @@ class MediaLibrary:
 
     @staticmethod
     def _normalize_tags(tags: list[str]) -> list[str]:
-        normalized = []
+        normalized: list[str] = []
         for tag in tags:
             candidate = str(tag).strip().lower()
             if candidate and candidate not in normalized:
                 normalized.append(candidate)
         return normalized
 
-    def _row_to_media_item(self, row: sqlite3.Row) -> MediaItemRecord:
-        metadata_raw = row["metadata"] or "{}"
+    def _load_media_rows(self, query: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:
+        return self._row_mapper.load_rows(query, params)
+
+    def _load_tags_for_media_ids(self, media_ids: Iterable[int]) -> dict[int, list[str]]:
+        return self._row_mapper.load_tags_by_media_id(media_ids)
+
+    def _map_media_rows_to_records(self, rows: Iterable[sqlite3.Row]) -> list[MediaItemRecord]:
+        return self._row_mapper.map_rows_to_records(rows)
+
+    @staticmethod
+    def _deserialize_media_metadata(metadata_raw: str) -> dict[str, Any]:
         try:
-            metadata = json.loads(metadata_raw)
+            return json.loads(metadata_raw or "{}")
         except json.JSONDecodeError:
-            metadata = {}
+            return {}
 
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT tag FROM tags WHERE media_id = ? ORDER BY tag ASC", (row["id"],))
-        tags = [tag_row["tag"] for tag_row in cursor.fetchall()]
-
+    def _build_media_record(
+        self,
+        row: sqlite3.Row,
+        tags_by_media_id: dict[int, list[str]],
+    ) -> MediaItemRecord:
+        media_id = int(row["id"])
+        metadata = self._deserialize_media_metadata(row["metadata"])
         return MediaItemRecord(
-            id=row["id"],
+            id=media_id,
             file_path=row["file_path"],
             title=row["title"] or "",
             format=row["format"] or "",
@@ -593,7 +598,7 @@ class MediaLibrary:
             added_at=row["added_at"] or "",
             metadata=metadata,
             thumbnail=row["thumbnail"] or "",
-            tags=tags,
+            tags=list(tags_by_media_id.get(media_id, [])),
         )
 
     def _record_search(self, query: str, filters: MediaSearchFilters, result_count: int) -> None:
@@ -607,4 +612,41 @@ class MediaLibrary:
                 self._utc_now_iso(),
             ),
         )
+        self._prune_search_history(cursor)
         self.conn.commit()
+
+    def _prune_search_history(self, cursor: sqlite3.Cursor) -> None:
+        if self.search_history_limit <= 0:
+            cursor.execute("DELETE FROM search_history")
+            return
+        cursor.execute(
+            """
+            DELETE FROM search_history
+            WHERE id NOT IN (
+                SELECT id
+                FROM search_history
+                ORDER BY searched_at DESC, id DESC
+                LIMIT ?
+            )
+            """,
+            (self.search_history_limit,),
+        )
+
+    def _count_duplicate_groups(self) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM (
+                SELECT 1
+                FROM media_items
+                GROUP BY size, ROUND(COALESCE(duration, 0), 3), format
+                HAVING COUNT(*) > 1
+            ) duplicate_groups
+            """
+        )
+        row = cursor.fetchone()
+        return int(row[0] or 0) if row else 0
+
+    def _invalidate_stats_cache(self) -> None:
+        self._stats_cache.invalidate()

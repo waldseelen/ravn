@@ -1,6 +1,8 @@
-"""
-RAVN - History and Settings Tab (Faz 4)
-Geçmiş ve ayarlar arayüzü
+"""Legacy-compatible shared History/Settings implementation module.
+
+Canonical desktop imports should use ``ravn_app.ui.tabs.history_tab`` and
+``ravn_app.ui.tabs.settings_tab``. This file remains as a shared implementation
+module while Phase 5 clarifies feature ownership without risky UI rewrites.
 """
 
 import customtkinter as ctk
@@ -15,6 +17,7 @@ from .advanced_features import SearchFilter, ThemeManager
 from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
 from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
+from ravn_app.core.tool_health import get_tool_health_checker
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -483,8 +486,197 @@ class SettingsTab(ctk.CTkFrame):
             anchor="w",
         ).pack(fill="x", padx=Spacing.SM, pady=(Spacing.SM, Spacing.XS))
 
+    def _create_tool_health_section(self, parent):
+        """Create tool health status section"""
+        self.tool_health_section_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
+        self.tool_health_section_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
+
+        health_frame = self.tool_health_section_frame
+
+        # Header with refresh button
+        header_frame = ctk.CTkFrame(health_frame, fg_color="transparent")
+        header_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
+
+        ctk.CTkLabel(
+            header_frame,
+            text=t("settings.toolHealthSection"),
+            font=Fonts.H2
+        ).pack(side="left", anchor="w")
+
+        refresh_btn = ctk.CTkButton(
+            header_frame,
+            text=t("settings.toolHealthRefresh"),
+            command=self._refresh_tool_health,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_SM,
+            width=120,
+            cursor=Cursors.POINTER,
+        )
+        refresh_btn.pack(side="right")
+
+        # Overall status
+        self.tool_health_status_label = ctk.CTkLabel(
+            health_frame,
+            text="",
+            font=Fonts.LABEL,
+            text_color=Colors.TEXT_PRIMARY,
+            anchor="w"
+        )
+        self.tool_health_status_label.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        # Tool details frame
+        self.tool_health_details_frame = ctk.CTkFrame(health_frame, fg_color="transparent")
+        self.tool_health_details_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
+
+        # Load initial status
+        self._refresh_tool_health()
+
+    def _refresh_tool_health(self):
+        """Refresh tool health status display"""
+        # Clear existing details
+        for widget in self.tool_health_details_frame.winfo_children():
+            widget.destroy()
+        help_frame = getattr(self, 'tool_health_help_frame', None)
+        if help_frame is not None:
+            help_frame.destroy()
+            self.tool_health_help_frame = None
+
+        # Get health checker
+        checker = get_tool_health_checker()
+        checker.clear_cache()  # Force fresh check
+        summary = checker.get_health_summary()
+
+        # Update overall status
+        status_text = ""
+        status_color = Colors.TEXT_PRIMARY
+
+        if summary['overall_status'] == 'healthy':
+            status_text = t("settings.toolHealthHealthy")
+            status_color = Colors.SUCCESS
+        elif summary['overall_status'] == 'degraded':
+            status_text = t("settings.toolHealthDegraded")
+            status_color = Colors.WARNING
+        else:  # critical
+            status_text = t("settings.toolHealthCritical")
+            status_color = Colors.ERROR
+
+        status_text += f" • {t('settings.toolHealthAvailable', count=summary['available_tools'], total=summary['total_tools'])}"
+        self.tool_health_status_label.configure(text=status_text, text_color=status_color)
+
+        # Display each tool
+        for tool_name, tool_info in summary['tools'].items():
+            tool_frame = ctk.CTkFrame(self.tool_health_details_frame, fg_color=Colors.BG_CARD)
+            tool_frame.pack(fill="x", pady=2)
+
+            # Tool name and status
+            status_icon = "✅" if tool_info.status.value == "available" else "❌"
+            required_label = t("settings.toolHealthRequired") if tool_info.required else t("settings.toolHealthOptional")
+
+            name_label = ctk.CTkLabel(
+                tool_frame,
+                text=f"{status_icon} {tool_name} ({required_label})",
+                font=Fonts.LABEL_BOLD,
+                text_color=Colors.TEXT_PRIMARY,
+                anchor="w"
+            )
+            name_label.pack(fill="x", padx=Spacing.XS, pady=(Spacing.XS, 0))
+
+            # Version and path
+            if tool_info.version:
+                version_label = ctk.CTkLabel(
+                    tool_frame,
+                    text=t("settings.toolHealthVersion", version=tool_info.version),
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w"
+                )
+                version_label.pack(fill="x", padx=Spacing.XS)
+
+            if tool_info.path:
+                path_label = ctk.CTkLabel(
+                    tool_frame,
+                    text=t("settings.toolHealthPath", path=tool_info.path),
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w"
+                )
+                path_label.pack(fill="x", padx=Spacing.XS)
+            elif tool_info.status.value == "missing":
+                missing_label = ctk.CTkLabel(
+                    tool_frame,
+                    text=t("settings.toolHealthNoPath"),
+                    font=Fonts.SMALL,
+                    text_color=Colors.ERROR,
+                    anchor="w"
+                )
+                missing_label.pack(fill="x", padx=Spacing.XS)
+
+            # Affected features
+            if tool_info.affected_features:
+                features_text = ", ".join(tool_info.affected_features[:3])
+                if len(tool_info.affected_features) > 3:
+                    features_text += f" +{len(tool_info.affected_features) - 3} more"
+
+                features_label = ctk.CTkLabel(
+                    tool_frame,
+                    text=t("settings.toolHealthAffectedFeatures", features=features_text),
+                    font=Fonts.SMALL,
+                    text_color=Colors.TEXT_MUTED,
+                    anchor="w",
+                    wraplength=540
+                )
+                features_label.pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
+        # Help messages for missing tools
+        if summary['missing_required'] or summary['missing_optional']:
+            self.tool_health_help_frame = ctk.CTkFrame(
+                self.tool_health_section_frame,
+                fg_color=Colors.BG_CARD,
+                border_width=1,
+                border_color=Colors.WARNING,
+            )
+            help_frame = self.tool_health_help_frame
+            help_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.SM)
+
+            if summary['missing_required']:
+                required_text = t("settings.toolHealthMissingRequiredTools", tools=", ".join(summary['missing_required']))
+                ctk.CTkLabel(
+                    help_frame,
+                    text=required_text,
+                    font=Fonts.LABEL,
+                    text_color=Colors.ERROR,
+                    anchor="w",
+                    wraplength=540
+                ).pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
+
+            if summary['missing_optional']:
+                optional_text = t("settings.toolHealthMissingOptionalTools", tools=", ".join(summary['missing_optional']))
+                ctk.CTkLabel(
+                    help_frame,
+                    text=optional_text,
+                    font=Fonts.LABEL,
+                    text_color=Colors.WARNING,
+                    anchor="w",
+                    wraplength=540
+                ).pack(fill="x", padx=Spacing.XS, pady=Spacing.XS)
+
+            # Installation help
+            ctk.CTkLabel(
+                help_frame,
+                text=t("settings.toolHealthInstallHelp"),
+                font=Fonts.SMALL,
+                text_color=Colors.TEXT_MUTED,
+                anchor="w",
+                wraplength=540
+            ).pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
+
     def create_general_settings(self, parent):
         """Genel ayarlar"""
+        # Tool Health Status
+        self._create_tool_health_section(parent)
+        
         # Tema
         theme_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
         theme_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)

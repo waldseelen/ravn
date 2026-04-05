@@ -44,7 +44,7 @@ Use these files in order before substantial changes:
 ## Current Reality
 
 - Phases 1–4C, Phase 6, Phase 7, and Phase 8 are complete.
-- Phase 5 build/packaging/distribution remains open.
+- Phase 5 release-readiness work remains open, with current packaging scope focused on a Windows-only distributable after runtime hardening tasks.
 - Desktop shell uses grouped workspaces: `Home`, `Download`, `Studio`, `Library`.
 - Queue is exposed through a global right-side panel/drawer.
 - Settings are exposed as an independent lower-left utility/workspace entry.

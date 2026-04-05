@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 from pathlib import Path
+from time import perf_counter
 from tkinter import filedialog
 from typing import Any, Callable, Optional
 
@@ -55,6 +56,10 @@ class LibraryTab(ctk.CTkFrame):
         self._last_results: list[MediaItemRecord] = []
         self._active_task_id: Optional[str] = None
         self._active_task_context: dict[str, Any] = {}
+        self._chunked_result_rendering_enabled = True
+        self._result_render_after_id: Optional[str] = None
+        self._result_render_token = 0
+        self._perf_metrics: dict[str, dict[str, Any]] = {}
 
         self._setup_ui()
         self.refresh_dashboard()
@@ -401,8 +406,30 @@ class LibraryTab(ctk.CTkFrame):
             )
             button.pack(fill="x", pady=(0, Spacing.XS))
 
+    def _record_perf_metric(self, name: str, *, item_count: int, duration_seconds: float, chunked: bool = False, **extra: Any) -> None:
+        metrics = getattr(self, "_perf_metrics", None)
+        if metrics is None:
+            metrics = {}
+            self._perf_metrics = metrics
+        metrics[name] = {
+            "item_count": int(item_count),
+            "duration_ms": round(float(duration_seconds) * 1000.0, 3),
+            "chunked": bool(chunked),
+            **extra,
+        }
+
     def _render_results(self, items: list[MediaItemRecord]) -> None:
+        render_started = perf_counter()
         self._last_results = items
+
+        existing_after = getattr(self, "_result_render_after_id", None)
+        if existing_after and hasattr(self, "after_cancel"):
+            try:
+                self.after_cancel(existing_after)
+            except Exception:
+                pass
+            self._result_render_after_id = None
+
         for child in self.results_frame.winfo_children():
             child.destroy()
 
@@ -414,10 +441,50 @@ class LibraryTab(ctk.CTkFrame):
                 icon=Icons.EMPTY_FOLDER,
                 message=t("library.noResults"),
             ).pack(fill="both", expand=True, pady=Spacing.XL)
+            self._record_perf_metric("library_results_render", item_count=0, duration_seconds=perf_counter() - render_started)
             return
 
-        for item in items:
-            self._create_result_item(item)
+        chunk_enabled = bool(getattr(self, "_chunked_result_rendering_enabled", False))
+        render_in_chunks = chunk_enabled and len(items) > 120 and callable(getattr(self, "after", None))
+        batch_size = 40
+        render_batches = 0
+
+        def finalize_render(chunked: bool, batches: int) -> None:
+            self._record_perf_metric(
+                "library_results_render",
+                item_count=len(items),
+                duration_seconds=perf_counter() - render_started,
+                chunked=chunked,
+                batches=batches,
+            )
+
+        if not render_in_chunks:
+            for item in items:
+                self._create_result_item(item)
+            finalize_render(False, 1 if items else 0)
+            return
+
+        self._result_render_token = int(getattr(self, "_result_render_token", 0)) + 1
+        active_token = self._result_render_token
+
+        def render_batch(start_index: int = 0) -> None:
+            nonlocal render_batches
+            if active_token != getattr(self, "_result_render_token", active_token):
+                return
+
+            render_batches += 1
+            end_index = min(start_index + batch_size, len(items))
+            for item in items[start_index:end_index]:
+                self._create_result_item(item)
+
+            if end_index < len(items):
+                self._result_render_after_id = self.after(1, lambda: render_batch(end_index))
+                return
+
+            self._result_render_after_id = None
+            finalize_render(True, render_batches)
+
+        render_batch(0)
 
     def _create_result_item(self, item: MediaItemRecord) -> None:
         card = ctk.CTkFrame(self.results_frame, fg_color=Colors.BG_CARD, corner_radius=Sizes.CORNER_MD)
@@ -631,7 +698,6 @@ class LibraryTab(ctk.CTkFrame):
             return
 
         self.error_panel.hide_error()
-        self._refresh_stats()
         self._refresh_recent_searches()
         self._render_results(items)
 
@@ -641,7 +707,6 @@ class LibraryTab(ctk.CTkFrame):
         self.format_combo.set(t("common.all"))
         self.error_panel.hide_error()
         self._render_results(self.library.list_media(limit=self._max_results()))
-        self._refresh_stats()
         self._refresh_recent_searches()
 
     def _create_collection(self) -> None:

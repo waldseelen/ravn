@@ -325,6 +325,28 @@ class TestTaskQueue:
         all_tasks = self.queue.get_all_tasks()
         assert len(all_tasks) == 0
 
+    def test_completed_history_limit_prunes_old_terminal_tasks(self):
+        queue_with_limit = TaskQueue(max_concurrent=1, completed_history_limit=2)
+
+        def instant_fn(*args, **kwargs):
+            return True
+
+        queue_with_limit.start()
+        try:
+            for index in range(4):
+                queue_with_limit.add_task(
+                    task_type=TaskType.GENERIC,
+                    name=f"Task {index}",
+                    execute_fn=instant_fn,
+                )
+
+            time.sleep(0.6)
+            retained = queue_with_limit.get_all_tasks()
+            assert len(retained) == 2
+            assert all(task.status == TaskStatus.COMPLETED for task in retained)
+        finally:
+            queue_with_limit.stop(wait=True)
+
     def test_concurrent_execution(self):
         """Test concurrent task execution"""
         execution_times = []

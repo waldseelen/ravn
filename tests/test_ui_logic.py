@@ -12,19 +12,20 @@ from ravn_app.core.task_manager import TaskResult, TaskStatus
 from ravn_app.core.converter import AudioBitrate, VideoQuality
 from ravn_app.core.i18n import t
 from ravn_app.core.runners import TorrentProgressSnapshot
-from ravn_app.ui.converter_tab import ConverterTab
-from ravn_app.ui.history_settings_tab import HistoryTab, SettingsTab
 from ravn_app.ui.main_window import YouTubeDownloaderApp
 from ravn_app.ui.components.command_palette import PaletteCommand, CommandPaletteDialog
 from ravn_app.ui.components.playlist_sort_dialog import PlaylistSortDialog
+from ravn_app.ui.tabs.converter_tab import ConverterTab
 from ravn_app.ui.tabs.download_tab import DownloadTab
 from ravn_app.ui.tabs.download_workspace import DownloadWorkspace
 from ravn_app.ui.tabs.filters_tab import FiltersTab
+from ravn_app.ui.tabs.history_tab import HistoryTab
 from ravn_app.ui.tabs.library_tab import LibraryTab
 from ravn_app.ui.tabs.mixer_tab import MixerTab
+from ravn_app.ui.tabs.settings_tab import SettingsTab
+from ravn_app.ui.tabs.subtitle_tab import SubtitleTab
 from ravn_app.ui.tabs.torrent_tab import TorrentTab
-from ravn_app.ui.queue_panel import QueueItemWidget
-from ravn_app.ui.subtitle_tab import SubtitleTab
+from ravn_app.ui.queue_panel import QueueItemWidget, QueuePanel
 from ravn_app.ui.design_tokens import Colors, Icons
 
 
@@ -96,6 +97,34 @@ class _FakeText:
 
     def see(self, _pos):
         return None
+
+
+class _FakeTextBox:
+    def __init__(self, value=""):
+        self.value = value
+        self.config = {}
+        self.focused = False
+
+    def get(self, *_args):
+        return self.value
+
+    def delete(self, *_args):
+        self.value = ""
+
+    def insert(self, _index, value):
+        self.value = value
+
+    def bind(self, *_args, **_kwargs):
+        return None
+
+    def configure(self, **kwargs):
+        self.config.update(kwargs)
+
+    def focus_set(self):
+        self.focused = True
+
+    def winfo_manager(self):
+        return self.config.get("manager", "pack")
 
 
 class _FakeEvent:
@@ -285,6 +314,10 @@ class _FakeFrame:
     def grid(self, **kwargs):
         self._manager = "grid"
         self.calls.append({"grid": kwargs})
+
+    def grid_remove(self):
+        self._manager = ""
+        self.calls.append({"grid_remove": True})
 
     def tkraise(self):
         self.raised = True
@@ -594,6 +627,25 @@ class TestPlaylistSortDialogLogic:
         assert [row["selected"] for row in dialog._all_rows] == [False, True, True, False]
         dialog._refresh_tree.assert_called_once()
 
+    def test_filter_rows_large_playlist_records_perf_metrics(self):
+        dialog = PlaylistSortDialog.__new__(PlaylistSortDialog)
+        dialog._perf_metrics = {}
+        dialog._all_rows = [
+            {
+                "index": index,
+                "title_sort": f"track {index}",
+                "duration": float(60 + index),
+                "view_count": 1000 - index,
+            }
+            for index in range(500)
+        ]
+
+        rows = dialog._filter_rows(title_query="track", min_duration=120.0, popularity_mode="top50")
+
+        assert rows
+        assert dialog._perf_metrics["playlist_filter_rows"]["source_count"] == 500
+        assert dialog._perf_metrics["playlist_filter_rows"]["duration_ms"] >= 0
+
 
 class TestTorrentTabLogic:
     def test_resolve_play_target_prefers_primary_file(self):
@@ -648,6 +700,7 @@ class TestTorrentTabLogic:
     def test_apply_session_filter_hides_non_matching_rows(self):
         tab = TorrentTab.__new__(TorrentTab)
         tab._downloads_tree = _FakeTree()
+        tab._perf_metrics = {}
         tab._download_rows = {
             "torrent-1": {"name": "Queued", "mode": "Full", "status": "", "progress": "0%", "downloaded": "0 B", "total_size": "—", "remaining": "—", "speed": "—", "eta": "—", "peers": "—", "seeders": "—", "queue_state": "queued"},
             "torrent-2": {"name": "Paused", "mode": "Full", "status": "", "progress": "0%", "downloaded": "0 B", "total_size": "—", "remaining": "—", "speed": "—", "eta": "—", "peers": "—", "seeders": "—", "queue_state": "paused"},
@@ -661,6 +714,35 @@ class TestTorrentTabLogic:
         tab._apply_session_filter()
 
         assert tab._downloads_tree.get_children("") == ["torrent-1"]
+        assert tab._perf_metrics["torrent_session_filter"]["file_row_count"] == 0
+
+    def test_apply_session_filter_handles_many_sessions_and_child_rows(self):
+        tab = TorrentTab.__new__(TorrentTab)
+        tab._downloads_tree = _FakeTree()
+        tab._perf_metrics = {}
+        tab._download_rows = {}
+        tab._file_rows = {}
+        tab._session_order = []
+        tab._active_filter_key = "paused"
+
+        for index in range(120):
+            session_id = f"torrent-{index}"
+            queue_state = "paused" if index % 2 else "queued"
+            row = {"name": session_id, "mode": "Full", "status": "", "progress": "0%", "downloaded": "0 B", "remaining": "—", "speed": "—", "eta": "—", "queue_state": queue_state}
+            tab._download_rows[session_id] = row
+            tab._session_order.append(session_id)
+            tab._downloads_tree.insert("", "end", iid=session_id, text=session_id, values=TorrentTab._build_row_values(row))
+            for file_index in range(3):
+                file_iid = f"{session_id}::file::{file_index}"
+                tab._file_rows[file_iid] = {"parent_id": session_id, "file_path": f"C:/tmp/{session_id}-{file_index}.mkv"}
+                tab._downloads_tree.insert(session_id, "end", iid=file_iid, text=file_iid)
+
+        tab._apply_session_filter()
+
+        visible_sessions = tab._downloads_tree.get_children("")
+        assert len(visible_sessions) == 60
+        assert all(tab._download_rows[session_id]["queue_state"] == "paused" for session_id in visible_sessions)
+        assert tab._perf_metrics["torrent_session_filter"]["file_row_count"] == 360
 
     def test_selected_open_target_prefers_child_file_path(self):
         tab = TorrentTab.__new__(TorrentTab)
@@ -1060,25 +1142,133 @@ class TestMainWindowLogic:
         assert app._last_primary_view_key == "download"
         assert app._current_view_key == "download"
 
-    def test_download_workspace_select_mode_updates_segment_for_programmatic_switch(self):
+    def test_show_studio_view_selects_tool(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        studio_workspace = _FakeFrame()
+        studio_workspace.select_view = Mock()
+        app._workspace_frames = {"studio": studio_workspace}
+        app.studio_workspace = studio_workspace
+        app._sidebar_buttons = {}
+        app._workspace_meta = lambda: {"studio": ("Studio", "Tools")}
+        app.workspace_title_label = _FakeLabel()
+        app.workspace_subtitle_label = _FakeLabel()
+        app._update_navigation_state = Mock()
+        app._refresh_header_actions = Mock()
+        app.home_workspace = None
+        app._current_view_key = None
+
+        app.show_studio_view("filters")
+
+        studio_workspace.select_view.assert_called_once_with("filters")
+        assert app._last_primary_view_key == "studio"
+        assert app._current_view_key == "studio"
+
+    def test_show_library_view_selects_subview(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        library_workspace = _FakeFrame()
+        library_workspace.select_view = Mock()
+        app._workspace_frames = {"library": library_workspace}
+        app.library_workspace = library_workspace
+        app._sidebar_buttons = {}
+        app._workspace_meta = lambda: {"library": ("Library", "Media")}
+        app.workspace_title_label = _FakeLabel()
+        app.workspace_subtitle_label = _FakeLabel()
+        app._update_navigation_state = Mock()
+        app._refresh_header_actions = Mock()
+        app.home_workspace = None
+        app._current_view_key = None
+
+        app.show_library_view("history")
+
+        library_workspace.select_view.assert_called_once_with("history")
+        assert app._last_primary_view_key == "library"
+        assert app._current_view_key == "library"
+
+    def test_task_callback_pump_refreshes_queue_bound_surfaces_on_snapshot_change(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        app.task_queue = Mock()
+        app.task_queue.get_ui_snapshot.return_value = (("task-1", "running", 10, "work", ""),)
+        app.task_queue.process_callbacks = Mock()
+        app._process_ui_callbacks = Mock()
+        app._refresh_header_actions = Mock()
+        app.home_workspace = SimpleNamespace(refresh_dashboard=Mock())
+        app.queue_tab = SimpleNamespace(refresh_queue=Mock())
+        app._current_view_key = "home"
+        app._last_task_snapshot = ()
+        app.after = lambda _delay, _callback: "after-1"
+
+        app._schedule_task_queue_callback_pump()
+
+        app._refresh_header_actions.assert_called_once()
+        app.home_workspace.refresh_dashboard.assert_called_once()
+        app.queue_tab.refresh_queue.assert_called_once_with(force=True)
+        assert app._task_callback_after_id == "after-1"
+
+    def test_refresh_task_bound_surfaces_if_needed_skips_unchanged_snapshot(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        snapshot = (("task-1", "running", 10, "work", ""),)
+        app._last_task_snapshot = snapshot
+        app._refresh_header_actions = Mock()
+        app.home_workspace = SimpleNamespace(refresh_dashboard=Mock())
+        app.queue_tab = SimpleNamespace(refresh_queue=Mock())
+        app._current_view_key = "home"
+
+        refreshed = app._refresh_task_bound_surfaces_if_needed(snapshot)
+
+        assert refreshed is False
+        app._refresh_header_actions.assert_not_called()
+        app.home_workspace.refresh_dashboard.assert_not_called()
+        app.queue_tab.refresh_queue.assert_not_called()
+
+    def test_download_workspace_select_mode_updates_override_for_programmatic_switch(self):
         workspace = DownloadWorkspace.__new__(DownloadWorkspace)
-        workspace._MODE_KEYS = ("url", "playlist", "batch", "torrent")
-        workspace._segment_value_to_key = {
-            "URL": "url",
+        workspace._override_value_to_key = {
+            "Auto": "auto",
+            "Media": "media",
             "Playlist": "playlist",
             "Batch": "batch",
             "Torrent": "torrent",
         }
-        workspace.mode_selector = _FakeCombo("URL")
-        workspace.download_tab = _FakeFrame()
-        workspace.torrent_tab = _FakeFrame()
-        workspace._sync_standard_mode = Mock()
+        workspace.mode_selector = _FakeCombo("Auto")
+        workspace._apply_workspace_state = Mock()
 
         workspace.select_mode("torrent")
 
         assert workspace.mode_selector.get() == "Torrent"
-        assert workspace.torrent_tab.winfo_manager() == "pack"
-        workspace._sync_standard_mode.assert_not_called()
+        assert workspace._source_override_key == "torrent"
+        workspace._apply_workspace_state.assert_called_once()
+
+    def test_download_workspace_switches_back_from_torrent_when_content_host_exists(self):
+        workspace = DownloadWorkspace.__new__(DownloadWorkspace)
+        workspace.content_host = _FakeFrame()
+        workspace.download_scroll_frame = _FakeFrame()
+        workspace.download_scroll_frame.grid(row=0, column=0, sticky="nsew")
+        workspace.torrent_tab = _FakeFrame()
+        workspace.torrent_tab.grid(row=0, column=0, sticky="nsew")
+
+        workspace._show_mode_frame(workspace.download_scroll_frame, workspace.torrent_tab)
+
+        assert workspace.download_scroll_frame.raised is True
+        assert any("grid_remove" in call for call in workspace.torrent_tab.calls)
+
+    def test_download_workspace_classifies_batch_playlist_and_torrent_sources(self):
+        workspace = DownloadWorkspace.__new__(DownloadWorkspace)
+
+        assert workspace._classify_source_text("https://www.youtube.com/playlist?list=PL1") == "playlist"
+        assert workspace._classify_source_text("https://a.com\nhttps://b.com") == "batch"
+        assert workspace._classify_source_text("magnet:?xt=urn:btih:123") == "torrent"
+
+    def test_download_workspace_applies_compact_layout_profile(self):
+        workspace = DownloadWorkspace.__new__(DownloadWorkspace)
+        workspace._compact_layout_active = False
+        workspace.guide_panel = Mock()
+        workspace.download_tab = Mock()
+
+        workspace._apply_workspace_layout_profile(720)
+
+        assert workspace._compact_layout_active is True
+        workspace.guide_panel.set_expanded.assert_called_once_with(False)
+        workspace.download_tab.apply_layout_profile.assert_called_once_with(height=720, compact=True)
 
     def test_open_and_close_drawer_updates_state(self):
         app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
@@ -1113,19 +1303,20 @@ class TestMainWindowLogic:
         app._close_drawer.assert_called_once()
         assert result == "break"
 
-    def test_quick_paste_url_populates_download_input(self):
+    def test_quick_paste_url_populates_unified_download_source(self):
         app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
         app.show_download_view = Mock()
         app.clipboard_get = Mock(return_value="https://example.com/video")
-        entry = _FakeEntry()
-        app.download_tab = SimpleNamespace(url_entry=entry, _on_url_changed=Mock())
+        app.download_workspace = SimpleNamespace(
+            apply_detected_source_text=Mock(),
+            focus_source_input=Mock(),
+        )
 
         app._quick_paste_url()
 
-        app.show_download_view.assert_called_once_with("url")
-        assert entry.get() == "https://example.com/video"
-        assert entry.focused is True
-        app.download_tab._on_url_changed.assert_called_once()
+        app.show_download_view.assert_called_once_with("auto")
+        app.download_workspace.apply_detected_source_text.assert_called_once_with("https://example.com/video")
+        app.download_workspace.focus_source_input.assert_called_once()
 
     @patch("ravn_app.ui.main_window.CommandPaletteDialog")
     def test_open_command_palette_creates_dialog(self, mock_dialog):
@@ -1286,6 +1477,49 @@ class TestMainWindowLogic:
 
         assert app._sidebar_buttons["download"].cget("text").startswith("› ")
         assert app._sidebar_buttons["home"].cget("text") == "Home"
+
+    def test_center_window_uses_taskbar_aware_work_area(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        app.update_idletasks = Mock()
+        app.winfo_width = Mock(return_value=1000)
+        app.winfo_height = Mock(return_value=700)
+        app.winfo_rootx = Mock(return_value=120)
+        app.winfo_x = Mock(return_value=112)
+        app.winfo_rooty = Mock(return_value=148)
+        app.winfo_y = Mock(return_value=112)
+        app._get_screen_work_area = Mock(return_value=(0, 40, 1920, 1040))
+        app.geometry = Mock()
+
+        app._center_window()
+
+        app.geometry.assert_called_once_with("1000x700+452+188")
+
+    def test_get_screen_work_area_falls_back_to_screen_dimensions(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        app.winfo_vrootx = Mock(return_value=0)
+        app.winfo_vrooty = Mock(return_value=0)
+        app.winfo_vrootwidth = Mock(return_value=0)
+        app.winfo_vrootheight = Mock(return_value=0)
+        app.winfo_screenwidth = Mock(return_value=1600)
+        app.winfo_screenheight = Mock(return_value=900)
+
+        import ravn_app.ui.main_window as module
+        with patch.object(module.platform, "system", return_value="Linux"):
+            work_area = app._get_screen_work_area()
+
+        assert work_area == (0, 0, 1600, 900)
+
+    def test_show_centered_initial_window_centers_before_show(self):
+        app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
+        app._center_window = Mock()
+        app.deiconify = Mock()
+        app.lift = Mock()
+
+        app._show_centered_initial_window()
+
+        app._center_window.assert_called_once()
+        app.deiconify.assert_called_once()
+        app.lift.assert_called_once()
 
     def test_close_drawer_restores_focus_target(self):
         app = YouTubeDownloaderApp.__new__(YouTubeDownloaderApp)
@@ -1527,6 +1761,22 @@ class TestMainWindowLogic:
         assert metrics["resolution"] == "1920x1080"
         assert metrics["format_note"] == "1080p"
 
+    def test_playlist_metrics_fallback_uses_entry_filesize_when_quality_map_is_empty(self):
+        app = DownloadTab.__new__(DownloadTab)
+        entry = {
+            "filesize_mb": 2400.0,
+            "resolution": "1280x720",
+            "format_note": "720p",
+            "size_by_quality_mb": {"720p": 0.0},
+            "resolution_by_quality": {"720p": "1280x720"},
+            "format_note_by_quality": {"720p": "720p"},
+        }
+
+        metrics = app._get_playlist_entry_quality_metrics(entry, "720p")
+
+        assert metrics["size_mb"] == 2400.0
+        assert metrics["resolution"] == "1280x720"
+
     def test_update_playlist_summary_uses_best_fallback_when_quality_missing(self):
         app = DownloadTab.__new__(DownloadTab)
         app.playlist_summary_label = _FakeLabel()
@@ -1670,6 +1920,130 @@ class TestMainWindowLogic:
         assert any("1280x720" in text for text in captured_label_texts)
         assert any("65.4 MB" in text for text in captured_label_texts)
 
+    def test_render_inline_playlist_entries_large_dataset_records_chunked_metrics(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_list_frame = _FakeFrame()
+        app.playlist_frame = _FakeFrame()
+        app.playlist_selection_vars = [_FakeVar(True) for _ in range(180)]
+        app.playlist_detail_rows = []
+        app._columns_frame = _FakeFrame()
+        app._playlist_inline_chunk_rendering_enabled = True
+        app._playlist_render_after_id = None
+        app._playlist_render_token = 0
+        app._perf_metrics = {}
+        app.download_btn = _FakeActionButton(text="Download")
+        app._update_playlist_summary = Mock()
+        app._build_playlist_detail_text = Mock(return_value="detail")
+        app.after_cancel = lambda _after_id: None
+
+        def immediate_after(_delay, callback):
+            callback()
+            return "after-inline"
+
+        app.after = immediate_after
+
+        import ravn_app.ui.tabs.download_tab as module
+        original_playlist_item = module.PlaylistItemRow
+
+        class _FakePlaylistItem(_FakeFrame):
+            def __init__(self, *_args, **_kwargs):
+                super().__init__()
+
+        try:
+            module.PlaylistItemRow = _FakePlaylistItem
+            entries = [{"title": f"Track {index}", "duration": 60 + index} for index in range(180)]
+            app._render_inline_playlist_entries(entries, "720p")
+        finally:
+            module.PlaylistItemRow = original_playlist_item
+
+        assert len(app.playlist_detail_rows) == 180
+        assert app._perf_metrics["playlist_inline_render"]["chunked"] is True
+        assert app._perf_metrics["playlist_inline_render"]["item_count"] == 180
+
+    def test_playlist_detail_enrichment_updates_rows_and_dialog(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_source_url = "https://example.com/list"
+        app.playlist_entries = [{"title": "Video 1", "url": "https://example.com/1", "duration": 61}]
+        app.playlist_selection_vars = [_FakeVar(True)]
+        app.playlist_summary_label = _FakeLabel()
+        app.size_estimate_label = _FakeLabel()
+        app.quality_menu = _FakeCombo("720p")
+        app._update_playlist_summary = Mock()
+        app._update_size_estimate = Mock()
+        app._record_perf_metric = Mock()
+        app._playlist_detail_fetch_token = 2
+        from ravn_app.core.downloader import YouTubeDownloader
+        app.downloader = SimpleNamespace(
+            merge_playlist_entry_detail_fields=YouTubeDownloader.merge_playlist_entry_detail_fields,
+        )
+
+        captured_detail_texts = []
+
+        class _FakePlaylistItem:
+            def set_detail_text(self, detail_text):
+                captured_detail_texts.append(detail_text)
+
+        app.playlist_detail_rows = [(_FakePlaylistItem(), app.playlist_entries[0])]
+        app._playlist_sort_dialog_window = SimpleNamespace(
+            winfo_exists=lambda: True,
+            refresh_entries=Mock(),
+        )
+
+        detailed_entries = [
+            {
+                "title": "Video 1",
+                "url": "https://example.com/1",
+                "duration": 61,
+                "filesize_mb": 65.4,
+                "resolution": "1280x720",
+                "format_note": "720p",
+                "size_by_quality_mb": {"720p": 65.4},
+                "resolution_by_quality": {"720p": "1280x720"},
+                "format_note_by_quality": {"720p": "720p"},
+            }
+        ]
+
+        app._on_playlist_detail_fetch_complete(
+            "https://example.com/list",
+            detailed_entries,
+            2,
+            0.15,
+        )
+
+        assert app.playlist_entries[0]["filesize_mb"] == 65.4
+        assert any("1280x720" in text for text in captured_detail_texts)
+        assert any("65.4 MB" in text for text in captured_detail_texts)
+        app._playlist_sort_dialog_window.refresh_entries.assert_called_once()
+        app._update_playlist_summary.assert_called_once()
+        app._update_size_estimate.assert_called_once()
+
+    def test_library_render_results_large_dataset_records_chunked_metrics(self):
+        tab = LibraryTab.__new__(LibraryTab)
+        tab.results_frame = _FakeFrame()
+        tab.results_info_label = _FakeLabel()
+        tab._perf_metrics = {}
+        tab._chunked_result_rendering_enabled = True
+        tab._result_render_after_id = None
+        tab._result_render_token = 0
+        tab._last_results = []
+        tab.after_cancel = lambda _after_id: None
+
+        rendered = []
+        tab._create_result_item = Mock(side_effect=lambda item: rendered.append(item.id))
+
+        def immediate_after(_delay, callback):
+            callback()
+            return "after-library"
+
+        tab.after = immediate_after
+
+        items = [SimpleNamespace(id=index) for index in range(150)]
+        tab._render_results(items)
+
+        assert len(rendered) == 150
+        assert tab._perf_metrics["library_results_render"]["chunked"] is True
+        assert tab._perf_metrics["library_results_render"]["item_count"] == 150
+
 
 class TestQueuePanelLogic:
     def test_status_badge_uses_expected_colors(self):
@@ -1704,4 +2078,14 @@ class TestQueuePanelLogic:
         widget.animate_entrance()
 
         widget.animation_manager.animate_queue_entrance.assert_called_once()
+
+    def test_queue_panel_clear_completed_delegates_to_task_queue(self):
+        panel = QueuePanel.__new__(QueuePanel)
+        panel.task_queue = Mock()
+        panel.refresh_tasks = Mock()
+
+        panel.clear_completed()
+
+        panel.task_queue.clear_completed.assert_called_once()
+        panel.refresh_tasks.assert_called_once_with(force=True)
 

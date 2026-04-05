@@ -167,6 +167,32 @@ class FFmpegRunner(BaseRunner):
         command = [self.executable_path] + args
         return self._run_process(command, timeout)
 
+    def run_ffprobe(
+        self,
+        args: List[str],
+        timeout: Optional[int] = 60,
+    ) -> RunnerResult:
+        """Run FFprobe with raw arguments and normalized RunnerResult output."""
+        command = [self.ffprobe_path] + args
+        return self._run_process(command, timeout)
+
+    def run_ffprobe_json(
+        self,
+        args: List[str],
+        timeout: Optional[int] = 60,
+    ) -> Optional[Dict[str, Any]]:
+        """Run FFprobe and parse JSON stdout output."""
+        result = self.run_ffprobe(args, timeout)
+        if not result.success:
+            logger.error("FFprobe error: %s", result.error_message or result.stderr)
+            return None
+
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            logger.error("FFprobe output parse error: %s", exc)
+            return None
+
     def probe(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
         Analyze media file using FFprobe.
@@ -181,40 +207,18 @@ class FFmpegRunner(BaseRunner):
             logger.error("FFprobe: File not found: %s", file_path)
             return None
 
-        cmd = [
-            self.ffprobe_path,
-            "-v",
-            "error",
-            "-show_entries",
-            "format:stream",
-            "-of",
-            "json",
-            file_path,
-        ]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
-            if result.returncode == 0:
-                return json.loads(result.stdout)
-
-            logger.error("FFprobe error: %s", result.stderr)
-            return None
-
-        except subprocess.TimeoutExpired:
-            logger.error("FFprobe timed out")
-            return None
-        except json.JSONDecodeError as exc:
-            logger.error("FFprobe output parse error: %s", exc)
-            return None
-        except Exception as exc:
-            logger.error("FFprobe error: %s", exc)
-            return None
+        return self.run_ffprobe_json(
+            [
+                "-v",
+                "error",
+                "-show_entries",
+                "format:stream",
+                "-of",
+                "json",
+                file_path,
+            ],
+            timeout=60,
+        )
 
     def get_duration(self, file_path: str) -> Optional[float]:
         """Get media duration in seconds."""

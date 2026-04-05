@@ -27,7 +27,7 @@ from ravn_app.core.config_paths import (
 logger = logging.getLogger(__name__)
 
 
-LATEST_SCHEMA_VERSION = 3
+LATEST_SCHEMA_VERSION = 4
 
 
 class DatabaseMigrationError(Exception):
@@ -209,6 +209,7 @@ class DatabaseManager:
             )
         ''')
 
+        self._create_history_indexes(cursor)
         self.conn.commit()
 
     def _run_migrations(self):
@@ -235,6 +236,8 @@ class DatabaseManager:
                     self._migrate_v1_to_v2()
                 elif target_version == 3:
                     self._migrate_v2_to_v3()
+                elif target_version == 4:
+                    self._migrate_v3_to_v4()
                 else:
                     raise DatabaseMigrationError(
                         f"No migration script available for schema v{target_version}"
@@ -294,6 +297,25 @@ class DatabaseManager:
     @staticmethod
     def _utc_now_iso() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _create_history_indexes(cursor: sqlite3.Cursor) -> None:
+        """Create indexes that support the most common history/top-N reads."""
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_downloads_download_date ON downloads(download_date DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_downloads_status_download_date ON downloads(status, download_date DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversions_conversion_date ON conversions(conversion_date DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_operations_history_sort ON operations(COALESCE(completed_at, started_at) DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_operations_task_type_history_sort ON operations(task_type, COALESCE(completed_at, started_at) DESC)"
+        )
 
     def backup_database(self) -> str:
         """Create a timestamped backup before migration attempt."""
@@ -393,6 +415,88 @@ class DatabaseManager:
                 "phase7_operation_history",
                 self._utc_now_iso(),
                 "Added generic operations table for Phase 7 queue/history persistence",
+            ),
+        )
+        self.conn.commit()
+
+    def _migrate_v3_to_v4(self):
+        """Migration script v3 -> v4 for history/top-N query indexes."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS migration_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_version INTEGER NOT NULL,
+                to_version INTEGER NOT NULL,
+                migration_name TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                details TEXT
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS downloads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                title TEXT,
+                format TEXT,
+                quality TEXT,
+                file_path TEXT,
+                file_size INTEGER,
+                download_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'completed',
+                duration REAL,
+                thumbnail_url TEXT
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS conversions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                input_file TEXT NOT NULL,
+                output_file TEXT NOT NULL,
+                input_codec TEXT,
+                output_codec TEXT,
+                conversion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                duration REAL,
+                status TEXT DEFAULT 'completed'
+            )
+            '''
+        )
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_type TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                title TEXT,
+                input_paths TEXT,
+                output_path TEXT,
+                format TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                duration REAL,
+                status TEXT DEFAULT 'completed',
+                error_message TEXT,
+                metadata TEXT
+            )
+            '''
+        )
+        self._create_history_indexes(cursor)
+        cursor.execute(
+            '''
+            INSERT INTO migration_history (
+                from_version, to_version, migration_name, applied_at, details
+            ) VALUES (?, ?, ?, ?, ?)
+            ''',
+            (
+                3,
+                4,
+                "history_query_indexes",
+                self._utc_now_iso(),
+                "Added top-N/history indexes for downloads, conversions, and operations",
             ),
         )
         self.conn.commit()
@@ -775,7 +879,7 @@ class ConfigManager:
             return False
 
 
-# ===== Plugin System (Genişletilebilir Mimari) =====
+# ===== Internal hook placeholders (not a public runtime plugin API) =====
 
 class PluginInterface:
     """Plugin arayüzü (gelecek genişletmeler için)"""

@@ -1,8 +1,10 @@
-"""
-Plugin sistemi - RAVN uygulamasını genişletmek için modüler hooklar
+"""Experimental plugin/extension scaffold.
+
+This module is intentionally not wired into the active desktop or CLI runtime.
+It remains as a future-facing extension boundary only; no stable plugin API is
+currently promised for packaged or day-to-day RAVN usage.
 """
 
-import os
 import sys
 import importlib
 import logging
@@ -13,6 +15,9 @@ from enum import Enum
 
 
 logger = logging.getLogger(__name__)
+
+PLUGIN_SYSTEM_STATUS = "experimental"
+PLUGIN_RUNTIME_INTEGRATED = False
 
 
 class PluginHook(Enum):

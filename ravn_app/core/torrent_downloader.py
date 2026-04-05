@@ -145,7 +145,24 @@ class TorrentDownloader:
 
         Returns:
             TorrentDownloadResult with outcome details.
+            
+        Raises:
+            RuntimeError: If aria2c is not available.
         """
+        # Check aria2c availability first
+        if not self.is_available():
+            error_msg = (
+                "aria2c is not available. Torrent features require aria2c to be installed and accessible in PATH. "
+                "Please install aria2c to use torrent downloads. See README.md for installation instructions."
+            )
+            logger.error(error_msg)
+            return TorrentDownloadResult(
+                success=False,
+                source=source,
+                error_message=error_msg,
+                display_name=self.infer_display_name(source)
+            )
+        
         sequential = mode in (TorrentDownloadMode.SEQUENTIAL, TorrentDownloadMode.STREAM)
         display_name = self.infer_display_name(source)
         latest_progress: Optional[TorrentProgressSnapshot] = None

@@ -366,11 +366,27 @@ class QueuePanel(ctk.CTkFrame):
         )
         self.empty_state.pack(fill="both", expand=True, pady=40)
 
-        # Start auto-refresh
-        self._refresh_tasks()
+        self._refresh_after_id = None
+        self._last_task_snapshot = None
+        self.refresh_tasks(force=True)
+        self._schedule_refresh_fallback()
 
-    def _refresh_tasks(self):
-        """Refresh task list from queue manager"""
+    def _schedule_refresh_fallback(self):
+        """Keep a low-frequency fallback refresh for non-shell hosts."""
+        self._refresh_after_id = self.after(2500, self._run_fallback_refresh)
+
+    def _run_fallback_refresh(self):
+        self._refresh_after_id = None
+        self.refresh_tasks()
+        self._schedule_refresh_fallback()
+
+    def refresh_tasks(self, force: bool = False):
+        """Refresh task list from queue manager when the task snapshot changes."""
+        snapshot = self.task_queue.get_ui_snapshot()
+        if not force and snapshot == self._last_task_snapshot:
+            return
+
+        self._last_task_snapshot = snapshot
         tasks = self.task_queue.get_all_tasks()
 
         # Update stats
@@ -387,16 +403,13 @@ class QueuePanel(ctk.CTkFrame):
             self.stats_label.configure(text="")
             self.empty_state.pack(fill="both", expand=True, pady=40)
 
-        # Update existing widgets or create new ones
         current_task_ids = {t.id for t in tasks}
 
-        # Remove widgets for tasks no longer in queue
         for task_id in list(self.task_widgets.keys()):
             if task_id not in current_task_ids:
                 self.task_widgets[task_id].destroy()
                 del self.task_widgets[task_id]
 
-        # Update or create widgets
         for task in tasks:
             if task.id in self.task_widgets:
                 self.task_widgets[task.id].update_task(task)
@@ -405,19 +418,28 @@ class QueuePanel(ctk.CTkFrame):
                     self.task_list,
                     task,
                     on_cancel=self.on_cancel_task,
-                    on_open_folder=self.on_open_folder
+                    on_open_folder=self.on_open_folder,
                 )
                 widget.pack(fill="x", pady=12)
                 widget.animate_entrance()
                 self.task_widgets[task.id] = widget
 
-        # Schedule next refresh
-        self.after(1000, self._refresh_tasks)
-
     def clear_completed(self):
-        """Remove completed tasks from queue"""
-        tasks = self.task_queue.get_all_tasks()
-        for task in tasks:
-            if task.status == TaskStatus.COMPLETED:
-                # Remove from queue (implementation depends on TaskQueue API)
+        """Remove completed/cancelled tasks from the queue UI and backing store."""
+        self.task_queue.clear_completed()
+        self.refresh_tasks(force=True)
+
+    def destroy(self):
+        if self._refresh_after_id is not None:
+            try:
+                self.after_cancel(self._refresh_after_id)
+            except Exception:
                 pass
+            self._refresh_after_id = None
+        for widget in list(self.task_widgets.values()):
+            try:
+                widget.destroy()
+            except Exception:
+                pass
+        self.task_widgets.clear()
+        super().destroy()

@@ -2,35 +2,29 @@
 FFmpeg Codec Denetleyicisi - Desteklenen codec'leri kontrol et
 """
 
-import subprocess
 import json
 from typing import Dict, List
+
+from ravn_app.core.runners.ffmpeg import FFmpegRunner
 
 
 class FFmpegCodecChecker:
     """FFmpeg'in desteklediği codec'leri kontrol et"""
     
-    def __init__(self):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
         self.codecs_cache = None
         self.encoders_cache = None
+        self.runner = FFmpegRunner(ffmpeg_path=ffmpeg_path, ffprobe_path=ffprobe_path)
     
     def get_supported_codecs(self) -> List[str]:
         """Desteklenen codec'lerin listesini al"""
         if self.codecs_cache is not None:
             return self.codecs_cache
-        
-        try:
-            result = subprocess.run(
-                ["ffprobe", "-codecs", "-of", "json"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                self.codecs_cache = [c.get('name') for c in data.get('codecs', [])]
-                return self.codecs_cache
-        except Exception:
-            pass
+
+        data = self.runner.run_ffprobe_json(["-codecs", "-of", "json"], timeout=30)
+        if data:
+            self.codecs_cache = [c.get('name') for c in data.get('codecs', [])]
+            return self.codecs_cache
         return []
     
     def is_codec_supported(self, codec_name: str) -> bool:
@@ -69,24 +63,14 @@ class FFmpegCodecChecker:
     
     def get_ffmpeg_info(self) -> Dict:
         """FFmpeg hakkında detaylı bilgi"""
-        try:
-            result = subprocess.run(
-                ["ffmpeg", "-version"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                lines = result.stdout.split('\n')
-                version_line = lines[0] if lines else ""
-                return {
-                    "version": version_line,
-                    "available": True,
-                    "video_codecs": self.check_video_codecs(),
-                    "audio_codecs": self.check_audio_codecs()
-                }
-        except Exception:
-            pass
-        
+        version_line = self.runner.get_version()
+        if version_line:
+            return {
+                "version": version_line,
+                "available": True,
+                "video_codecs": self.check_video_codecs(),
+                "audio_codecs": self.check_audio_codecs()
+            }
         return {"available": False}
 
 

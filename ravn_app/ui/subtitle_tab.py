@@ -1,6 +1,8 @@
-"""
-RAVN - Subtitle Manager Tab (Faz 3)
-Altyazı yönetim arayüzü
+"""Legacy-compatible subtitle implementation module.
+
+Canonical desktop imports should use ``ravn_app.ui.tabs.subtitle_tab``.
+This module remains in place so older imports still resolve while Phase 5 keeps
+wrapper/compatibility cleanup behavior-safe.
 """
 
 import customtkinter as ctk

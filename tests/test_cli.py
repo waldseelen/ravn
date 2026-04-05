@@ -15,6 +15,53 @@ from ravn_app.cli import cli
 class TestCliCommands:
     def setup_method(self):
         self.runner = CliRunner()
+        self._tool_check_patcher = patch("ravn_app.cli.check_tool_availability", return_value=True)
+        self._tool_check_patcher.start()
+
+    def teardown_method(self):
+        self._tool_check_patcher.stop()
+
+    def test_download_fails_when_ytdlp_missing(self):
+        self._tool_check_patcher.stop()
+        with patch("ravn_app.cli.check_tool_availability", side_effect=lambda tool: False if tool == "yt-dlp" else True):
+            result = self.runner.invoke(
+                cli,
+                ["download", "https://example.com/video", "--json"],
+            )
+        self._tool_check_patcher.start()
+
+        assert result.exit_code == 1
+        assert 'yt-dlp' in result.output
+        assert 'Required tools missing' in result.output
+
+    def test_torrent_fails_gracefully_when_aria2_missing(self):
+        with patch("ravn_app.cli.TorrentDownloader") as mock_downloader_cls:
+            downloader = Mock()
+            downloader.is_available.return_value = False
+            mock_downloader_cls.return_value = downloader
+
+            result = self.runner.invoke(
+                cli,
+                ["torrent", "magnet:?xt=urn:btih:123", "--json"],
+            )
+
+        assert result.exit_code == 1
+        assert 'error' in result.output.lower()
+
+    def test_convert_fails_when_ffmpeg_missing(self):
+        self._tool_check_patcher.stop()
+        with patch("ravn_app.cli.check_tool_availability", side_effect=lambda tool: False if tool == "ffmpeg" else True):
+            with self.runner.isolated_filesystem():
+                input_file = Path("input.mp4")
+                input_file.write_bytes(b"test")
+                result = self.runner.invoke(
+                    cli,
+                    ["convert", str(input_file), "--format", "webm", "--codec", "vp9", "--json"],
+                )
+        self._tool_check_patcher.start()
+
+        assert result.exit_code == 1
+        assert 'ffmpeg' in result.output.lower()
 
     @patch("ravn_app.cli.YouTubeDownloader")
     @patch("ravn_app.cli.DatabaseManager")

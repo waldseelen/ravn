@@ -66,6 +66,41 @@ class TestYouTubeDownloader:
         entries = self.downloader.extract_playlist_entries("https://example.com/playlist")
         assert len(entries) == 2
         assert entries[0]["title"] == "A"
+        mock_extract.assert_called_once_with(
+            "https://example.com/playlist",
+            with_details=True,
+            quality_label="En İyi",
+        )
+
+    def test_merge_playlist_entry_detail_fields_merges_deferred_metadata(self):
+        base_entries = [
+            {"title": "A", "url": "https://example.com/a", "duration": 10},
+            {"title": "B", "url": "https://example.com/b", "duration": 20},
+        ]
+        detailed_entries = [
+            {
+                "title": "A",
+                "url": "https://example.com/a",
+                "duration": 10,
+                "filesize_mb": 42.0,
+                "resolution": "1280x720",
+                "size_by_quality_mb": {"720p": 42.0},
+            },
+            {
+                "title": "B",
+                "url": "https://example.com/b",
+                "duration": 20,
+                "filesize_mb": 84.0,
+                "resolution": "1920x1080",
+                "size_by_quality_mb": {"1080p": 84.0},
+            },
+        ]
+
+        merged_count = self.downloader.merge_playlist_entry_detail_fields(base_entries, detailed_entries)
+
+        assert merged_count == 2
+        assert base_entries[0]["filesize_mb"] == 42.0
+        assert base_entries[1]["resolution"] == "1920x1080"
 
     def test_download_audio_includes_metadata_embedding_args(self):
         self.downloader._runner = Mock()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import tkinter as tk
+from time import perf_counter
 from tkinter import ttk
 from typing import Any, Callable, Dict, List, Optional
 
@@ -38,6 +39,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         self._duration_formatter = duration_formatter
         self._size_formatter = size_formatter
         self._on_download = on_download
+        self._perf_metrics: Dict[str, Dict[str, Any]] = {}
         self._sort_key = "index"
         self._descending = False
 
@@ -104,14 +106,14 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         return rows
 
     def _build_ui(self) -> None:
-        info = ctk.CTkLabel(
+        self.info_label = ctk.CTkLabel(
             self,
             text=t("download.playlistSortQuality", quality=self._quality_label),
             text_color=Colors.TEXT_PRIMARY,
             font=Fonts.LABEL,
             anchor="w",
         )
-        info.pack(fill="x", padx=12, pady=(12, 6))
+        self.info_label.pack(fill="x", padx=12, pady=(12, 6))
 
         filters_frame = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE)
         filters_frame.pack(fill="x", padx=12, pady=(0, 8))
@@ -464,6 +466,17 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         )
         return {int(row["index"]) for row in ranked_rows[:top_count]}
 
+    def _record_perf_metric(self, name: str, *, item_count: int, duration_seconds: float, **extra: Any) -> None:
+        metrics = getattr(self, "_perf_metrics", None)
+        if metrics is None:
+            metrics = {}
+            self._perf_metrics = metrics
+        metrics[name] = {
+            "item_count": int(item_count),
+            "duration_ms": round(float(duration_seconds) * 1000.0, 3),
+            **extra,
+        }
+
     def _filter_rows(
         self,
         *,
@@ -472,6 +485,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         max_duration: Optional[float] = None,
         popularity_mode: str = "all",
     ) -> List[Dict[str, Any]]:
+        started = perf_counter()
         query = str(title_query or "").strip().casefold()
         if min_duration is not None and max_duration is not None and min_duration > max_duration:
             min_duration, max_duration = max_duration, min_duration
@@ -493,7 +507,31 @@ class PlaylistSortDialog(ctk.CTkToplevel):
 
             filtered_rows.append(row)
 
+        self._record_perf_metric(
+            "playlist_filter_rows",
+            item_count=len(filtered_rows),
+            duration_seconds=perf_counter() - started,
+            source_count=len(self._all_rows),
+            popularity_mode=self._normalize_popularity_value(popularity_mode),
+        )
         return filtered_rows
+
+    def refresh_entries(self, entries: List[Dict[str, Any]], quality_label: Optional[str] = None) -> None:
+        """Refresh row metrics after deferred playlist detail enrichment completes."""
+        selection_by_index = {
+            int(row.get("index") or 0): bool(row.get("selected", True))
+            for row in self._all_rows
+        }
+        if quality_label is not None:
+            self._quality_label = quality_label
+            if hasattr(self, "info_label"):
+                self.info_label.configure(text=t("download.playlistSortQuality", quality=self._quality_label))
+
+        refreshed_rows = self._build_rows(entries)
+        for row in refreshed_rows:
+            row["selected"] = selection_by_index.get(int(row.get("index") or 0), True)
+        self._all_rows = refreshed_rows
+        self._apply_filters()
 
     def _apply_filters(self) -> None:
         title_query = self.title_filter_entry.get() if hasattr(self, "title_filter_entry") else ""
@@ -522,6 +560,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         self._apply_filters()
 
     def _refresh_tree(self) -> None:
+        started = perf_counter()
         for item_id in self.tree.get_children():
             self.tree.delete(item_id)
 
@@ -546,6 +585,11 @@ class PlaylistSortDialog(ctk.CTkToplevel):
             )
         self._update_filter_summary()
         self._update_selection_summary()
+        self._record_perf_metric(
+            "playlist_refresh_tree",
+            item_count=len(self._rows),
+            duration_seconds=perf_counter() - started,
+        )
 
     @staticmethod
     def _format_bytes(size_bytes: int) -> str:

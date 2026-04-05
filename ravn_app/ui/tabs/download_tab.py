@@ -2,6 +2,7 @@
 
 import threading
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import customtkinter as ctk
@@ -86,6 +87,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         queue_paused_getter: Callable[[], bool],
         show_queue_tab_callback: Callable[[], None],
         auto_add_to_library_callback: Optional[Callable[..., None]] = None,
+        use_embedded_workspace_source_bar: bool = False,
+        embedded_source_getter: Optional[Callable[[], str]] = None,
+        embedded_source_setter: Optional[Callable[[str], None]] = None,
+        embedded_source_focus: Optional[Callable[[], None]] = None,
         **kwargs,
     ):
         kwargs.setdefault("fg_color", "transparent")
@@ -102,6 +107,10 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.queue_paused_getter = queue_paused_getter
         self.show_queue_tab_callback = show_queue_tab_callback
         self.auto_add_to_library_callback = auto_add_to_library_callback
+        self._embedded_workspace_source_bar = bool(use_embedded_workspace_source_bar)
+        self._embedded_source_getter = embedded_source_getter
+        self._embedded_source_setter = embedded_source_setter
+        self._embedded_source_focus = embedded_source_focus
 
         # Video column playlist state
         self._video_playlist_entries: List[Dict[str, Any]] = []
@@ -135,6 +144,13 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self._last_video_info: Optional[Dict[str, Any]] = None
         self._player_btn = None
         self._playlist_sort_dialog_enabled = True
+        self._playlist_inline_chunk_rendering_enabled = True
+        self._playlist_render_after_id: Optional[str] = None
+        self._playlist_render_token = 0
+        self._playlist_detail_fetch_token = 0
+        self._playlist_detail_fetch_inflight = False
+        self._playlist_sort_dialog_window = None
+        self._perf_metrics: Dict[str, Dict[str, Any]] = {}
 
         aria2c_path = self.config_manager.get("aria2c_path", "aria2c")
         self.torrent_downloader = TorrentDownloader(aria2c_path)
@@ -143,7 +159,9 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     def setup_ui(self):
         """Build tab widgets."""
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=15, pady=10)
+        self._header_frame = header_frame
+        if not self._embedded_workspace_source_bar:
+            header_frame.pack(fill="x", padx=15, pady=10)
 
         title = ctk.CTkLabel(
             header_frame,
@@ -177,8 +195,9 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.selected_platform_label.pack(side="left", padx=8)
 
         url_frame = ctk.CTkFrame(self, fg_color="transparent")
-        url_frame.pack(fill="x", padx=15, pady=10)
         self._url_row_frame = url_frame
+        if not self._embedded_workspace_source_bar:
+            url_frame.pack(fill="x", padx=15, pady=10)
 
         ctk.CTkLabel(url_frame, text=f"{Icons.LINK_INPUT} {t('download.urlLabel')}", font=Fonts.LABEL).pack(side="left", padx=5)
 
@@ -295,7 +314,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             fg_color=Colors.BG_SURFACE,
             corner_radius=8,
         )
-        video_col.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self._video_column_frame = video_col
+        video_col.grid(row=0, column=0, sticky="nsew", padx=0)
 
         ctk.CTkLabel(
             video_col,
@@ -403,7 +423,8 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             fg_color=Colors.BG_SURFACE,
             corner_radius=8,
         )
-        music_col.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        self._music_column_frame = music_col
+        music_col.grid(row=0, column=0, sticky="nsew", padx=0)
 
         ctk.CTkLabel(
             music_col,
@@ -504,6 +525,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         # Initialize active-side pointers to video (default)
         self._active_btn_restore_text = f"{Icons.DOWNLOAD_BTN} {t('download.videoDownloadBtn')}"
         self._activate_video_side()
+        self.set_output_surface("video")
 
         # Shared button bindings and tooltips
         for button in (self._video_fetch_btn, self._video_download_btn,
@@ -615,6 +637,56 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._music_playlist_detail_rows = self.playlist_detail_rows
             self._music_is_playlist_fetching = self.is_playlist_fetching
 
+    def set_embedded_source_text(self, value: str) -> None:
+        """Mirror workspace source text into the internal media widgets."""
+        normalized = str(value or "")
+        first_line = next((line.strip() for line in normalized.splitlines() if line.strip()), normalized.strip())
+        self.url_entry.delete(0, "end")
+        if first_line:
+            self.url_entry.insert(0, first_line)
+
+        self.batch_url_text.delete("1.0", "end")
+        if normalized:
+            self.batch_url_text.insert("1.0", normalized)
+
+        self._on_url_changed()
+
+    def set_workspace_mode(self, mode_key: str) -> None:
+        """Sync media-mode widgets with the unified workspace source classifier."""
+        batch_enabled = mode_key == "batch"
+        current_batch_state = bool(self.batch_mode_var.get())
+        if batch_enabled != current_batch_state:
+            self.batch_mode_var.set(batch_enabled)
+            self._toggle_batch_mode()
+
+    def set_output_surface(self, surface_key: str) -> None:
+        """Show either the video or audio controls while reusing existing implementations."""
+        normalized = str(surface_key or "video").strip().lower()
+        if normalized not in {"video", "audio"}:
+            normalized = "video"
+
+        video_col = getattr(self, "_video_column_frame", None)
+        music_col = getattr(self, "_music_column_frame", None)
+        if video_col is None or music_col is None:
+            return
+
+        if normalized == "audio":
+            try:
+                video_col.grid_remove()
+            except Exception:
+                pass
+            music_col.grid(row=0, column=0, sticky="nsew", padx=0)
+            self._activate_music_side()
+        else:
+            try:
+                music_col.grid_remove()
+            except Exception:
+                pass
+            video_col.grid(row=0, column=0, sticky="nsew", padx=0)
+            self._activate_video_side()
+
+        self._media_output_key = normalized
+
     def _download_music(self) -> None:
         """Start a music download from the music column."""
         if self.queue_paused_getter():
@@ -634,16 +706,12 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         output_dir = self._resolve_download_output_dir()
         self._start_single_download(url, output_dir, format_type, quality, audio_bitrate)
 
-    # _on_mode_changed kept for backward compat with any external callers
-    def _on_mode_changed(self, value: str) -> None:
-        pass
-
-    def _is_audio_mode(self) -> bool:
-        return False
-
     def _on_ctrl_enter(self, event=None):
         """Handle Ctrl+Enter - trigger primary download action."""
         if not self.winfo_viewable():
+            return
+        if getattr(self, "_media_output_key", "video") == "audio":
+            self._download_music()
             return
         if self._selected_download_profile().preferred_surface == "audio":
             self._download_music()
@@ -664,6 +732,11 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Handle Ctrl+L - clear URL input."""
         if not self.winfo_viewable():
             return
+        if getattr(self, "_embedded_workspace_source_bar", False) and callable(getattr(self, "_embedded_source_setter", None)):
+            self._embedded_source_setter("")
+            if callable(getattr(self, "_embedded_source_focus", None)):
+                self._embedded_source_focus()
+            return "break"
         if self.batch_mode_var.get():
             self.batch_url_text.delete("1.0", "end")
         else:
@@ -694,8 +767,9 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         ]
 
         if self.batch_mode_var.get():
-            self.url_input_row.pack_forget()
-            self.batch_url_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.info_label)
+            if not getattr(self, "_embedded_workspace_source_bar", False):
+                self.url_input_row.pack_forget()
+                self.batch_url_frame.pack(fill="x", padx=15, pady=(0, 10), before=self.info_label)
             for button in fetch_buttons:
                 self._set_button_loading_state(button, is_loading=True)
             self.info_label.configure(
@@ -703,8 +777,9 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             )
             return
 
-        self.batch_url_frame.pack_forget()
-        self.url_input_row.pack(side="left", fill="x", expand=True)
+        if not getattr(self, "_embedded_workspace_source_bar", False):
+            self.batch_url_frame.pack_forget()
+            self.url_input_row.pack(side="left", fill="x", expand=True)
         for button in fetch_buttons:
             self._set_button_loading_state(button, is_loading=False)
         self.info_label.configure(
@@ -828,12 +903,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             self._update_size_estimate()
             return
 
-        quality_label = self._get_selected_quality_label()
-        for item_widget, entry in self.playlist_detail_rows:
-            item_widget.set_detail_text(self._build_playlist_detail_text(entry, quality_label))
-
-        self._update_playlist_summary()
-        self._update_size_estimate()
+        self._refresh_playlist_detail_surfaces(self._get_selected_quality_label())
 
     def _set_url_validation_state(self, icon_text: str, color):
         url_validation_icon = self.__dict__.get("url_validation_icon")
@@ -978,6 +1048,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
             return
 
         if profile.preferred_surface == "audio":
+            self.set_output_surface("audio")
             self._activate_music_side()
             if profile.format_key:
                 self.music_format_menu.set(profile.format_key)
@@ -986,6 +1057,7 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
                 if bitrate_value in {"320k", "192k", "128k"}:
                     self.music_bitrate_menu.set(bitrate_value)
         else:
+            self.set_output_surface("video")
             self._activate_video_side()
             if profile.format_key:
                 self.format_menu.set(profile.format_key)
@@ -1375,6 +1447,58 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
     def set_status_text(self, text: str):
         """Public bridge for main window level status updates."""
         self.download_status_label.configure(text=text)
+
+    def _record_perf_metric(self, name: str, *, item_count: int, duration_seconds: float, chunked: bool = False, **extra: Any) -> None:
+        metrics = getattr(self, "_perf_metrics", None)
+        if metrics is None:
+            metrics = {}
+            self._perf_metrics = metrics
+        payload: Dict[str, Any] = {
+            "item_count": int(item_count),
+            "duration_ms": round(float(duration_seconds) * 1000.0, 3),
+            "chunked": bool(chunked),
+        }
+        payload.update(extra)
+        metrics[name] = payload
+
+    def apply_layout_profile(self, *, height: int | None = None, compact: bool | None = None) -> None:
+        effective_height = int(height or 0)
+        compact_mode = bool(compact) if compact is not None else effective_height < 860
+        playlist_height = 220 if compact_mode else 300
+        batch_height = 92 if compact_mode else 120
+
+        for widget_group_name in ("_video_playlist_widgets", "_music_playlist_widgets"):
+            widget_group = getattr(self, widget_group_name, None)
+            if not widget_group:
+                continue
+            list_frame = widget_group.get("list_frame")
+            if list_frame is not None:
+                try:
+                    list_frame.configure(height=playlist_height)
+                except Exception:
+                    pass
+
+        batch_widget = getattr(self, "batch_url_text", None)
+        if batch_widget is not None:
+            try:
+                batch_widget.configure(height=batch_height)
+            except Exception:
+                pass
+
+        columns_frame = getattr(self, "_columns_frame", None)
+        if columns_frame is not None and hasattr(columns_frame, "pack_configure"):
+            columns_frame.pack_configure(pady=(0, 6 if compact_mode else 10))
+
+        self._record_perf_metric(
+            "download_layout_profile",
+            item_count=0,
+            duration_seconds=0.0,
+            chunked=False,
+            compact=compact_mode,
+            height=effective_height,
+            playlist_height=playlist_height,
+            batch_height=batch_height,
+        )
 
     def _create_playlist_panel(self, parent, download_command):
         """Create a playlist panel for a column.

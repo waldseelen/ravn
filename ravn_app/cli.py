@@ -40,6 +40,7 @@ from ravn_app.core.runners import AudioMixerRunner, AudioTrack, FFmpegRunner, Vi
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
 from ravn_app.core.media_helpers import get_media_helpers
+from ravn_app.core.tool_health import get_tool_health_checker, check_tool_availability
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +94,28 @@ def _option_was_provided(ctx: click.Context, name: str) -> bool:
         return ctx.get_parameter_source(name) not in {ParameterSource.DEFAULT, ParameterSource.DEFAULT_MAP}
     except Exception:
         return False
+
+
+def _check_required_tools(tools: list[str], as_json: bool = False) -> None:
+    """Check if required tools are available, exit with error if not."""
+    checker = get_tool_health_checker()
+    missing = []
+
+    for tool in tools:
+        if not check_tool_availability(tool):
+            missing.append(tool)
+
+    if missing:
+        affected_features = set()
+        for tool in missing:
+            features = checker.get_affected_features(tool)
+            affected_features.update(features)
+
+        error_msg = f"Required tools missing: {', '.join(missing)}. "
+        error_msg += f"This affects: {', '.join(affected_features)}. "
+        error_msg += "Please install missing tools. See DEPENDENCIES.md for instructions."
+
+        _error(error_msg, as_json)
 
 
 # ---------------------------------------------------------------------------
@@ -479,6 +502,9 @@ def download_cmd(
     as_json: bool,
 ):
     """Download media from URL using intent-driven acquisition settings."""
+    # Check required tools
+    _check_required_tools(['yt-dlp'], as_json)
+
     try:
         output_dir, dl_format, dl_quality, download_settings, summary_json = _resolve_download_cli_settings(
             ctx,
@@ -619,6 +645,9 @@ def convert_cmd(
     as_json: bool,
 ):
     """Convert a media file to a different format."""
+    # Check required tools
+    _check_required_tools(['ffmpeg'], as_json)
+
     video_codec = _CODEC_MAP[codec.lower()]
     video_quality = _VIDEO_QUALITY_MAP[quality.lower()]
 
@@ -698,6 +727,9 @@ def convert_cmd(
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
 def info_cmd(file: Path, as_json: bool):
     """Show media file metadata (duration, codec, resolution, bitrate)."""
+    # Check required tools
+    _check_required_tools(['ffprobe'], as_json)
+
     runner = FFmpegRunner()
     try:
         data = runner.probe(str(file))
@@ -795,6 +827,7 @@ def subtitle_cmd(
     as_json: bool,
 ):
     """Embed a subtitle file into a video."""
+    _check_required_tools(['ffmpeg'], as_json)
     output_path: Path = output or video.with_stem(video.stem + "_subtitled")
 
     if not as_json:
@@ -1038,6 +1071,7 @@ def mixer_audio_cmd(
     as_json: bool,
 ):
     """Run audio concat, mix, crossfade, or trim operations."""
+    _check_required_tools(['ffmpeg'], as_json)
     mixer = AudioMixerRunner()
     input_paths = [str(path) for path in input_files]
 
@@ -1135,6 +1169,7 @@ def mixer_video_cmd(
     as_json: bool,
 ):
     """Run video concat, overlay, PiP, watermark, transition, or frame extraction operations."""
+    _check_required_tools(['ffmpeg'], as_json)
     runner = VideoMixerRunner()
     input_paths = [str(path) for path in inputs]
     normalized_operation = operation.lower()
@@ -1449,6 +1484,7 @@ def filters_cmd(
     as_json: bool,
 ):
     """Apply FFmpeg-based video filters to a local file."""
+    _check_required_tools(['ffmpeg'], as_json)
     runner = VideoMixerRunner()
     result = runner.apply_filters(
         input_file=str(file),
@@ -1496,7 +1532,7 @@ def filters_cmd(
 # ---------------------------------------------------------------------------
 
 @cli.command("utilities")
-@click.option("--operation", "-o", required=True, 
+@click.option("--operation", "-o", required=True,
               type=click.Choice(["remux", "extract-audio", "mute", "trim", "preview", "thumbnail",
                                 "volume", "fade", "bitrate", "channels", "silence-detect", "loudnorm",
                                 "scale", "crop", "pad", "rotate", "fps", "color", "blur", "deinterlace",
@@ -1550,13 +1586,14 @@ def utilities_cmd(
     as_json: bool,
 ):
     """Run utility media helper operations."""
+    _check_required_tools(['ffmpeg'], as_json)
     helpers = get_media_helpers()
     op = operation.lower()
-    
+
     # Auto-generate output file if not provided (except for detection operations)
     if not output and op not in ("silence-detect", "blackdetect"):
         output = input_file.parent / f"{input_file.stem}_{op}{input_file.suffix}"
-    
+
     try:
         # Quick Helpers
         if op == "remux":
@@ -1576,15 +1613,15 @@ def utilities_cmd(
         elif op == "thumbnail":
             ts = start or 1.0
             result = helpers.thumbnail(str(input_file), str(output), timestamp=ts, width=width)
-        
+
         # Audio Utilities
         elif op == "volume":
             if volume is None:
                 _error("--volume is required for volume operation", as_json)
             result = helpers.adjust_volume(str(input_file), str(output), volume)
         elif op == "fade":
-            result = helpers.fade_audio(str(input_file), str(output), 
-                                       fade_in_duration=fade_in or 0.0, 
+            result = helpers.fade_audio(str(input_file), str(output),
+                                       fade_in_duration=fade_in or 0.0,
                                        fade_out_duration=fade_out or 0.0)
         elif op == "bitrate":
             if not bitrate:
@@ -1607,7 +1644,7 @@ def utilities_cmd(
                 return
         elif op == "loudnorm":
             result = helpers.loudness_normalize(str(input_file), str(output))
-        
+
         # Video Utilities
         elif op == "scale":
             result = helpers.scale_video(str(input_file), str(output), width=width, height=height)
@@ -1628,7 +1665,7 @@ def utilities_cmd(
                 _error("--fps is required for fps operation", as_json)
             result = helpers.change_fps(str(input_file), str(output), fps)
         elif op == "color":
-            result = helpers.adjust_color(str(input_file), str(output), 
+            result = helpers.adjust_color(str(input_file), str(output),
                                          brightness=brightness or 0.0,
                                          contrast=contrast or 1.0,
                                          saturation=saturation or 1.0)
@@ -1638,7 +1675,7 @@ def utilities_cmd(
                                          sharpen_amount=sharpen_amount or 0.0)
         elif op == "deinterlace":
             result = helpers.deinterlace(str(input_file), str(output))
-        
+
         # Smart Helpers
         elif op == "blackdetect":
             result = helpers.detect_black_frames(str(input_file))
@@ -1673,7 +1710,7 @@ def utilities_cmd(
                 return
         else:
             _error(f"Unknown operation: {operation}", as_json)
-        
+
         # Handle result
         if result.success:
             if as_json:
@@ -1687,7 +1724,7 @@ def utilities_cmd(
                 click.echo(f"✓ {op.title()} completed: {result.metadata.get('output_file', output)}")
         else:
             _error(result.error_message or f"{op} operation failed", as_json)
-            
+
     except Exception as e:
         _error(f"Utility operation failed: {str(e)}", as_json)
 

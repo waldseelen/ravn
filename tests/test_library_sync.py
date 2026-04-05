@@ -19,7 +19,7 @@ class _ConfigStub:
 
 
 class TestMediaLibraryAutoAdder:
-    def _build_auto_adder(self, tmp_path, library_section=None, metadata=None):
+    def _build_auto_adder(self, tmp_path, library_section=None, metadata=None, metadata_handler_factory=None):
         metadata_handler = Mock()
         metadata_handler.extract_metadata.return_value = metadata or {
             "title": "Generated Output",
@@ -31,7 +31,7 @@ class TestMediaLibraryAutoAdder:
         auto_adder = MediaLibraryAutoAdder(
             config_manager=_ConfigStub(library_section),
             db_path=str(tmp_path / "library.db"),
-            metadata_handler_factory=lambda: metadata_handler,
+            metadata_handler_factory=metadata_handler_factory or (lambda: metadata_handler),
         )
         return auto_adder, metadata_handler
 
@@ -106,6 +106,48 @@ class TestMediaLibraryAutoAdder:
                 assert items[0].metadata["input_file"] == "source.mov"
             finally:
                 library.close()
+
+    def test_register_outputs_reuses_one_library_session_per_batch(self, tmp_path):
+        output_files = [tmp_path / "one.mp4", tmp_path / "two.mp4"]
+        for file_path in output_files:
+            file_path.write_bytes(b"video")
+
+        created_handlers = []
+
+        def handler_factory():
+            handler = Mock()
+            handler.extract_metadata.side_effect = [
+                {
+                    "title": "One",
+                    "format": "mp4",
+                    "duration": 3.0,
+                    "size": output_files[0].stat().st_size,
+                    "codec": "h264",
+                },
+                {
+                    "title": "Two",
+                    "format": "mp4",
+                    "duration": 4.0,
+                    "size": output_files[1].stat().st_size,
+                    "codec": "h264",
+                },
+            ] if not created_handlers else []
+            created_handlers.append(handler)
+            return handler
+
+        auto_adder, _ = self._build_auto_adder(
+            tmp_path,
+            {"auto_add_downloads": True},
+            metadata_handler_factory=handler_factory,
+        )
+
+        with patch("ravn_app.core.persistence.media_library.ensure_directories_exist"):
+            results = auto_adder.register_outputs(output_files, source_type="download")
+
+        assert len(results) == 2
+        assert all(result.added for result in results)
+        assert len(created_handlers) == 1
+        assert created_handlers[0].extract_metadata.call_count == 2
 
 
 class TestQueueToLibraryIntegration:

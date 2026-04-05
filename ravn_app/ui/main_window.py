@@ -1,5 +1,6 @@
 """Main desktop shell for the RAVN application."""
 
+import ctypes
 import platform
 import queue
 import subprocess
@@ -42,10 +43,11 @@ class YouTubeDownloaderApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.configure(fg_color=Colors.BG_PRIMARY)
+        self.withdraw()
 
         self.title(t("common.appTitle"))
-        self.geometry("1400x900")
-        self.minsize(1200, 800)
+        self.geometry("1360x840")
+        self.minsize(1080, 720)
         self._apply_window_icon()
 
         self.db_manager = DatabaseManager()
@@ -91,12 +93,12 @@ class YouTubeDownloaderApp(ctk.CTk):
         self._last_primary_view_key = "home"
         self._active_drawer_key: Optional[str] = None
         self._drawer_return_focus = None
-        self._dashboard_refresh_tick = 0
+        self._last_task_snapshot = self.task_queue.get_ui_snapshot()
         self._command_palette = None
         self.tray = None
 
         self._setup_ui()
-        self.after(100, self._center_window)
+        self.after(10, self._show_centered_initial_window)
         self._setup_global_shortcuts()
         self.toast_manager = ToastManager(self)
         self._setup_tray_integration()
@@ -394,7 +396,7 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def _build_header(self) -> None:
         self.header = ctk.CTkFrame(self.content_shell, fg_color=Colors.BG_PRIMARY)
-        self.header.pack(fill="x", padx=Spacing.LG, pady=(Spacing.MD, Spacing.XS))
+        self.header.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
 
         header_left = ctk.CTkFrame(self.header, fg_color=Colors.BG_PRIMARY)
         header_left.pack(side="left", fill="x", expand=True)
@@ -479,7 +481,7 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def _build_main_stage(self) -> None:
         self.stage_frame = ctk.CTkFrame(self.content_shell, fg_color=Colors.BG_PRIMARY)
-        self.stage_frame.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, Spacing.XS))
+        self.stage_frame.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, 0))
 
         self.workspace_host = ctk.CTkFrame(self.stage_frame, fg_color=Colors.BG_PRIMARY)
         self.workspace_host.pack(side="left", fill="both", expand=True)
@@ -622,7 +624,7 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def _build_footer(self) -> None:
         footer = ctk.CTkFrame(self.content_shell, fg_color=Colors.BG_PRIMARY)
-        footer.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.SM))
+        footer.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
 
         self.footer_status_label = ctk.CTkLabel(
             footer,
@@ -678,6 +680,8 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def show_queue_view(self) -> None:
         self._open_drawer("queue")
+        if self.queue_tab is not None and hasattr(self.queue_tab, "refresh_queue"):
+            self.queue_tab.refresh_queue(force=True)
 
     def show_settings_view(self) -> None:
         self._show_view("settings")
@@ -874,19 +878,22 @@ class YouTubeDownloaderApp(ctk.CTk):
             return
 
     def _quick_paste_url(self) -> None:
-        self.show_download_view("url")
+        self.show_download_view("auto")
         try:
             clipboard_text = str(self.clipboard_get()).strip()
         except Exception:
             clipboard_text = ""
 
-        if not clipboard_text or self.download_tab is None:
+        download_workspace = getattr(self, "download_workspace", None)
+        if not clipboard_text or download_workspace is None:
             return
 
-        self.download_tab.url_entry.delete(0, "end")
-        self.download_tab.url_entry.insert(0, clipboard_text)
-        self.download_tab._on_url_changed()
-        self.download_tab.url_entry.focus_set()
+        if hasattr(download_workspace, "apply_detected_source_text"):
+            download_workspace.apply_detected_source_text(clipboard_text)
+        elif hasattr(download_workspace, "set_source_text"):
+            download_workspace.set_source_text(clipboard_text)
+        if hasattr(download_workspace, "focus_source_input"):
+            download_workspace.focus_source_input()
 
     def _quick_convert_file(self) -> None:
         self.show_studio_view("convert")
@@ -989,16 +996,117 @@ class YouTubeDownloaderApp(ctk.CTk):
             ),
         ]
 
+    def _get_screen_work_area(self) -> tuple[int, int, int, int]:
+        """Return taskbar-aware usable bounds, preferring the active monitor on Windows."""
+        try:
+            if platform.system() == "Windows":
+                user32 = ctypes.windll.user32
+                MONITOR_DEFAULTTONEAREST = 2
+
+                class RECT(ctypes.Structure):
+                    _fields_ = [
+                        ("left", ctypes.c_long),
+                        ("top", ctypes.c_long),
+                        ("right", ctypes.c_long),
+                        ("bottom", ctypes.c_long),
+                    ]
+
+                class POINT(ctypes.Structure):
+                    _fields_ = [
+                        ("x", ctypes.c_long),
+                        ("y", ctypes.c_long),
+                    ]
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", ctypes.c_ulong),
+                        ("rcMonitor", RECT),
+                        ("rcWork", RECT),
+                        ("dwFlags", ctypes.c_ulong),
+                    ]
+
+                def _rect_to_work_area(rect: RECT) -> tuple[int, int, int, int] | None:
+                    width = max(int(rect.right - rect.left), 0)
+                    height = max(int(rect.bottom - rect.top), 0)
+                    if width <= 0 or height <= 0:
+                        return None
+                    return int(rect.left), int(rect.top), width, height
+
+                def _monitor_work_area_from_handle(handle) -> tuple[int, int, int, int] | None:
+                    if not handle:
+                        return None
+                    info = MONITORINFO()
+                    info.cbSize = ctypes.sizeof(MONITORINFO)
+                    if not user32.GetMonitorInfoW(handle, ctypes.byref(info)):
+                        return None
+                    return _rect_to_work_area(info.rcWork)
+
+                try:
+                    foreground = user32.GetForegroundWindow()
+                    if foreground:
+                        monitor = user32.MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST)
+                        work_area = _monitor_work_area_from_handle(monitor)
+                        if work_area is not None:
+                            return work_area
+                except Exception:
+                    pass
+
+                try:
+                    point = POINT()
+                    if user32.GetCursorPos(ctypes.byref(point)):
+                        point_value = POINT(point.x, point.y)
+                        monitor = user32.MonitorFromPoint(point_value, MONITOR_DEFAULTTONEAREST)
+                        work_area = _monitor_work_area_from_handle(monitor)
+                        if work_area is not None:
+                            return work_area
+                except Exception:
+                    pass
+
+                rect = RECT()
+                if user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
+                    work_area = _rect_to_work_area(rect)
+                    if work_area is not None:
+                        return work_area
+        except Exception:
+            pass
+
+        try:
+            left = int(getattr(self, "winfo_vrootx", lambda: 0)() or 0)
+            top = int(getattr(self, "winfo_vrooty", lambda: 0)() or 0)
+            width = int(getattr(self, "winfo_vrootwidth", lambda: 0)() or 0)
+            height = int(getattr(self, "winfo_vrootheight", lambda: 0)() or 0)
+            if width > 0 and height > 0:
+                return left, top, width, height
+        except Exception:
+            pass
+
+        return 0, 0, int(self.winfo_screenwidth()), int(self.winfo_screenheight())
+
+    def _show_centered_initial_window(self) -> None:
+        """Show the initial window only after it has been centered."""
+        try:
+            self._center_window()
+            self.deiconify()
+            self.lift()
+        except Exception:
+            try:
+                self.deiconify()
+            except Exception:
+                pass
+
     def _center_window(self):
-        """Center the main window on the active display."""
+        """Center the main window within the taskbar-aware work area."""
         try:
             self.update_idletasks()
-            width = self.winfo_width() or 1400
-            height = self.winfo_height() or 900
-            screen_width = self.winfo_screenwidth()
-            screen_height = self.winfo_screenheight()
-            x = max((screen_width - width) // 2, 0)
-            y = max((screen_height - height) // 2, 0)
+            width = int(self.winfo_width() or 1360)
+            height = int(self.winfo_height() or 840)
+            frame_width = max(int(self.winfo_rootx() - self.winfo_x()), 0)
+            titlebar_height = max(int(self.winfo_rooty() - self.winfo_y()), 0)
+            outer_width = width + (frame_width * 2)
+            outer_height = height + frame_width + titlebar_height
+            left, top, work_width, work_height = self._get_screen_work_area()
+            x = left + max((work_width - outer_width) // 2, 0)
+            y = top + max((work_height - outer_height) // 2, 0)
             self.geometry(f"{width}x{height}+{x}+{y}")
         except Exception:
             pass
@@ -1014,12 +1122,13 @@ class YouTubeDownloaderApp(ctk.CTk):
     def _get_active_shortcut_tab(self):
         """Return the currently visible feature widget that supports global shortcuts."""
         for tab in (
-            getattr(self, "download_tab", None),
-            getattr(self, "converter_tab", None),
-            getattr(self, "subtitle_tab", None),
-            getattr(self, "mixer_tab", None),
-            getattr(self, "filters_tab", None),
-            getattr(self, "library_tab", None),
+            self.__dict__.get("torrent_tab"),
+            self.__dict__.get("download_tab"),
+            self.__dict__.get("converter_tab"),
+            self.__dict__.get("subtitle_tab"),
+            self.__dict__.get("mixer_tab"),
+            self.__dict__.get("filters_tab"),
+            self.__dict__.get("library_tab"),
         ):
             if tab and getattr(tab, "winfo_viewable", lambda: False)():
                 return tab
@@ -1277,15 +1386,29 @@ class YouTubeDownloaderApp(ctk.CTk):
             self.drawer_subtitle_label.configure(text=drawer_subtitle)
         self._refresh_header_actions()
 
+    def _refresh_task_bound_surfaces_if_needed(
+        self,
+        task_snapshot: Optional[tuple[tuple[str, str, int, str, str], ...]] = None,
+    ) -> bool:
+        """Refresh Home/Queue shell surfaces only when the task snapshot actually changes."""
+        current_snapshot = task_snapshot if task_snapshot is not None else self.task_queue.get_ui_snapshot()
+        if current_snapshot == self._last_task_snapshot:
+            return False
+
+        self._last_task_snapshot = current_snapshot
+        self._refresh_header_actions()
+        if self._current_view_key == "home" and self.home_workspace is not None:
+            self.home_workspace.refresh_dashboard()
+        if self.queue_tab is not None and hasattr(self.queue_tab, "refresh_queue"):
+            self.queue_tab.refresh_queue(force=True)
+        return True
+
     def _schedule_task_queue_callback_pump(self):
-        """Poll task queue callbacks so worker-thread UI updates land on the main thread."""
+        """Pump task/UI callbacks and refresh queue-bound surfaces only when state changes."""
         try:
             self.task_queue.process_callbacks()
             self._process_ui_callbacks()
-            self._refresh_header_actions()
-            self._dashboard_refresh_tick += 1
-            if self._current_view_key == "home" and self.home_workspace is not None and self._dashboard_refresh_tick % 10 == 0:
-                self.home_workspace.refresh_dashboard()
+            self._refresh_task_bound_surfaces_if_needed()
         finally:
             self._task_callback_after_id = self.after(120, self._schedule_task_queue_callback_pump)
 

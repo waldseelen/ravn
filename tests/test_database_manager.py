@@ -68,7 +68,7 @@ class TestDatabaseManagerBasics:
                 cursor = db.conn.cursor()
                 cursor.execute("UPDATE schema_version SET version = 3 WHERE id = 1")
                 db.conn.commit()
-                with patch("ravn_app.core.database.LATEST_SCHEMA_VERSION", 4):
+                with patch("ravn_app.core.database.LATEST_SCHEMA_VERSION", 5):
                     with pytest.raises(Exception):
                         db._run_migrations()
             finally:
@@ -335,6 +335,75 @@ class TestDatabaseManagerBasics:
                 assert len(db.get_downloads(limit=10)) == 0
                 db.clear_history("operations")
                 assert len(db.get_operations(limit=10)) == 0
+            finally:
+                db.close()
+
+    def test_history_indexes_exist(self, tmp_path):
+        db_path = tmp_path / "ravn.db"
+        with patch("ravn_app.core.database.ensure_directories_exist"), patch(
+            "ravn_app.core.database.migrate_all_legacy_files"
+        ):
+            db = DatabaseManager(db_path=str(db_path))
+            try:
+                rows = db.conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'"
+                ).fetchall()
+                index_names = {row[0] for row in rows}
+                assert "idx_downloads_download_date" in index_names
+                assert "idx_downloads_status_download_date" in index_names
+                assert "idx_conversions_conversion_date" in index_names
+                assert "idx_operations_history_sort" in index_names
+                assert "idx_operations_task_type_history_sort" in index_names
+            finally:
+                db.close()
+
+    def test_history_queries_use_indexes(self, tmp_path):
+        db_path = tmp_path / "ravn.db"
+        with patch("ravn_app.core.database.ensure_directories_exist"), patch(
+            "ravn_app.core.database.migrate_all_legacy_files"
+        ):
+            db = DatabaseManager(db_path=str(db_path))
+            try:
+                db.add_download(
+                    DownloadRecord(
+                        url="https://example.com/a",
+                        title="A",
+                        format="mp4",
+                        quality="best",
+                        file_path="a.mp4",
+                        file_size=100,
+                        download_date="2024-01-01T00:00:00",
+                        status="completed",
+                    )
+                )
+                db.add_operation(
+                    OperationRecord(
+                        task_type="filters",
+                        operation="apply_filters",
+                        title="filtered.mp4",
+                        input_paths=["input.mp4"],
+                        output_path="filtered.mp4",
+                        format="mp4",
+                        started_at="2024-01-01T00:00:00",
+                        completed_at="2024-01-01T00:00:05",
+                        status="completed",
+                    )
+                )
+
+                download_plan = db.conn.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM downloads WHERE status = ? ORDER BY download_date DESC LIMIT ?",
+                    ("completed", 5),
+                ).fetchall()
+                operation_plan = db.conn.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM operations ORDER BY COALESCE(completed_at, started_at) DESC LIMIT ?",
+                    (5,),
+                ).fetchall()
+
+                download_details = " ".join(str(row[-1]) for row in download_plan)
+                operation_details = " ".join(str(row[-1]) for row in operation_plan)
+                assert "idx_downloads_status_download_date" in download_details
+                assert "idx_operations_history_sort" in operation_details
+                assert "TEMP B-TREE" not in operation_details.upper()
             finally:
                 db.close()
 

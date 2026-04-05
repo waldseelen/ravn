@@ -80,6 +80,7 @@ ravn.py
   -> setup_logging()
   -> ensure_directories_exist()
   -> migrate_all_legacy_files()
+  -> check_tool_dependencies()
   -> YouTubeDownloaderApp
       -> shell composition
       -> shared services
@@ -125,6 +126,7 @@ ravn_app/
     i18n.py
     logging_config.py
     media_helpers.py
+    tool_health.py
     platform_support.py
     plugin_system.py
     subtitle_manager.py
@@ -133,6 +135,10 @@ ravn_app/
     torrent_downloader.py
     update_manager.py
     persistence/
+      _library_registration_batch.py
+      _media_library_export.py
+      _media_library_rows.py
+      _media_library_stats.py
       library_sync.py
       media_library.py
     runners/
@@ -144,13 +150,13 @@ ravn_app/
       video_mixer.py
   ui/
     advanced_features.py
-    converter_tab.py
+    converter_tab.py        # legacy-compatible implementation module
     design_tokens.py
-    download_tab.py
-    history_settings_tab.py
+    download_tab.py         # legacy-compatible alias to ui/tabs/download_tab.py
+    history_settings_tab.py # shared legacy-compatible implementation module
     main_window.py
     queue_panel.py
-    subtitle_tab.py
+    subtitle_tab.py         # legacy-compatible implementation module
     ui_components.py
     components/
       collapsible_panel.py
@@ -159,7 +165,7 @@ ravn_app/
       playlist_item.py
       playlist_sort_dialog.py
       url_input.py
-    tabs/
+    tabs/                   # canonical desktop feature import surfaces
       _download_feedback.py
       _download_playlist.py
       converter_tab.py
@@ -188,6 +194,8 @@ ravn_app/
 
 tests/
 docs/
+tools/
+  phase5e_benchmarks.py
 ```
 
 ---
@@ -203,13 +211,15 @@ Startup order:
 1. `setup_logging()`
 2. `ensure_directories_exist()`
 3. `migrate_all_legacy_files()`
-4. delayed import of `YouTubeDownloaderApp`
+4. `check_tool_dependencies()`
+5. delayed import of `YouTubeDownloaderApp`
 
 Why this matters:
 
 - logging is initialized before most runtime actions
 - config/data/cache directories exist before service startup
 - old config/history files can migrate before normal persistence begins
+- dependency-health warnings are emitted before feature surfaces load
 - delayed UI import reduces noisy early-interrupt behavior
 
 ## 5.2 CLI entry
@@ -279,6 +289,10 @@ Shared services created here typically include:
 
 The Phase 8 shell groups features by user intent.
 
+Canonical desktop feature imports should come from `ravn_app.ui.tabs.*`.
+Legacy `ravn_app.ui.*` feature modules remain only as compatibility surfaces or
+shared implementation modules where broader file moves are not yet justified.
+
 ### Home workspace
 
 File: `ravn_app/ui/tabs/home_workspace.py`
@@ -302,10 +316,13 @@ Files:
 
 Responsibilities:
 
+- unified source-bar orchestration for URLs / playlists / batches / torrents
+- auto-detected media-vs-torrent workspace routing with manual override support
 - URL download flow
 - playlist acquisition flow
 - batch acquisition flow
 - torrent manager flow
+- shared media output-type switching (`Video` / `Audio`)
 - compact profile selector
 - UI feedback and progress handling
 - playlist fetch / selection / filtering / summary logic
@@ -314,8 +331,8 @@ Responsibilities:
 
 Files:
 
-- `ravn_app/ui/converter_tab.py`
-- `ravn_app/ui/subtitle_tab.py`
+- `ravn_app/ui/tabs/converter_tab.py`
+- `ravn_app/ui/tabs/subtitle_tab.py`
 - `ravn_app/ui/tabs/filters_tab.py`
 - `ravn_app/ui/tabs/mixer_tab.py`
 - `ravn_app/ui/tabs/utilities_tab.py`
@@ -334,7 +351,7 @@ Responsibilities:
 Files:
 
 - `ravn_app/ui/tabs/library_tab.py`
-- `ravn_app/ui/history_settings_tab.py` (`HistoryTab`)
+- `ravn_app/ui/tabs/history_tab.py`
 - `ravn_app/ui/tabs/library_workspace.py`
 
 Responsibilities:
@@ -349,7 +366,6 @@ Files:
 
 - `ravn_app/ui/queue_panel.py`
 - `ravn_app/ui/tabs/queue_tab.py`
-- `ravn_app/ui/history_settings_tab.py` (`SettingsTab`)
 - `ravn_app/ui/tabs/settings_tab.py`
 
 Responsibilities:
@@ -439,6 +455,7 @@ Responsibilities:
 - schema migration support
 - download/conversion/operation queries
 - app statistics used by shell surfaces
+- history/top-N index management for common downloads / conversions / operations reads
 
 ### `task_manager.py`
 
@@ -447,6 +464,8 @@ Responsibilities:
 - async queue model
 - task status/result handling
 - callback scheduling/pumping support
+- bounded retention for completed/failed/cancelled in-memory tasks
+- stable task snapshots for low-cost UI dirty checks
 - generic operation compatibility across multiple feature surfaces
 
 ## 6.4 Runner layer
@@ -454,37 +473,58 @@ Responsibilities:
 The runner layer centralizes subprocess execution and parsing.
 
 ### `runners/base.py`
+
 - base process-runner abstraction
 - result normalization
 
 ### `runners/ffmpeg.py`
+
 - FFmpeg / FFprobe execution
 - real-time progress parsing via `-progress pipe:1`
 
 ### `runners/ytdlp.py`
+
 - yt-dlp command construction
 - retry behavior
 - deterministic downloaded-file discovery
 - archive-skip detection metadata
 
 ### `runners/aria2.py`
+
 - aria2c process execution for torrent/magnet flows
 
 ### `runners/audio_mixer.py`
+
 - audio mixing/concat helpers
 
 ### `runners/video_mixer.py`
+
 - video composition/concat/filter-adjacent helpers
 
 ## 6.5 Persistence + library layer
 
 ### `persistence/media_library.py`
+
 - local media library database
 - add/search/tag/collection/export behavior
+- bulk tag preloading for hot list/search/query paths
+- cached aggregate statistics with explicit invalidation
+- bounded search-history retention
+- batched export iteration for large JSON/CSV exports
+- delegates row-mapping / stats / export details to explicit private helper modules for clearer ownership
+
+Supporting private helpers:
+
+- `persistence/_media_library_rows.py`
+- `persistence/_media_library_stats.py`
+- `persistence/_media_library_export.py`
 
 ### `persistence/library_sync.py`
+
 - auto-add / registration helpers for successful outputs
 - library synchronization support across feature flows
+- shared batch registration path that reuses one library session / metadata handler per batch
+- delegates per-batch registration mechanics to `persistence/_library_registration_batch.py`
 
 ## 6.6 UI component layer
 
@@ -510,35 +550,51 @@ Design tokens live in:
 ## 6.7 Infrastructure / support layer
 
 ### `config_paths.py`
+
 - OS-aware config/data/cache paths
 - default config generation
 - schema validation
 - legacy-file migration helpers
 
 ### `i18n.py`
+
 - runtime translation lookup
 - language switching
 - app-wide translation interface
 
 ### `theme_catalog.py`
+
 - strict canonical theme IDs
 - legacy-name normalization to `dark` / `light`
 
 ### `logging_config.py`
+
 - structured logging bootstrap
 
+### `tool_health.py`
+
+- shared external-tool health/status model
+- startup dependency checks
+- feature-to-tool impact mapping
+- user-facing missing-tool summaries for desktop + CLI
+
 ### `error_handler.py`
+
 - user-friendly external-tool error parsing
 
 ### `platform_support.py`
+
 - platform helpers and environment-specific behavior
 
 ### `update_manager.py`
+
 - app update helpers
 
 ### `plugin_system.py`
-- plugin/extension boundary scaffold
-- not central to current runtime
+
+- experimental plugin/extension boundary scaffold
+- not auto-loaded by the active desktop or CLI runtime
+- retained as a future-facing extension surface, not a supported packaged-plugin system
 
 ---
 
@@ -574,7 +630,14 @@ Adaptive shell behaviors:
 - adaptive queue drawer width
 - shorter quick-action labels on tighter widths
 - mounted workspace switching to reduce redraw flicker
+- taskbar-aware, active-monitor-aware initial window centering on desktop launch
 - in-place theme/language refresh behavior where possible
+- dependency-health warning summary in `Home` plus detailed status in `Settings`
+- compact-height download-workspace profile to reduce clipped/broken impressions on shorter desktop heights
+- chunked rendering on selected list-heavy surfaces where Phase 5C measurement justified it
+- task-snapshot-driven Home / Queue refreshes where practical instead of fixed high-frequency polling
+- in-place Home summary-card updates instead of destroy/recreate refreshes
+- unified download-source classification with contextual media / torrent panel switching
 
 ---
 
@@ -731,6 +794,8 @@ Capabilities include:
 - callback pumping
 - cancellation hooks
 - heterogeneous result support
+- bounded terminal-task retention to prevent unbounded in-memory growth
+- stable queue snapshots for shell/queue dirty checks
 
 ### History model
 
@@ -741,6 +806,8 @@ Capabilities include:
 - generic operations
 
 History is surfaced in the desktop Library workspace and is also reachable via CLI.
+
+Common history reads now have dedicated secondary SQLite indexes so downloads / conversions / operations top-N queries do not rely on repeated full scans and temp-sort plans for the covered paths.
 
 ---
 
@@ -767,17 +834,26 @@ Theme policy is intentionally strict:
 
 ## 13. Validation Snapshot
 
-Verified on 2026-04-03:
+Verified on 2026-04-05:
 
 - full-suite baseline:
   - `pytest -q`
-  - `578 passed, 1 skipped` (`579` collected)
-- targeted CLI + acquisition regression sweep:
-  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `245 passed, 1 skipped`
-- targeted acquisition-engine regression sweep:
-  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `206 passed, 1 skipped`
+  - `633 passed, 1 skipped` (`634` collected)
+- required UI logic sweep:
+  - `pytest -q tests/test_ui_logic.py`
+  - `87 passed`
+- required UI components + builder sweep:
+  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
+  - `37 passed`
+- required config/database sweep:
+  - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
+  - `58 passed`
+- targeted Phase 5E optimization sweep:
+  - `pytest -q tests/test_media_library.py tests/test_library_sync.py tests/test_task_manager.py tests/test_database_manager.py tests/test_ui_logic.py`
+  - `145 passed`
+- Phase 5E benchmark harness:
+  - `python tools/phase5e_benchmarks.py --output docs/phase5e_benchmark_results.json`
+  - benchmark artifact refreshed successfully
 
 Treat these as the current validated documentation snapshot.
 
@@ -788,11 +864,19 @@ Treat these as the current validated documentation snapshot.
 Current strengths of the codebase:
 
 - strong shared-runner model for major external processes
+- runtime media-path subprocess debt reduced through Phase 5B shared-runner convergence
 - acquisition logic moved toward reusable core orchestration
 - thin desktop shell with grouped workspaces
+- canonical desktop feature imports are now clearer under `ravn_app.ui.tabs.*`
 - queue/history/library integration across more workflows than before
+- unified download-source UX now reduces tab-hopping between media and torrent entry paths
+- MediaLibrary hot paths now avoid per-row tag query fan-out
+- MediaLibrary now has clearer private helper boundaries for row loading, stats, and export behavior
+- auto-add library batches reuse one session/metadata handler instead of recreating them per file
+- playlist fetch now stages detail enrichment behind an initial flat pass so the first UI-visible step is cheaper
 - OS-aware persistence paths
 - strict i18n/theme policies
+- explicit documentation that `plugin_system.py` is experimental-only rather than an implied runtime feature
 - clear separation between feature UIs and lower-level media execution paths
 
 ---
@@ -801,11 +885,13 @@ Current strengths of the codebase:
 
 Known or acknowledged open areas:
 
-- Phase 5 packaging/distribution is still incomplete
-- some auxiliary code paths still call `subprocess` directly outside the shared-runner ideal
-- packaging/build scripts/spec files exist but are not yet the finished cross-platform distribution story
-- some compatibility wrappers remain in `ui/` while `ui/tabs/` hosts the newer workspace-oriented structure
-- `plugin_system.py` exists as an extension boundary but is not central to the active product runtime
+- Phase 5 release-readiness work is still incomplete
+- direct `subprocess` usage now remains primarily in the runner layer, platform/open-file helpers, tool-health probing, and build/update helpers (see `docs/phase5b_subprocess_audit.md`)
+- list-heavy surfaces now have targeted chunking/measurement, but broader virtualization is intentionally deferred until future measurement justifies it (see `docs/phase5c_ux_scalability.md`)
+- packaging/build scripts/spec files exist but are not yet the finished Windows release story
+- canonical desktop feature imports are now documented under `ui/tabs/`, but some legacy-compatible implementation modules remain in `ui/` to avoid risky churn before packaging (see `docs/phase5d_wrapper_boundary_clarity.md`)
+- `plugin_system.py` is explicitly experimental-only and does not imply supported runtime plugin loading today (see `docs/phase5d_wrapper_boundary_clarity.md`)
+- Phase 5E closeout evidence now spans `docs/phase5e_optimization_baseline.md`, `docs/phase5e_dead_code_audit.md`, and `docs/phase5e_benchmark_closeout.md`
 
 ---
 

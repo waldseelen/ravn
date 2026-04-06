@@ -14,6 +14,7 @@ This file is the validated implementation snapshot for the current repository st
 
 - Repository structure is stable: desktop entrypoint, CLI entrypoint, layered core, modular UI, tests, build script, and PyInstaller spec are present.
 - Main external-tool execution paths are consolidated around shared runners in `ravn_app/core/runners/`.
+- Windows runner/tool-health subprocess launches now suppress stray child console windows on the main runtime paths.
 - Structured logging is centralized in `ravn_app/core/logging_config.py`.
 - OS-aware config/data/cache path handling and legacy migration are active through `ravn_app/core/config_paths.py` and `ravn.py`.
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
@@ -151,7 +152,7 @@ Verified on 2026-04-05:
 
 - Full suite:
   - `pytest -q`
-  - `641 passed, 1 skipped` (`642` collected)
+  - `644 passed, 1 skipped` (`645` collected)
 - Required UI logic sweep:
   - `pytest -q tests/test_ui_logic.py`
   - `90 passed`

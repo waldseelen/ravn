@@ -167,6 +167,17 @@ class TestToolHealthChecker:
                 assert summary['overall_status'] == 'critical'
                 assert 'ffmpeg' in summary['missing_required']
 
+    def test_get_tool_version_passes_hidden_window_kwargs(self):
+        checker = ToolHealthChecker()
+        with patch('ravn_app.core.tool_health.get_hidden_subprocess_kwargs', return_value={'creationflags': 123}), patch(
+            'subprocess.run',
+            return_value=Mock(returncode=0, stdout='ffmpeg version 7.0\n'),
+        ) as mock_run:
+            version = checker._get_tool_version('ffmpeg', 'ffmpeg')
+
+        assert version == 'ffmpeg version 7.0'
+        assert mock_run.call_args.kwargs['creationflags'] == 123
+
 
 class TestGlobalFunctions:
     """Test global helper functions."""

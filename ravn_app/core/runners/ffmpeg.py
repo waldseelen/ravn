@@ -12,7 +12,7 @@ import subprocess
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
-from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus
+from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus, get_hidden_subprocess_kwargs
 
 
 logger = logging.getLogger(__name__)
@@ -238,6 +238,7 @@ class FFmpegRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=10,
+                **get_hidden_subprocess_kwargs(),
             )
             if result.returncode == 0:
                 return result.stdout.split("\n")[0]
@@ -253,6 +254,7 @@ class FFmpegRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=10,
+                **get_hidden_subprocess_kwargs(),
             )
             return codec in result.stdout
         except Exception:
@@ -298,6 +300,7 @@ class FFmpegRunner(BaseRunner):
                 universal_newlines=True,
                 bufsize=1,
                 env=process_env,
+                **get_hidden_subprocess_kwargs(),
             )
 
             stderr_lines: List[str] = []

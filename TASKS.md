@@ -240,6 +240,7 @@ Goal: after runtime/tooling/hardening work is sufficiently stable, produce a tru
 
 - The repo already contains packaging scaffolding (`build.ps1`, `ravn.spec`, `app_builder.py`) and now has a Windows-first release pipeline, but one manual clean-machine validation gate remains
 - Bundled FFmpeg strategy is now defined around `assets/ffmpeg/win64/`, runtime path auto-detection, and PyInstaller asset bundling
+- Windows runner/tool-health subprocess launches now suppress stray child console windows on the main packaged/runtime paths
 - Clean-machine validation has not yet closed the loop
 - Signing strategy is documented, but public release signing still depends on certificate provisioning
 

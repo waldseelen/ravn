@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from ravn_app.core.error_handler import parse_aria2c_error
-from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus
+from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus, get_hidden_subprocess_kwargs
 
 
 logger = logging.getLogger(__name__)
@@ -280,6 +280,7 @@ class Aria2Runner(BaseRunner):
                 universal_newlines=True,
                 bufsize=1,
                 env=process_env,
+                **get_hidden_subprocess_kwargs(),
             )
 
             stderr_lines: List[str] = []

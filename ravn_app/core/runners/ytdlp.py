@@ -11,7 +11,7 @@ import re
 import subprocess
 from typing import Any, Callable, Dict, List, Optional
 
-from ravn_app.core.runners.base import BaseRunner, RunnerResult
+from ravn_app.core.runners.base import BaseRunner, RunnerResult, get_hidden_subprocess_kwargs
 
 
 logger = logging.getLogger(__name__)
@@ -213,6 +213,7 @@ class YtDlpRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                **get_hidden_subprocess_kwargs(),
             )
 
             if result.returncode == 0:
@@ -502,6 +503,7 @@ class YtDlpRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                **get_hidden_subprocess_kwargs(),
             )
         except subprocess.TimeoutExpired:
             logger.error("yt-dlp playlist extraction timed out")
@@ -631,6 +633,7 @@ class YtDlpRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=10,
+                **get_hidden_subprocess_kwargs(),
             )
             if result.returncode == 0:
                 return result.stdout.strip()
@@ -654,6 +657,7 @@ class YtDlpRunner(BaseRunner):
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                **get_hidden_subprocess_kwargs(),
             )
             return result.returncode == 0
         except Exception as exc:

@@ -496,7 +496,7 @@ Verified on 2026-04-05:
 
 - Full baseline:
   - `pytest -q`
-  - `641 passed, 1 skipped` (`642` collected)
+  - `644 passed, 1 skipped` (`645` collected)
 - Required UI logic sweep:
   - `pytest -q tests/test_ui_logic.py`
   - `90 passed`
@@ -540,6 +540,7 @@ Current release state:
 
 - bundled FFmpeg/FFprobe layout is defined under `assets/ffmpeg/win64/`
 - runtime lookup now prefers bundled FFmpeg/FFprobe before PATH fallback
+- Windows runner/tool-health subprocess launches now suppress stray child console windows where practical
 - `build.ps1` can prepare bundled runtime, run verification, build the PyInstaller package, and emit a zip + checksum
 - CI can build Windows artifacts
 - tagged releases can publish Windows zip artifacts automatically

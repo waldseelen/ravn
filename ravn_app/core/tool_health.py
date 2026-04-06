@@ -10,6 +10,8 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ravn_app.core.runners.base import get_hidden_subprocess_kwargs
+
 logger = logging.getLogger(__name__)
 
 
@@ -138,14 +140,16 @@ class ToolHealthChecker:
                     [tool_path, '--version'],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
+                    **get_hidden_subprocess_kwargs(),
                 )
             else:
                 result = subprocess.run(
                     [tool_path, '-version'],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
+                    **get_hidden_subprocess_kwargs(),
                 )
             
             if result.returncode == 0:

@@ -5,6 +5,7 @@ Tests for FFmpegRunner and YtDlpRunner classes
 import os
 import json
 import pytest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 
@@ -20,6 +21,37 @@ from ravn_app.core.runners import (
     get_aria2c_runner,
 )
 from ravn_app.core.runners.aria2 import _Aria2ProgressParser, emit_torrent_progress
+from ravn_app.core.runners.base import get_hidden_subprocess_kwargs
+
+
+class TestRunnerProcessWindowHandling:
+    def test_hidden_subprocess_kwargs_windows_configures_no_window(self):
+        import ravn_app.core.runners.base as base_module
+
+        with patch.object(base_module.os, "name", "nt"), patch.object(
+            base_module.subprocess,
+            "STARTUPINFO",
+            return_value=SimpleNamespace(dwFlags=0, wShowWindow=None),
+            create=True,
+        ), patch.object(base_module.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), patch.object(
+            base_module.subprocess,
+            "STARTF_USESHOWWINDOW",
+            0x00000001,
+            create=True,
+        ), patch.object(base_module.subprocess, "SW_HIDE", 0, create=True):
+            kwargs = get_hidden_subprocess_kwargs()
+
+        assert kwargs["creationflags"] == 0x08000000
+        assert kwargs["startupinfo"].dwFlags & 0x00000001
+        assert kwargs["startupinfo"].wShowWindow == 0
+
+    def test_hidden_subprocess_kwargs_non_windows_empty(self):
+        import ravn_app.core.runners.base as base_module
+
+        with patch.object(base_module.os, "name", "posix"):
+            kwargs = get_hidden_subprocess_kwargs()
+
+        assert kwargs == {}
 
 
 class TestFFmpegRunner:

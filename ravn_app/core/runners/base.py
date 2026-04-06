@@ -18,6 +18,29 @@ from typing import Any, Callable, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+def get_hidden_subprocess_kwargs() -> Dict[str, Any]:
+    """Return Windows-specific subprocess kwargs that suppress child console windows."""
+    if os.name != "nt":
+        return {}
+
+    kwargs: Dict[str, Any] = {}
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if creationflags:
+        kwargs["creationflags"] = creationflags
+
+    startupinfo_factory = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_factory is not None:
+        startupinfo = startupinfo_factory()
+        startupinfo.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
+        try:
+            startupinfo.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
+        except Exception:
+            pass
+        kwargs["startupinfo"] = startupinfo
+
+    return kwargs
+
+
 class RunnerStatus(Enum):
     """Process execution status."""
 
@@ -122,6 +145,7 @@ class BaseRunner(ABC):
                 stderr=subprocess.PIPE,
                 universal_newlines=True,
                 env=process_env,
+                **get_hidden_subprocess_kwargs(),
             )
 
             stdout, stderr = self.current_process.communicate(timeout=timeout)

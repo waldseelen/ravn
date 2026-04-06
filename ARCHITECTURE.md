@@ -482,6 +482,7 @@ Responsibilities:
 ## 6.4 Runner layer
 
 The runner layer centralizes subprocess execution and parsing.
+On Windows, the main runner/tool-health subprocess paths also apply no-console launch flags so packaged GUI usage does not spawn stray child terminals for normal tool invocations.
 
 ### `runners/base.py`
 
@@ -849,7 +850,7 @@ Verified on 2026-04-05:
 
 - full-suite baseline:
   - `pytest -q`
-  - `641 passed, 1 skipped` (`642` collected)
+  - `644 passed, 1 skipped` (`645` collected)
 - required UI logic sweep:
   - `pytest -q tests/test_ui_logic.py`
   - `90 passed`
@@ -876,6 +877,7 @@ Current strengths of the codebase:
 
 - strong shared-runner model for major external processes
 - runtime media-path subprocess debt reduced through Phase 5B shared-runner convergence
+- Windows GUI/runtime behavior is cleaner because runner/tool-health child process launches now suppress transient console windows on the main tool paths
 - acquisition logic moved toward reusable core orchestration
 - thin desktop shell with grouped workspaces
 - canonical desktop feature imports are now clearer under `ravn_app.ui.tabs.*`

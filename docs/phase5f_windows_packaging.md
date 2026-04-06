@@ -76,6 +76,34 @@ Outputs:
 - `dist/RAVN-windows-x64.zip`
 - `dist/RAVN-windows-x64.sha256.txt`
 
+## Packaged-app smoke helper
+
+A Windows validation helper is available at:
+
+- `tools/windows_package_smoke.ps1`
+
+Typical usage after building and copying the package to a clean Windows machine:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\windows_package_smoke.ps1 -PackageRoot .\dist\RAVN
+```
+
+What it checks automatically:
+
+- packaged `RAVN.exe` exists
+- bundled `ffmpeg.exe` / `ffprobe.exe` exist in the packaged asset tree
+- translation files exist
+- the packaged app can launch
+- config/data/cache/log directories are created
+- a smoke report is written to `windows-package-smoke-report.json`
+
+What still remains manual:
+
+- complete one URL download
+- complete one conversion
+- verify queue/history persistence
+- verify library auto-add basics
+
 ## GitHub Actions
 
 ### CI artifact build
@@ -107,14 +135,15 @@ Behavior:
 
 Use a clean Windows VM or disposable test machine and verify:
 
-1. application launches from packaged folder without a Python installation
-2. config/data directories are created
-3. bundled FFmpeg/FFprobe are detected without PATH edits
-4. a basic URL download succeeds
-5. a conversion succeeds
-6. queue entries appear and finish cleanly
-7. history entries are persisted
-8. media library auto-add basics work for a supported output
+1. run `tools/windows_package_smoke.ps1` against the packaged folder
+2. application launches from packaged folder without a Python installation
+3. config/data directories are created
+4. bundled FFmpeg/FFprobe are detected without PATH edits
+5. a basic URL download succeeds
+6. a conversion succeeds
+7. queue entries appear and finish cleanly
+8. history entries are persisted
+9. media library auto-add basics work for a supported output
 
 Record results in this document or a release-specific validation note before public distribution.
 

@@ -901,7 +901,7 @@ Known or acknowledged open areas:
 - Phase 5 release-readiness work is still incomplete
 - direct `subprocess` usage now remains primarily in the runner layer, platform/open-file helpers, tool-health probing, and build/update helpers (see `docs/phase5b_subprocess_audit.md`)
 - list-heavy surfaces now have targeted chunking/measurement, but broader virtualization is intentionally deferred until future measurement justifies it (see `docs/phase5c_ux_scalability.md`)
-- packaging/build scripts/spec files now form a Windows-first release pipeline, but clean-machine packaged-app validation is still the final open release gate
+- packaging/build scripts/spec files now form a Windows-first release pipeline, with hyphenated release tags publishing as prereleases, but clean-machine packaged-app validation is still the final open release gate
 - canonical desktop feature imports are now documented under `ui/tabs/`, but some legacy-compatible implementation modules remain in `ui/` to avoid risky churn before packaging (see `docs/phase5d_wrapper_boundary_clarity.md`)
 - `plugin_system.py` is explicitly experimental-only and does not imply supported runtime plugin loading today (see `docs/phase5d_wrapper_boundary_clarity.md`)
 - Phase 5E closeout evidence now spans `docs/phase5e_optimization_baseline.md`, `docs/phase5e_dead_code_audit.md`, and `docs/phase5e_benchmark_closeout.md`

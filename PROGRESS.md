@@ -21,6 +21,7 @@ This file is the validated implementation snapshot for the current repository st
 - Theme system is strict two-theme (`dark`, `light`) with legacy normalization.
 - Localization is active through `ravn_app/core/i18n.py` and `ravn_app/translations/`.
 - Windows packaging now has a concrete bundled-runtime strategy through `ravn.spec`, `build.ps1`, `assets/ffmpeg/win64/`, and GitHub Actions packaging/release workflows.
+- Tag-driven Windows release publishing now automatically marks hyphenated version tags as GitHub prereleases.
 
 ### Desktop shell / UX
 

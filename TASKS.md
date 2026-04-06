@@ -243,6 +243,7 @@ Goal: after runtime/tooling/hardening work is sufficiently stable, produce a tru
 - Windows runner/tool-health subprocess launches now suppress stray child console windows on the main packaged/runtime paths
 - Clean-machine validation has not yet closed the loop
 - Signing strategy is documented, but public release signing still depends on certificate provisioning
+- Tag-driven release automation now supports prerelease tagging through hyphenated versions (for example `v1.1.0-rc1`)
 
 ### Tasks
 

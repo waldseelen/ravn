@@ -130,6 +130,7 @@ Behavior:
 - triggers on tags matching `v*`
 - builds the Windows package
 - uploads zip + checksum to the GitHub Release
+- if the tag contains a hyphen (for example `v1.1.0-rc1`), the published GitHub Release is marked as a prerelease
 
 ## Clean-machine validation checklist
 

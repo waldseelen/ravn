@@ -544,6 +544,7 @@ Current release state:
 - `build.ps1` can prepare bundled runtime, run verification, build the PyInstaller package, and emit a zip + checksum
 - CI can build Windows artifacts
 - tagged releases can publish Windows zip artifacts automatically
+- tags that include a hyphen (for example `v1.1.0-rc1`) publish as GitHub prereleases
 - the final open release gate is still clean-machine validation of the packaged app
 
 ## Documentation Map

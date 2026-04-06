@@ -1,440 +1,188 @@
-# RAVN
+<p align="center">
+  <img src="assets/ravnapp.jpeg" alt="RAVN brand image" width="220">
+</p>
 
-RAVN is a desktop + CLI media application for **acquiring, processing, organizing, and reviewing media**.
+<p align="center">
+  <img src="assets/ravn-icon-256.png" alt="RAVN icon" width="96" height="96">
+</p>
 
-- **Desktop runtime:** CustomTkinter
-- **CLI runtime:** Click
-- **Primary external tools:** FFmpeg / FFprobe, yt-dlp, aria2c
-- **Current product state:** Phases 1–4D, Phase 5A, Phase 5B, Phase 5C, Phase 5D, Phase 5E, Phase 6, Phase 7, and Phase 8 are complete; the Phase 5F Windows packaging pipeline is now implemented except for final clean-machine validation
-- **Open major area:** Phase 5F clean-machine release validation / sign-and-publish closeout for the Windows distributable
+<h1 align="center">RAVN</h1>
 
-RAVN is no longer just a thin yt-dlp front-end. The project now behaves as a broader **media acquisition + studio + library** system built around shared runners, queue/history persistence, and automatic media-library registration.
+<p align="center">
+  Desktop + CLI media app for downloading, converting, organizing, and reviewing media on Windows.
+</p>
 
-## What RAVN Can Do
+<p align="center">
+  <a href="https://github.com/waldseelen/ravn/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/waldseelen/ravn?display_name=tag&label=release"></a>
+  <a href="https://github.com/waldseelen/ravn/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/waldseelen/ravn/total?label=downloads"></a>
+  <a href="https://github.com/waldseelen/ravn/actions/workflows/windows-package.yml"><img alt="Windows package workflow" src="https://img.shields.io/github/actions/workflow/status/waldseelen/ravn/windows-package.yml?branch=main&label=windows%20package"></a>
+</p>
 
-### 1. Media Acquisition
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white">
+  <img alt="UI" src="https://img.shields.io/badge/UI-CustomTkinter-1F6FEB">
+  <img alt="CLI" src="https://img.shields.io/badge/CLI-Click-6C47FF">
+</p>
 
-RAVN can download media from supported online sources through a unified acquisition flow.
+<p align="center">
+  <a href="https://github.com/waldseelen/ravn/releases">Download the latest Windows build</a>
+</p>
 
-Supported acquisition behaviors include:
+---
 
-- a unified smart source bar for URLs, playlists, batches, magnets, and `.torrent` files
-- single-URL downloads
-- playlist metadata fetch + selective playlist download
-- batch downloads from multiline URL lists
-- magnet links and `.torrent` files
-- torrent download management through aria2
-- reusable acquisition presets:
-  - `Custom`
-  - `Music`
-  - `Podcast`
-  - `Archive`
-  - `Social Clip`
+## What is RAVN?
 
-Acquisition features include:
+RAVN is a Windows-first media workstation that combines four things in one app:
 
-- quality intent selection (`Best`, `1080p`, `720p`, `480p`, audio-only behavior)
-- format selection (`MP4`, `WebM`, `MKV`, `MP3`, `M4A`, `AAC`, `FLAC`, `OPUS`, `WAV` depending on flow)
-- quality-based size estimation where source metadata allows it
-- safe filename templating with tokens such as:
-  - `{title}`
-  - `{uploader}`
-  - `{playlist}`
-  - `{upload_date}`
-  - `{resolution}`
-- naming presets:
-  - `standard`
-  - `clean`
-  - `playlist`
-- normalized post-download renaming
-- optional auto-sort folder routing by artist/channel metadata
-- preferred subtitle language selection
-- subtitle fallback language support
-- optional auto-generated subtitle fallback
-- optional downloader-side subtitle embedding
-- post-download automation pipeline:
-  - extract audio
-  - convert final output
-  - embed matching subtitle sidecars
-  - preserve original downloaded artifacts
-  - hand final outputs to library auto-add
-- metadata normalization and enrichment for acquired media
-- platform-aware library tags and structured acquisition metadata
-- robustness controls:
-  - archive-backed duplicate skipping
-  - resumable partial downloads
-  - fallback format retries
-  - optional bandwidth limits
-- collapsed advanced acquisition controls:
-  - browser-cookie auth handoff
-  - `cookies.txt` auth handoff
-  - fragment concurrency tuning
-  - fragment retry tuning
-  - socket timeout tuning
+- **Download** videos, audio, playlists, batches, magnets, and `.torrent` files
+- **Process** media with FFmpeg-backed conversion, filters, subtitles, mixer, and utilities
+- **Organize** outputs in a local library with history and queue tracking
+- **Automate** the same core flows from the command line
 
-### 2. Playlist Intelligence
+It is built around a desktop UI, a shared-core CLI, queue/history persistence, bundled-runtime packaging, and a practical Windows release flow.
 
-Playlist flow is no longer just “download all”. It supports:
+---
 
-- playlist metadata fetch with staged detail enrichment
-- sortable review dialog
-- checkbox-based partial selection
-- range selection
-- title filtering
-- duration filtering
-- popularity-aware filtering when metadata exists
-- selected-count and selected-total-size summaries
-- quality-aware summary calculations
+## Screenshots
 
-### 3. Torrent / Magnet Support
+<p align="center">
+  <img src="docs/screenshots/home-workspace.png" alt="RAVN Home workspace" width="48%">
+  <img src="docs/screenshots/download-workspace.png" alt="RAVN Download workspace" width="48%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/studio-workspace.png" alt="RAVN Studio workspace" width="48%">
+  <img src="docs/screenshots/library-workspace.png" alt="RAVN Library workspace" width="48%">
+</p>
 
-Torrent support is a first-class capability.
+---
 
-RAVN supports:
+## Highlights
 
-- magnet URI detection
-- `.torrent` URL/file detection
-- drag-and-drop `.torrent` input when DnD backend is available
-- aria2-backed torrent downloading
-- torrent queueing from a dedicated UI surface
-- torrent modes:
-  - `FULL`
-  - `SEQUENTIAL`
-  - `STREAM`
-- pause / resume / complete filtering
-- per-session progress and metrics:
-  - progress
-  - total size
-  - downloaded
-  - remaining
-  - speed
-  - ETA
-  - peers
-  - seeders
-- per-file child rows under torrent sessions
-- open-in-player behavior with safe fallback to the best available target
+### Unified download workspace
+- one smart source bar for:
+  - media URLs
+  - playlists
+  - batch links
+  - magnets
+  - `.torrent` files
+- automatic source detection with manual override
+- shared **Video / Audio** output switching
+- staged playlist loading with selective download controls
 
-### 4. Studio / Processing Tools
+### Media processing toolkit
+- convert video and audio formats
+- embed and process subtitles
+- apply FFmpeg filters
+- mix audio and video workflows
+- use utility helpers like remux, trim, thumbnail, loudnorm, blackdetect, scene preview, and more
 
-RAVN includes a broader FFmpeg-backed studio toolset.
+### Queue, history, and library
+- background task queue
+- persisted history for downloads and processing operations
+- local media library with tags, collections, search, and export
+- optional auto-add of successful outputs into the media library
 
-#### Convert
+### Windows-focused packaging
+- packaged Windows build flow via PyInstaller
+- bundled FFmpeg / FFprobe runtime strategy
+- release zip + SHA256 artifacts
+- GitHub Actions packaging and tagged release publishing
 
-- video/audio format conversion
-- codec + quality mapping
-- real-time FFmpeg progress reporting
-- queue integration
-- history persistence
-- optional auto-library registration
+---
 
-#### Subtitle
-
-- subtitle download
-- subtitle processing
-- subtitle embedding
-- inline error display through `ErrorPanel`
-
-#### Filters
-
-- FFmpeg-based filter chains
-- queue integration
-- history persistence
-- library auto-add support
-
-#### Mixer
-
-- audio concatenation and mix-style workflows
-- video concatenation / composition workflows
-- queue integration
-- history persistence
-- library auto-add support
-
-#### Utilities
-
-RAVN includes a large utility-media helper set in both desktop UI and CLI.
-
-Current utility groups:
-
-- **Quick helpers**
-  - remux
-  - extract-audio
-  - mute
-  - trim
-  - preview clip
-  - thumbnail
-- **Audio utilities**
-  - volume
-  - fade
-  - bitrate
-  - channels
-  - silence-detect
-  - loudnorm
-- **Video utilities**
-  - scale
-  - crop
-  - pad
-  - rotate
-  - fps
-  - brightness / contrast / saturation
-  - blur / sharpen
-  - deinterlace
-- **Smart helpers**
-  - blackdetect
-  - scene-preview
-  - scene-thumbnail
-
-### 5. Media Library + History
-
-RAVN includes a local SQLite-backed media-library system.
-
-Capabilities include:
-
-- add media to a local library
-- automatic registration of supported outputs from:
-  - downloads
-  - conversions
-  - mixer workflows
-  - filter workflows
-  - utility workflows where applicable
-- tags
-- collections
-- search filters
-- duplicate detection
-- bounded recent-search history
-- JSON export
-- CSV export
-- large library exports streamed in batches instead of one large in-memory materialization
-- persisted history for:
-  - downloads
-  - conversions
-  - generic Phase 7 operations
-
-### 6. Queue, Shell, and UX
-
-The desktop shell was redesigned in Phase 8 and now provides a grouped workspace model.
-
-Primary desktop workspaces:
-
-- `Home`
-- `Download`
-- `Studio`
-- `Library`
-
-Shell capabilities include:
-
-- global right-side Queue panel
-- smart download-source routing with manual override when detection should be forced
-- lower-left theme toggle
-- lower-left language toggle
-- lower-left Settings workspace entry
-- shell quick actions
-- command palette (`Ctrl+K`)
-- settings shortcut (`Ctrl+,`)
-- dependency-health summary in `Home` and detailed tool status in `Settings`
-- progressive-disclosure guidance panels
-- mounted workspace switching for lower flicker
-- taskbar-aware, active-monitor-aware startup centering on desktop launch
-- lighter in-place language refresh
-- in-place theme application without full shell rebuild
-- adaptive sizing for compact and wide desktop widths
-- task-snapshot-driven Home/Queue refreshes where practical instead of fixed high-frequency polling
-- in-place Home summary-card updates
-
-Keyboard shortcuts currently active across feature surfaces and shell-level flows include:
-
-- `Ctrl+Enter`
-- `Escape`
-- `Ctrl+L`
-- `Ctrl+K`
-- `Ctrl+,`
-
-### 7. CLI Automation
-
-RAVN exposes a shared-core CLI for scripting and automation.
-
-Current CLI commands:
-
-- `download`
-- `convert`
-- `info`
-- `subtitle`
-- `history`
-- `torrent`
-- `mixer`
-- `library`
-- `filters`
-- `utilities`
-- `serve` placeholder
-
-The `download` CLI now mirrors the project’s intent-driven acquisition model instead of exposing a raw yt-dlp passthrough surface.
-
-That includes support for:
-
-- acquisition profiles
-- naming presets / filename templates
-- subtitle preferences
-- post-process automation
-- robustness controls
-- auth/tuning controls
-- JSON output with effective acquisition summaries
-
-## Desktop Information Architecture
-
-### Home
-
-- quick-start cards
-- recent activity snapshot
-- queue/library context
-- orientation surface for the app
+## Main product areas
 
 ### Download
-
-- one shared source area for URLs / playlists / batches / torrents
-- auto-detected media / playlist / batch / torrent routing with manual override chips
-- `Video` / `Audio` output switching on the shared media surface
-- torrent manager surface when torrent input is active
-- profile-driven acquisition controls
-- compact advanced settings via Settings workspace
+- single URL downloads
+- playlist review and partial selection
+- batch URL downloads
+- torrent and magnet handling through aria2
+- quality / format selection
+- subtitle preferences and embedding
+- post-download automation
+- reusable acquisition profiles
 
 ### Studio
-
-- Convert
-- Subtitle
-- Filters
-- Mixer
-- Utilities
+- **Convert**
+- **Subtitle**
+- **Filters**
+- **Mixer**
+- **Utilities**
 
 ### Library
+- local media catalog
+- aggregated activity history
+- search, tags, collections, export
 
-- media library browsing and management
-- history review
-- export/search-oriented workflows
+### CLI
+- shared-core scripting access for download, convert, history, torrent, mixer, filters, utilities, and library actions
 
-## Current Status
+---
 
-### Complete
+## Download the app
 
-- Phase 1
-- Phase 2
-- Phase 3
-- Phase 4A
-- Phase 4B
-- Phase 4C
-- Phase 4D
-- Phase 5A — runtime dependency health / toolchain UX
-- Phase 5B — shared-runner convergence / runtime process cleanup
-- Phase 5C — UX hardening / scalability investigation
-- Phase 5D — codebase cleanup / wrapper / extension-boundary clarity
-- Phase 5E — optimization / clean code / dead code cleanup
-- Phase 6
-- Phase 7
-- Phase 8
-- yt-dlp acquisition-engine upgrade tasks `YTD-01` through `YTD-11`
+### Windows packaged build
 
-### Open
+RAVN currently targets **Windows packaged releases**.
 
-- Phase 5F clean-machine validation gate for the Windows release track
+Pre-release and release artifacts are published on GitHub Releases and include:
 
-## Technology Stack
+- `RAVN-windows-x64.zip`
+- `RAVN-windows-x64.sha256.txt`
 
-### Application
+If SmartScreen appears, that is expected for unsigned or newly released builds. See the signing note below.
 
-- Python 3.9+
-- CustomTkinter
-- Click
-- SQLite
+---
 
-### External Tools
+## Quick start
 
-- FFmpeg / FFprobe
-- yt-dlp
-- aria2c
+### Option 1: Run from source
 
-### Optional / graceful-degradation pieces
-
-- `tkinterdnd2` for drag-and-drop
-- optional metadata-related runtime paths where available
-
-## Repository Layout
-
-```text
-ravn.py
-setup.py
-build.ps1
-ravn.spec
-ravn_app/
-  cli.py
-  core/
-    runners/
-    persistence/
-    config_paths.py
-    database.py
-    downloader.py
-    converter.py
-    subtitle_manager.py
-    torrent_downloader.py
-    media_helpers.py
-    download_naming.py
-    download_profiles.py
-    download_metadata.py
-    task_manager.py
-    i18n.py
-    logging_config.py
-    theme_catalog.py
-    app_builder.py
-  ui/
-    main_window.py
-    converter_tab.py          # legacy-compatible implementation module
-    download_tab.py           # legacy-compatible alias to ui/tabs/download_tab.py
-    history_settings_tab.py   # shared legacy-compatible implementation module
-    subtitle_tab.py           # legacy-compatible implementation module
-    queue_panel.py
-    components/
-    tabs/                     # canonical desktop feature import surfaces
-  translations/
-    en.json
-    tr.json
-  utils/
-    ffmpeg_checker.py
-    metadata_handler.py
-    system_utils.py
-tests/
-docs/
-tools/
-  phase5e_benchmarks.py
+```bash
+pip install -r requirements.txt
+python ravn.py
 ```
 
-Desktop feature note:
+### Option 2: Install editable package
 
-- `ravn_app.ui.tabs.*` is the canonical import namespace for active desktop feature modules.
-- Legacy `ravn_app.ui.*` feature modules are retained only as compatibility surfaces where noted above.
-- `ravn_app.core.plugin_system` is experimental only and is not auto-loaded by the desktop app or CLI.
+```bash
+pip install -e .
+python ravn.py
+```
 
-## Requirements
+### CLI examples
 
-**For detailed dependency information, installation instructions, and troubleshooting, see [DEPENDENCIES.md](DEPENDENCIES.md).**
+```bash
+python -m ravn_app.cli download "https://example.com/video" --profile archive --subtitle-lang en --postprocess-embed-subtitles --json
+python -m ravn_app.cli convert input.mp4 --format mkv --quality high
+python -m ravn_app.cli torrent "magnet:?xt=urn:btih:..." --sequential
+ravn library search --query video --format mp4 --tags tutorial --json
+ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
+```
 
-### Quick Overview
+---
 
-**Required:**
+## Dependencies
 
+### Required
 - Python 3.9+
-- FFmpeg and FFprobe (for video/audio processing)
-- yt-dlp (for media downloads)
+- FFmpeg
+- FFprobe
+- yt-dlp
 - Python packages from `requirements.txt`
 
-**Optional:**
+### Optional
+- `aria2c` for torrent / magnet support
+- `tkinterdnd2` for drag-and-drop
 
-- aria2c (for torrent/magnet support)
-- tkinterdnd2 (for drag-and-drop functionality)
-
-Examples:
+Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Torrent prerequisite examples:
+Example `aria2` installs:
 
 ```bash
 winget install aria2
@@ -442,131 +190,146 @@ brew install aria2
 sudo apt install aria2
 ```
 
-**Tool Health Check:**
+For dependency troubleshooting and setup details, see **[DEPENDENCIES.md](DEPENDENCIES.md)**.
 
-RAVN includes built-in dependency checking. After launch, check Settings (Ctrl+,) → "Tool Status and Dependencies" to see which tools are available and which features require missing tools.
+---
 
-## Run
+## Desktop workspaces
 
-### Desktop
+### Home
+- quick actions
+- tool/dependency health summary
+- recent activity and queue context
 
-```bash
-python ravn.py
-```
+### Download
+- smart source routing
+- media / playlist / batch / torrent flows
+- profile-driven acquisition controls
 
-Alternative module form:
+### Studio
+- conversion, subtitle, filters, mixer, utilities
 
-```bash
-python -m ravn_app.ui.main_window
-```
+### Library
+- media library browsing
+- history review
+- search and export workflows
 
-### Install editable package
+---
 
-```bash
-pip install -e .
-```
+## Release status
 
-### CLI examples
+Current public release track:
 
-Acquisition examples:
+- Windows packaged builds are published through GitHub Releases
+- tagged releases can publish `zip` + `SHA256` artifacts automatically
+- tags that include a hyphen, such as `v1.1.0-rc2`, publish as **GitHub prereleases**
+- bundled FFmpeg / FFprobe runtime lookup is supported in packaged Windows builds
+- Windows child tool console popups are suppressed on the main GUI runtime paths
 
-```bash
-python -m ravn_app.cli download "https://example.com/video" --profile archive --subtitle-lang en --postprocess-embed-subtitles --json
-python -m ravn_app.cli download "https://example.com/channel/track" --profile music --extract-audio --convert-to m4a --output ./downloads
-python -m ravn_app.cli download "https://example.com/video" --profile social-clip --format mp4 --quality 720p
-python -m ravn_app.cli download "https://example.com/video" --cookies-from-browser firefox --cookies-profile Default --json
-```
+Latest validated automated test baseline:
 
-Other CLI examples:
+- `pytest -q` → `644 passed, 1 skipped`
 
-```bash
-python -m ravn_app.cli convert input.mp4 --format mkv --quality high
-python -m ravn_app.cli torrent "magnet:?xt=urn:btih:..." --sequential
-ravn mixer audio --input intro.mp3 --input main.mp3 --crossfade 1.5 --output merged.mp3
-ravn mixer video clip1.mp4 clip2.mp4 --operation concat --output combined.mp4
-ravn library add ./video.mp4 --title "My Video" --tags work,tutorial
-ravn library search --query video --format mp4 --tags tutorial --json
-ravn filters input.mp4 --brightness 20 --contrast 1.2 --blur 2 --output filtered.mp4
-ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
-```
+For the validated implementation snapshot, see **[PROGRESS.md](PROGRESS.md)**.
 
-## Testing
+---
 
-Verified on 2026-04-05:
+## Build and packaging
 
-- Full baseline:
-  - `pytest -q`
-  - `644 passed, 1 skipped` (`645` collected)
-- Required UI logic sweep:
-  - `pytest -q tests/test_ui_logic.py`
-  - `90 passed`
-- Required UI components + builder sweep:
-  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
-  - `37 passed`
-- Required config/database sweep:
-  - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
-  - `58 passed`
-- Targeted Phase 5E optimization sweep:
-  - `pytest -q tests/test_media_library.py tests/test_library_sync.py tests/test_task_manager.py tests/test_database_manager.py tests/test_ui_logic.py`
-  - `145 passed`
-- Phase 5E benchmark harness:
-  - `python tools/phase5e_benchmarks.py --output docs/phase5e_benchmark_results.json`
-  - benchmark artifact refreshed successfully
-
-Useful commands:
-
-```bash
-pytest
-pytest -q --tb=no
-pytest --collect-only -q
-pytest tests/test_ui_logic.py -q
-```
-
-## Build / Packaging Reality
-
-Build/distribution work now includes a concrete **Windows-first packaging pipeline**.
-
-Current repo artifacts include:
+Local Windows packaging uses:
 
 - `build.ps1`
 - `ravn.spec`
 - `.github/workflows/windows-package.yml`
 - `.github/workflows/windows-release.yml`
-- `assets/ffmpeg/win64/README.md`
-- `docs/phase5f_windows_packaging.md`
-- `ravn_app/core/app_builder.py`
 
-Current release state:
+Typical commands:
 
-- bundled FFmpeg/FFprobe layout is defined under `assets/ffmpeg/win64/`
-- runtime lookup now prefers bundled FFmpeg/FFprobe before PATH fallback
-- Windows runner/tool-health subprocess launches now suppress stray child console windows where practical
-- `build.ps1` can prepare bundled runtime, run verification, build the PyInstaller package, and emit a zip + checksum
-- CI can build Windows artifacts
-- tagged releases can publish Windows zip artifacts automatically
-- tags that include a hyphen (for example `v1.1.0-rc1`) publish as GitHub prereleases
-- the final open release gate is still clean-machine validation of the packaged app
+```powershell
+./build.ps1 -Action check
+./build.ps1 -Action package
+./build.ps1 -Action ci-package -DownloadBundledFFmpeg
+```
 
-## Documentation Map
+Smoke validation helper:
 
-- `AGENTS.md` — canonical shared agent workflow guide
-- `CLAUDE.md` — Claude-oriented repo entrypoint and condensed engineering guidance
-- `ARCHITECTURE.md` — full system structure, runtime flows, and module map
-- `PROGRESS.md` — validated implementation snapshot
-- `TASKS.md` — backlog, hardening roadmap, and Phase 5 Windows release plan
-- `OPTIMIZATIONS.md` — completed Phase 5E optimization / cleanup checklist
-- `docs/phase5b_subprocess_audit.md` — shared-runner convergence audit and subprocess classification record
-- `docs/phase5e_optimization_baseline.md` — first landed Phase 5E optimization slice, evidence, and deliberate non-changes
-- `docs/phase5e_dead_code_audit.md` — Phase 5E dead-code / wrapper audit closeout
-- `docs/phase5e_benchmark_closeout.md` — repeatable benchmark methodology and measured closeout summary
-- `docs/phase5e_benchmark_results.json` — raw Phase 5E benchmark artifact
-- `docs/phase5c_ux_scalability.md` — UX hardening, hotspot measurements, and scalability mitigation record
-- `docs/phase5d_wrapper_boundary_clarity.md` — canonical desktop import surfaces, wrapper inventory, and experimental plugin-boundary decision
-- `docs/phase5f_windows_packaging.md` — Windows bundled-runtime strategy, packaging commands, CI/release workflow behavior, validation checklist, and signing path
+```powershell
+pwsh -ExecutionPolicy Bypass -File .\tools\windows_package_smoke.ps1 -PackageRoot .\dist\RAVN
+```
 
-## Current Priorities
+Detailed packaging notes live in **[docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md)**.
 
-1. Execute the final clean-machine Windows packaging validation gate and record results.
-2. Maintain and harden the completed workspace shell, acquisition pipeline, staged playlist metadata flow, media-library flows, dependency-health UX, shared-runner boundaries, canonical desktop import surfaces, and measured list-heavy UI paths.
-3. Use the completed Phase 5E docs/benchmarks plus the new Phase 5F packaging pipeline as the release baseline.
-4. Avoid reintroducing parallel execution paths or implying unsupported plugin behavior.
+---
+
+## SmartScreen and code signing
+
+Public Windows builds can still show **SmartScreen** warnings if they are unsigned or newly published.
+
+Current practical guidance:
+
+- download only from GitHub Releases
+- verify the included SHA256 checksum
+- use prereleases for early validation when needed
+- long-term, use a **code-signing certificate** for stronger Windows trust and clearer publisher identity
+
+## Known limitations
+
+- Windows is the primary packaged-release target right now
+- public builds may still trigger SmartScreen until code signing is added and reputation builds over time
+- torrent reliability still depends on peer / tracker availability and local network conditions
+
+---
+
+## Documentation
+
+### User and operator docs
+- [DEPENDENCIES.md](DEPENDENCIES.md) — setup, required tools, and troubleshooting
+- [docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md) — Windows packaging, release workflow, smoke validation, and signing notes
+- [PROGRESS.md](PROGRESS.md) — validated repository snapshot
+
+### Engineering docs
+- [ARCHITECTURE.md](ARCHITECTURE.md) — runtime flows and module boundaries
+- [TASKS.md](TASKS.md) — active backlog and release-readiness plan
+- [OPTIMIZATIONS.md](OPTIMIZATIONS.md) — optimization closeout notes
+
+---
+
+## Repository layout
+
+```text
+ravn.py
+build.ps1
+ravn.spec
+ravn_app/
+  cli.py
+  core/
+  ui/
+  translations/
+  utils/
+docs/
+tests/
+tools/
+```
+
+Canonical active desktop feature imports live under:
+
+- `ravn_app.ui.tabs.*`
+
+---
+
+## Development and testing
+
+Useful commands:
+
+```bash
+pytest -q
+pytest -q tests/test_ui_logic.py
+pytest -q tests/test_ui_components.py tests/test_app_builder.py
+pytest -q tests/test_config_paths.py tests/test_database_manager.py
+```
+
+---
+
+## License
+
+Add your preferred license information here if / when the project is published under a formal license.

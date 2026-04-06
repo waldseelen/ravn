@@ -128,14 +128,35 @@ function Invoke-PackageBuild {
     }
 }
 
+function Get-Sha256Hex([string]$FilePath) {
+    if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
+        return (Get-FileHash -Algorithm SHA256 -Path $FilePath).Hash
+    }
+
+    $stream = [System.IO.File]::OpenRead($FilePath)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $hashBytes = $sha.ComputeHash($stream)
+            return ([System.BitConverter]::ToString($hashBytes)).Replace('-', '')
+        }
+        finally {
+            $sha.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 function New-ReleaseArtifacts {
     Write-Section 'Creating distributable archive'
     if (Test-Path $ArtifactZip) {
         Remove-Item $ArtifactZip -Force
     }
     Compress-Archive -Path (Join-Path $DistRoot 'RAVN\*') -DestinationPath $ArtifactZip -Force
-    $hash = Get-FileHash -Algorithm SHA256 -Path $ArtifactZip
-    Set-Content -Path $ChecksumFile -Value ("{0}  {1}" -f $hash.Hash, (Split-Path $ArtifactZip -Leaf))
+    $hash = Get-Sha256Hex -FilePath $ArtifactZip
+    Set-Content -Path $ChecksumFile -Value ("{0}  {1}" -f $hash, (Split-Path $ArtifactZip -Leaf))
     Write-Host "Archive: $ArtifactZip" -ForegroundColor Green
     Write-Host "Checksum: $ChecksumFile" -ForegroundColor Green
 }

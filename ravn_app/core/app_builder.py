@@ -3,6 +3,7 @@ PyInstaller Desktop Uygulaması Oluşturucu
 Windows, macOS ve Linux için tek kaynak koddan executable oluşturur
 """
 
+import importlib.util
 import os
 import sys
 import subprocess
@@ -47,22 +48,25 @@ class AppBuilder:
 
     def check_requirements(self) -> bool:
         """PyInstaller ve gerekli bağımlılıkları kontrol et"""
-        required_packages = [
-            'PyInstaller',
-            'customtkinter',
-            'yt-dlp',
-            'pillow',
+        required_packages = {
+            'PyInstaller': 'PyInstaller',
+            'customtkinter': 'customtkinter',
+            'yt-dlp': 'yt_dlp',
+            'pillow': 'PIL',
+        }
+
+        missing_packages = [
+            package_name
+            for package_name, import_name in required_packages.items()
+            if importlib.util.find_spec(import_name) is None
         ]
 
-        try:
-            for package in required_packages:
-                __import__(package.replace('-', '_'))
-
-            logger.info("✅ Tüm gerekli paketler yüklü")
-            return True
-        except ImportError as e:
-            logger.error(f"❌ Eksik paket: {e}")
+        if missing_packages:
+            logger.error("❌ Eksik paketler: %s", ", ".join(missing_packages))
             return False
+
+        logger.info("✅ Tüm gerekli paketler yüklü")
+        return True
 
     def check_ffmpeg(self) -> bool:
         """FFmpeg ve FFprobe'un yüklü olup olmadığını kontrol et"""

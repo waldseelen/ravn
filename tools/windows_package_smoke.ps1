@@ -52,12 +52,18 @@ if ($env:OS -ne 'Windows_NT') {
 }
 
 $results = [System.Collections.Generic.List[object]]::new()
-$packageRootResolved = [System.IO.Path]::GetFullPath($PackageRoot)
+$packageRootResolved = if ([System.IO.Path]::IsPathRooted($PackageRoot)) {
+    [System.IO.Path]::GetFullPath($PackageRoot)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $PWD.Path $PackageRoot))
+}
 $exePath = Join-Path $packageRootResolved 'RAVN.exe'
-$bundledFFmpeg = Join-Path $packageRootResolved 'assets\ffmpeg\win64\ffmpeg.exe'
-$bundledFFprobe = Join-Path $packageRootResolved 'assets\ffmpeg\win64\ffprobe.exe'
-$translationEn = Join-Path $packageRootResolved 'ravn_app\translations\en.json'
-$translationTr = Join-Path $packageRootResolved 'ravn_app\translations\tr.json'
+$internalRoot = Join-Path $packageRootResolved '_internal'
+$bundledFFmpeg = Join-Path $internalRoot 'assets\ffmpeg\win64\ffmpeg.exe'
+$bundledFFprobe = Join-Path $internalRoot 'assets\ffmpeg\win64\ffprobe.exe'
+$translationEn = Join-Path $internalRoot 'ravn_app\translations\en.json'
+$translationTr = Join-Path $internalRoot 'ravn_app\translations\tr.json'
 
 $appDataRoot = Join-Path $env:APPDATA 'ravn'
 $dataRoot = Join-Path $appDataRoot 'data'
@@ -119,6 +125,14 @@ Write-Section 'Manual validation checklist'
 
 if (-not $ReportPath) {
     $ReportPath = Join-Path $packageRootResolved 'windows-package-smoke-report.json'
+}
+elseif (-not [System.IO.Path]::IsPathRooted($ReportPath)) {
+    $ReportPath = [System.IO.Path]::GetFullPath((Join-Path $PWD.Path $ReportPath))
+}
+
+$reportDirectory = Split-Path -Parent $ReportPath
+if ($reportDirectory -and -not (Test-Path $reportDirectory)) {
+    New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
 }
 
 $results | ConvertTo-Json -Depth 3 | Set-Content -Path $ReportPath -Encoding UTF8

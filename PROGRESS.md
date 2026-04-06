@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-Verified on 2026-04-03.
+Verified on 2026-04-05.
 
 This file is the validated implementation snapshot for the current repository state.
 
@@ -19,6 +19,7 @@ This file is the validated implementation snapshot for the current repository st
 - Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
 - Theme system is strict two-theme (`dark`, `light`) with legacy normalization.
 - Localization is active through `ravn_app/core/i18n.py` and `ravn_app/translations/`.
+- Windows packaging now has a concrete bundled-runtime strategy through `ravn.spec`, `build.ps1`, `assets/ffmpeg/win64/`, and GitHub Actions packaging/release workflows.
 
 ### Desktop shell / UX
 
@@ -146,26 +147,23 @@ Recent validated UX/settings realities:
 
 ## Validation Status
 
-Verified on 2026-04-03:
+Verified on 2026-04-05:
 
 - Full suite:
   - `pytest -q`
-  - `578 passed, 1 skipped` (`579` collected)
-- CLI + acquisition regression sweep:
-  - `pytest -q tests/test_cli.py tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `245 passed, 1 skipped`
-- Acquisition-engine regression sweep:
-  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_runners.py`
-  - `206 passed, 1 skipped`
-- Playlist/download regression sweep:
-  - `pytest -q tests/test_ui_logic.py tests/test_runners.py`
-  - `147 passed`
-- Download/settings regression sweep:
-  - `pytest -q tests/test_core.py tests/test_ui_logic.py tests/test_config_paths.py tests/test_database_manager.py`
-  - `137 passed, 1 skipped`
-- UI/i18n/design-token regression sweep:
-  - `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py`
-  - `108 passed`
+  - `641 passed, 1 skipped` (`642` collected)
+- Required UI logic sweep:
+  - `pytest -q tests/test_ui_logic.py`
+  - `90 passed`
+- Required UI components + builder sweep:
+  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
+  - `37 passed`
+- Required config/database sweep:
+  - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
+  - `58 passed`
+- Packaging/runtime helper sweep:
+  - `pytest -q tests/test_media_helpers.py tests/test_ffmpeg_checker.py`
+  - `9 passed`
 
 ---
 
@@ -214,7 +212,7 @@ Verified on 2026-04-03:
 
 The main open project area is still **Phase 5 release readiness and Windows packaging**.
 
-Current build/distribution artifacts exist (`build.ps1`, `ravn.spec`, `app_builder.py`), but the packaged delivery story is not yet finished. The current documented direction is to harden runtime/tooling behavior first, then complete a **Windows-only** packaging/release pipeline.
+Current build/distribution artifacts now include a Windows-first packaging pipeline (`build.ps1`, `ravn.spec`, `.github/workflows/windows-package.yml`, `.github/workflows/windows-release.yml`, `assets/ffmpeg/win64/`, and `docs/phase5f_windows_packaging.md`). The remaining open release gate is clean-machine validation of the packaged app before calling Phase 5F complete.
 
 ---
 

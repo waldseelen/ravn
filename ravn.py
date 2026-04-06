@@ -8,6 +8,7 @@ import logging
 from ravn_app.core.config_paths import ensure_directories_exist, migrate_all_legacy_files
 from ravn_app.core.logging_config import setup_logging
 from ravn_app.core.tool_health import get_tool_health_checker
+from ravn_app.utils.ffmpeg_checker import configure_ffmpeg_runtime
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,9 @@ def main():
     ensure_directories_exist()
     migrate_all_legacy_files()
     
+    # Make bundled FFmpeg/FFprobe visible before any runtime/tool checks.
+    configure_ffmpeg_runtime()
+
     # Check tool dependencies at startup
     check_tool_dependencies()
 

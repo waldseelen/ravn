@@ -643,26 +643,19 @@ class MediaHelpers:
                 error_message=f"Input file not found: {input_file}",
             )
 
-        # Use silencedetect filter with dummy output
-        cmd = [
-            self.runner.executable_path,
-            "-i", input_file,
-            "-af", f"silencedetect=n={noise_threshold_db}dB:d={min_duration}",
-            "-f", "null",
-            "-"
-        ]
-
         logger.info(f"Detecting silence in {input_file} (threshold={noise_threshold_db}dB, min_duration={min_duration}s)")
 
-        import subprocess
         try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
+            result = self.runner.run_raw(
+                [
+                    "-i", input_file,
+                    "-af", f"silencedetect=n={noise_threshold_db}dB:d={min_duration}",
+                    "-f", "null",
+                    "-",
+                ],
                 timeout=300,
             )
-            stderr = proc.stderr
+            stderr = result.stderr
 
             # Parse silence detection output
             import re
@@ -686,12 +679,6 @@ class MediaHelpers:
                     silence_periods.append((current_start, end_time, duration))
                     current_start = None
 
-            result = RunnerResult(
-                success=True,
-                return_code=0,
-                stdout="",
-                stderr=stderr,
-            )
             result.metadata["operation"] = "detect_silence"
             result.metadata["silence_periods"] = silence_periods
             result.metadata["threshold_db"] = noise_threshold_db
@@ -699,12 +686,6 @@ class MediaHelpers:
 
             return result
 
-        except subprocess.TimeoutExpired:
-            return RunnerResult(
-                success=False,
-                return_code=-1,
-                error_message="Silence detection timed out",
-            )
         except Exception as e:
             return RunnerResult(
                 success=False,
@@ -1283,27 +1264,20 @@ class MediaHelpers:
                 error_message=f"Input file not found: {input_file}",
             )
 
-        # Use blackdetect filter
-        cmd = [
-            self.runner.executable_path,
-            "-i", input_file,
-            "-vf", f"blackdetect=d={black_duration_min}:pix_th={black_threshold}",
-            "-f", "null",
-            "-"
-        ]
-
         logger.info(f"Detecting black frames in {input_file} (threshold={black_threshold}, min_duration={black_duration_min}s)")
 
-        import subprocess
         import re
         try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
+            result = self.runner.run_raw(
+                [
+                    "-i", input_file,
+                    "-vf", f"blackdetect=d={black_duration_min}:pix_th={black_threshold}",
+                    "-f", "null",
+                    "-",
+                ],
                 timeout=600,
             )
-            stderr = proc.stderr
+            stderr = result.stderr
 
             # Parse blackdetect output
             black_start_pattern = re.compile(r"black_start:([\d.]+)")
@@ -1326,12 +1300,6 @@ class MediaHelpers:
                     black_periods.append((current_start, end_time, duration))
                     current_start = None
 
-            result = RunnerResult(
-                success=True,
-                return_code=0,
-                stdout="",
-                stderr=stderr,
-            )
             result.metadata["operation"] = "detect_black_frames"
             result.metadata["black_periods"] = black_periods
             result.metadata["threshold"] = black_threshold
@@ -1339,12 +1307,6 @@ class MediaHelpers:
 
             return result
 
-        except subprocess.TimeoutExpired:
-            return RunnerResult(
-                success=False,
-                return_code=-1,
-                error_message="Black frame detection timed out",
-            )
         except Exception as e:
             return RunnerResult(
                 success=False,
@@ -1388,27 +1350,20 @@ class MediaHelpers:
 
         os.makedirs(output_dir, exist_ok=True)
 
-        # First, detect scene changes using scenedetect filter
-        cmd = [
-            self.runner.executable_path,
-            "-i", input_file,
-            "-vf", "select='gt(scene,0.3)',showinfo",
-            "-f", "null",
-            "-"
-        ]
-
         logger.info(f"Detecting scenes in {input_file}")
 
-        import subprocess
         import re
         try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
+            detection_result = self.runner.run_raw(
+                [
+                    "-i", input_file,
+                    "-vf", "select='gt(scene,0.3)',showinfo",
+                    "-f", "null",
+                    "-",
+                ],
                 timeout=600,
             )
-            stderr = proc.stderr
+            stderr = detection_result.stderr
 
             # Parse scene timestamps from showinfo output
             pts_time_pattern = re.compile(r"pts_time:([\d.]+)")
@@ -1469,12 +1424,6 @@ class MediaHelpers:
 
             return result
 
-        except subprocess.TimeoutExpired:
-            return RunnerResult(
-                success=False,
-                return_code=-1,
-                error_message="Scene detection timed out",
-            )
         except Exception as e:
             return RunnerResult(
                 success=False,
@@ -1516,27 +1465,20 @@ class MediaHelpers:
 
         os.makedirs(output_dir, exist_ok=True)
 
-        # Detect scene changes
-        cmd = [
-            self.runner.executable_path,
-            "-i", input_file,
-            "-vf", "select='gt(scene,0.3)',showinfo",
-            "-f", "null",
-            "-"
-        ]
-
         logger.info(f"Detecting scenes in {input_file} for thumbnail generation")
 
-        import subprocess
         import re
         try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
+            detection_result = self.runner.run_raw(
+                [
+                    "-i", input_file,
+                    "-vf", "select='gt(scene,0.3)',showinfo",
+                    "-f", "null",
+                    "-",
+                ],
                 timeout=600,
             )
-            stderr = proc.stderr
+            stderr = detection_result.stderr
 
             # Parse scene timestamps
             pts_time_pattern = re.compile(r"pts_time:([\d.]+)")
@@ -1592,12 +1534,6 @@ class MediaHelpers:
 
             return result
 
-        except subprocess.TimeoutExpired:
-            return RunnerResult(
-                success=False,
-                return_code=-1,
-                error_message="Scene detection timed out",
-            )
         except Exception as e:
             return RunnerResult(
                 success=False,

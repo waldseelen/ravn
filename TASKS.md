@@ -238,19 +238,19 @@ Goal: after runtime/tooling/hardening work is sufficiently stable, produce a tru
 
 ### Confirmed Risks
 
-- The repo already contains packaging scaffolding (`build.ps1`, `ravn.spec`, `app_builder.py`) but not a finished release pipeline
-- Bundled FFmpeg strategy is not yet finalized
+- The repo already contains packaging scaffolding (`build.ps1`, `ravn.spec`, `app_builder.py`) and now has a Windows-first release pipeline, but one manual clean-machine validation gate remains
+- Bundled FFmpeg strategy is now defined around `assets/ffmpeg/win64/`, runtime path auto-detection, and PyInstaller asset bundling
 - Clean-machine validation has not yet closed the loop
-- Release/signing automation remains open
+- Signing strategy is documented, but public release signing still depends on certificate provisioning
 
 ### Tasks
 
-- [ ] **[BLD-01]** Update `ravn.spec` so Windows packaging has a clear bundled-runtime strategy for FFmpeg / FFprobe and required assets
-- [ ] **[BLD-02]** Add a bundled FFmpeg asset layout for Windows (for example `assets/ffmpeg/win64/`) and document how packaged builds consume it
-- [ ] **[BLD-03]** Extend `ravn_app/utils/ffmpeg_checker.py` to detect bundled FFmpeg/FFprobe before falling back to system PATH lookup
-- [ ] **[BLD-04]** Expand `build.ps1` from a developer helper script into a Windows packaging pipeline
-- [ ] **[BLD-05]** Add a Windows-focused CI artifact build workflow
-- [ ] **[BLD-06]** Add automated Windows release publishing workflow for tagged releases
+- [x] **[BLD-01]** Update `ravn.spec` so Windows packaging has a clear bundled-runtime strategy for FFmpeg / FFprobe and required assets
+- [x] **[BLD-02]** Add a bundled FFmpeg asset layout for Windows (for example `assets/ffmpeg/win64/`) and document how packaged builds consume it
+- [x] **[BLD-03]** Extend `ravn_app/utils/ffmpeg_checker.py` to detect bundled FFmpeg/FFprobe before falling back to system PATH lookup
+- [x] **[BLD-04]** Expand `build.ps1` from a developer helper script into a Windows packaging pipeline
+- [x] **[BLD-05]** Add a Windows-focused CI artifact build workflow
+- [x] **[BLD-06]** Add automated Windows release publishing workflow for tagged releases
 - [ ] **[BLD-07]** Validate packaged behavior on a clean Windows machine / VM:
   - app launch
   - config-dir creation
@@ -259,7 +259,7 @@ Goal: after runtime/tooling/hardening work is sufficiently stable, produce a tru
   - conversion
   - queue/history basics
   - library auto-add basics
-- [ ] **[BLD-08]** Add executable signing strategy for Windows (minimum viable documented signing path)
+- [x] **[BLD-08]** Add executable signing strategy for Windows (minimum viable documented signing path)
 
 ### Acceptance Focus
 
@@ -267,6 +267,8 @@ Goal: after runtime/tooling/hardening work is sufficiently stable, produce a tru
 - Bundled/runtime FFmpeg is discoverable and usable
 - Theme/i18n/assets still load correctly
 - Download/convert/history/library basics work in the packaged build
+
+**Status:** Phase 5F packaging pipeline implementation is largely complete; clean-machine validation (`BLD-07`) remains the final open release gate.
 
 ---
 

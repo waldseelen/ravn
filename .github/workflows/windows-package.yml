@@ -1,0 +1,42 @@
+name: windows-package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Build Windows package
+        shell: pwsh
+        run: |
+          ./build.ps1 -Action ci-package -DownloadBundledFFmpeg
+
+      - name: Upload packaged folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAVN-windows-folder
+          path: dist/RAVN
+
+      - name: Upload distributable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAVN-windows-x64
+          path: |
+            dist/RAVN-windows-x64.zip
+            dist/RAVN-windows-x64.sha256.txt

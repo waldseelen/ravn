@@ -1,42 +1,38 @@
-"""
-RAVN - Desktop Uygulama Kurulumu (PyInstaller ile)
-Bu dosya PyInstaller tarafından kullanılacak spec dosyasını oluşturmak için gereklidir
-"""
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec for the Windows RAVN desktop build."""
 
-import sys
+from __future__ import annotations
+
 from pathlib import Path
-from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
+
+from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ
 from PyInstaller.building.datastruct import Tree
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Proje kök dizini
-project_root = Path(__file__).parent
-app_dir = project_root / "ravn_app"
 
-# Veri dosyaları
-datas = [
-    # İkonlar ve görseller
-    (str(app_dir / "assets"), "assets") if (app_dir / "assets").exists() else None,
-    # Konfigürasyon dosyaları
-    (str(project_root / "ravn_config.json"), "."),
-]
+project_root = Path(__file__).resolve().parent
+assets_dir = project_root / "assets"
+translations_dir = project_root / "ravn_app" / "translations"
 
-# None değerleri kaldır
-datas = [d for d in datas if d is not None]
 
-# Gizli içe aktarmalar (PyInstaller tarafından otomatik olarak bulunamayan)
-hiddenimports = [
-    'customtkinter',
-    'PIL',
-    'yt_dlp',
-    'sqlite3',
-    'logging',
-    'json',
-    'pathlib',
-    'subprocess',
-    'threading',
-    'queue',
-    'importlib',
-]
+datas = []
+if assets_dir.exists():
+    datas.append(Tree(str(assets_dir), prefix="assets"))
+if translations_dir.exists():
+    datas.append(Tree(str(translations_dir), prefix="ravn_app/translations"))
+
+datas += collect_data_files("customtkinter")
+datas += collect_data_files("tkinterdnd2", include_py_files=False)
+
+hiddenimports = sorted(
+    {
+        *collect_submodules("PIL"),
+        *collect_submodules("yt_dlp"),
+        *collect_submodules("tkinterdnd2"),
+        "customtkinter",
+    }
+)
+
 
 a = Analysis(
     [str(project_root / "ravn.py")],
@@ -47,35 +43,25 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludedimports=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=None,
+    excludes=[],
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='RAVN',
+    exclude_binaries=True,
+    name="RAVN",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,  # Windows'ta console penceresi açma
+    upx=False,
+    console=False,
     disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=None,  # İkon dosyası varsa buraya ekle
+    icon=str(assets_dir / "ravn.ico") if (assets_dir / "ravn.ico").exists() else None,
 )
 
 coll = COLLECT(
@@ -84,7 +70,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
-    name='RAVN'
+    name="RAVN",
 )

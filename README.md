@@ -5,8 +5,8 @@ RAVN is a desktop + CLI media application for **acquiring, processing, organizin
 - **Desktop runtime:** CustomTkinter
 - **CLI runtime:** Click
 - **Primary external tools:** FFmpeg / FFprobe, yt-dlp, aria2c
-- **Current product state:** Phases 1–4D, Phase 5A, Phase 5B, Phase 5C, Phase 5D, Phase 5E, Phase 6, Phase 7, and Phase 8 are complete
-- **Open major area:** Phase 5F build / packaging / distribution follow-up work after the completed Phase 5E optimization closeout
+- **Current product state:** Phases 1–4D, Phase 5A, Phase 5B, Phase 5C, Phase 5D, Phase 5E, Phase 6, Phase 7, and Phase 8 are complete; the Phase 5F Windows packaging pipeline is now implemented except for final clean-machine validation
+- **Open major area:** Phase 5F clean-machine release validation / sign-and-publish closeout for the Windows distributable
 
 RAVN is no longer just a thin yt-dlp front-end. The project now behaves as a broader **media acquisition + studio + library** system built around shared runners, queue/history persistence, and automatic media-library registration.
 
@@ -333,7 +333,7 @@ That includes support for:
 
 ### Open
 
-- Phase 5F build / packaging / distribution follow-up track
+- Phase 5F clean-machine validation gate for the Windows release track
 
 ## Technology Stack
 
@@ -496,10 +496,10 @@ Verified on 2026-04-05:
 
 - Full baseline:
   - `pytest -q`
-  - `633 passed, 1 skipped` (`634` collected)
+  - `641 passed, 1 skipped` (`642` collected)
 - Required UI logic sweep:
   - `pytest -q tests/test_ui_logic.py`
-  - `87 passed`
+  - `90 passed`
 - Required UI components + builder sweep:
   - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
   - `37 passed`
@@ -524,15 +524,26 @@ pytest tests/test_ui_logic.py -q
 
 ## Build / Packaging Reality
 
-Build/distribution work exists but is **not finished**.
+Build/distribution work now includes a concrete **Windows-first packaging pipeline**.
 
 Current repo artifacts include:
 
 - `build.ps1`
 - `ravn.spec`
+- `.github/workflows/windows-package.yml`
+- `.github/workflows/windows-release.yml`
+- `assets/ffmpeg/win64/README.md`
+- `docs/phase5f_windows_packaging.md`
 - `ravn_app/core/app_builder.py`
 
-However, Phase 5 remains open. Current packaging work should be treated as a **Windows-first release track** after runtime hardening, dependency UX, and remaining architecture cleanup are in acceptable shape.
+Current release state:
+
+- bundled FFmpeg/FFprobe layout is defined under `assets/ffmpeg/win64/`
+- runtime lookup now prefers bundled FFmpeg/FFprobe before PATH fallback
+- `build.ps1` can prepare bundled runtime, run verification, build the PyInstaller package, and emit a zip + checksum
+- CI can build Windows artifacts
+- tagged releases can publish Windows zip artifacts automatically
+- the final open release gate is still clean-machine validation of the packaged app
 
 ## Documentation Map
 
@@ -549,10 +560,11 @@ However, Phase 5 remains open. Current packaging work should be treated as a **W
 - `docs/phase5e_benchmark_results.json` — raw Phase 5E benchmark artifact
 - `docs/phase5c_ux_scalability.md` — UX hardening, hotspot measurements, and scalability mitigation record
 - `docs/phase5d_wrapper_boundary_clarity.md` — canonical desktop import surfaces, wrapper inventory, and experimental plugin-boundary decision
+- `docs/phase5f_windows_packaging.md` — Windows bundled-runtime strategy, packaging commands, CI/release workflow behavior, validation checklist, and signing path
 
 ## Current Priorities
 
-1. Complete the remaining Windows-only Phase 5 packaging/release pipeline.
+1. Execute the final clean-machine Windows packaging validation gate and record results.
 2. Maintain and harden the completed workspace shell, acquisition pipeline, staged playlist metadata flow, media-library flows, dependency-health UX, shared-runner boundaries, canonical desktop import surfaces, and measured list-heavy UI paths.
-3. Use the completed Phase 5E docs/benchmarks as the optimization baseline for packaging validation.
+3. Use the completed Phase 5E docs/benchmarks plus the new Phase 5F packaging pipeline as the release baseline.
 4. Avoid reintroducing parallel execution paths or implying unsupported plugin behavior.

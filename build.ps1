@@ -1,123 +1,197 @@
-# RAVN Build Script
-# Proje yapısını kontrol et ve gerekli dosyaları kur
-
+[CmdletBinding()]
 param(
-    [string]$Action = "check"
+    [ValidateSet('check', 'test', 'bundle-ffmpeg', 'package', 'ci-package', 'clean')]
+    [string]$Action = 'package',
+    [string]$PythonExe = 'python',
+    [switch]$SkipTests,
+    [switch]$DownloadBundledFFmpeg,
+    [string]$FFmpegArchive = '',
+    [string]$FFmpegArchiveUrl = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip',
+    [string]$ArtifactName = 'RAVN-windows-x64'
 )
 
-Write-Host "╔════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║   RAVN - Media Downloader Builder     ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
-function Check-Environment {
-    Write-Host "🔍 Ortam kontrolü yapılıyor..." -ForegroundColor Yellow
+$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AssetsRoot = Join-Path $ProjectRoot 'assets\ffmpeg\win64'
+$BuildRoot = Join-Path $ProjectRoot 'build'
+$DistRoot = Join-Path $ProjectRoot 'dist'
+$ArtifactZip = Join-Path $DistRoot "$ArtifactName.zip"
+$ChecksumFile = Join-Path $DistRoot "$ArtifactName.sha256.txt"
 
-    # Python kontrolü
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        $pythonVersion = python --version
-        Write-Host "✓ Python: $pythonVersion" -ForegroundColor Green
-    }
-    else {
-        Write-Host "✗ Python bulunamadı!" -ForegroundColor Red
-        return $false
-    }
-
-    # FFmpeg kontrolü
-    if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
-        Write-Host "✓ FFmpeg: Kurulu" -ForegroundColor Green
-    }
-    else {
-        Write-Host "⚠ FFmpeg bulunamadı. Uygulama başlatıldığında indirilecek." -ForegroundColor Yellow
-    }
-
-    # Bağımlılıklar kontrolü
-    if (Test-Path "requirements.txt") {
-        Write-Host "✓ requirements.txt: Bulundu" -ForegroundColor Green
-    }
-    else {
-        Write-Host "✗ requirements.txt bulunamadı!" -ForegroundColor Red
-        return $false
-    }
-
-    return $true
+function Write-Section([string]$Message) {
+    Write-Host "`n=== $Message ===" -ForegroundColor Cyan
 }
 
-function Install-ProjectDependencies {
-    Write-Host "`n📦 Bağımlılıklar kuruluyor..." -ForegroundColor Yellow
-
-    if (-not (Test-Path "venv")) {
-        Write-Host "Sanal ortam oluşturuluyor..." -ForegroundColor Cyan
-        python -m venv venv
-    }
-
-    & ".\venv\Scripts\Activate.ps1"
-    pip install -r requirements.txt
-
-    Write-Host "✓ Bağımlılıklar kuruldu" -ForegroundColor Green
-}
-
-function Invoke-Tests {
-    Write-Host "`n🧪 Testler çalıştırılıyor..." -ForegroundColor Yellow
-
-    if (Get-Command pytest -ErrorAction SilentlyContinue) {
-        pytest tests/ -v
-        Write-Host "✓ Testler tamamlandı" -ForegroundColor Green
-    }
-    else {
-        Write-Host "⚠ pytest bulunamadı. Testler atlanıyor." -ForegroundColor Yellow
+function Assert-Windows {
+    if ($env:OS -ne 'Windows_NT') {
+        throw 'build.ps1 packaging pipeline is Windows-only.'
     }
 }
 
-function Start-RavnApp {
-    Write-Host "`n🚀 Uygulama başlatılıyor..." -ForegroundColor Yellow
-    python -m ravn_app.ui.main_window
+function Invoke-Python([string[]]$Arguments) {
+    & $PythonExe @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python command failed: $PythonExe $($Arguments -join ' ')"
+    }
 }
 
-function Clear-ProjectFiles {
-    Write-Host "`n🧹 Proje temizleniyor..." -ForegroundColor Yellow
-
-    Get-ChildItem -Path . -Include __pycache__ -Recurse -Directory | Remove-Item -Recurse -Force
-    Get-ChildItem -Path . -Include *.pyc -Recurse | Remove-Item -Force
-    Get-ChildItem -Path . -Include .pytest_cache -Recurse -Directory | Remove-Item -Recurse -Force
-
-    Write-Host "✓ Proje temizlendi" -ForegroundColor Green
+function Ensure-BuildDependencies {
+    Write-Section 'Installing build dependencies'
+    Invoke-Python @('-m', 'pip', 'install', '--upgrade', 'pip')
+    Invoke-Python @('-m', 'pip', 'install', '-r', 'requirements.txt')
+    Invoke-Python @('-m', 'pip', 'install', 'pyinstaller', 'pytest')
 }
 
-# Ana akış
-switch ($Action.ToLower()) {
-    "check" {
-        Check-Environment
+function Invoke-Verification {
+    if ($SkipTests) {
+        Write-Host 'Skipping tests by request.' -ForegroundColor Yellow
+        return
     }
-    "install" {
-        Check-Environment
-        Install-ProjectDependencies
+
+    Write-Section 'Running verification suite'
+    Invoke-Python @('-m', 'pytest', '-q')
+}
+
+function Clear-PreviousBuilds {
+    Write-Section 'Cleaning previous build artifacts'
+    foreach ($path in @($BuildRoot, $DistRoot)) {
+        if (Test-Path $path) {
+            Remove-Item $path -Recurse -Force
+        }
     }
-    "test" {
-        Invoke-Tests
+}
+
+function Expand-BundledFFmpegFromArchive([string]$ArchivePath) {
+    if (-not (Test-Path $ArchivePath)) {
+        throw "FFmpeg archive not found: $ArchivePath"
     }
-    "run" {
-        Start-RavnApp
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ravn-ffmpeg-" + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    try {
+        Expand-Archive -Path $ArchivePath -DestinationPath $tempRoot -Force
+        $ffmpegExe = Get-ChildItem -Path $tempRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+        $ffprobeExe = Get-ChildItem -Path $tempRoot -Filter ffprobe.exe -Recurse | Select-Object -First 1
+        if (-not $ffmpegExe -or -not $ffprobeExe) {
+            throw 'Archive did not contain ffmpeg.exe and ffprobe.exe'
+        }
+
+        New-Item -ItemType Directory -Path $AssetsRoot -Force | Out-Null
+        Copy-Item $ffmpegExe.FullName (Join-Path $AssetsRoot 'ffmpeg.exe') -Force
+        Copy-Item $ffprobeExe.FullName (Join-Path $AssetsRoot 'ffprobe.exe') -Force
     }
-    "clean" {
-        Clear-ProjectFiles
+    finally {
+        if (Test-Path $tempRoot) {
+            Remove-Item $tempRoot -Recurse -Force
+        }
     }
-    "all" {
-        Check-Environment
-        Install-ProjectDependencies
-        Clear-ProjectFiles
-        Invoke-Tests
-        Start-RavnApp
+}
+
+function Ensure-BundledFFmpeg {
+    Write-Section 'Preparing bundled FFmpeg runtime'
+    New-Item -ItemType Directory -Path $AssetsRoot -Force | Out-Null
+
+    $ffmpegExe = Join-Path $AssetsRoot 'ffmpeg.exe'
+    $ffprobeExe = Join-Path $AssetsRoot 'ffprobe.exe'
+
+    if ((Test-Path $ffmpegExe) -and (Test-Path $ffprobeExe)) {
+        Write-Host "Bundled FFmpeg runtime found in $AssetsRoot" -ForegroundColor Green
+        return
     }
-    default {
-        Write-Host "Kullanım: .\build.ps1 [check|install|test|run|clean|all]" -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "Seçenekler:" -ForegroundColor Cyan
-        Write-Host "  check    - Ortam kontrolü yap" -ForegroundColor Gray
-        Write-Host "  install  - Bağımlılıkları kur" -ForegroundColor Gray
-        Write-Host "  test     - Testleri çalıştır" -ForegroundColor Gray
-        Write-Host "  run      - Uygulamayı başlat" -ForegroundColor Gray
-        Write-Host "  clean    - Projeden cache'leri temizle" -ForegroundColor Gray
-        Write-Host "  all      - Hepsi (install→clean→test→run)" -ForegroundColor Gray
+
+    if ($FFmpegArchive) {
+        Expand-BundledFFmpegFromArchive -ArchivePath $FFmpegArchive
+        Write-Host "Bundled FFmpeg extracted from archive: $FFmpegArchive" -ForegroundColor Green
+        return
     }
+
+    if ($DownloadBundledFFmpeg) {
+        $downloadPath = Join-Path $BuildRoot 'ffmpeg-runtime.zip'
+        New-Item -ItemType Directory -Path $BuildRoot -Force | Out-Null
+        Write-Host "Downloading FFmpeg runtime from $FFmpegArchiveUrl" -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $FFmpegArchiveUrl -OutFile $downloadPath
+        Expand-BundledFFmpegFromArchive -ArchivePath $downloadPath
+        Write-Host 'Bundled FFmpeg downloaded and extracted.' -ForegroundColor Green
+        return
+    }
+
+    throw "Bundled FFmpeg runtime missing. Place ffmpeg.exe and ffprobe.exe under $AssetsRoot, pass -FFmpegArchive <zip>, or use -DownloadBundledFFmpeg."
+}
+
+function Invoke-PackageBuild {
+    Write-Section 'Building PyInstaller package'
+    Invoke-Python @('-m', 'PyInstaller', '--clean', '--noconfirm', 'ravn.spec')
+    if (-not (Test-Path (Join-Path $DistRoot 'RAVN\RAVN.exe'))) {
+        throw 'Expected packaged executable dist\RAVN\RAVN.exe was not created.'
+    }
+}
+
+function New-ReleaseArtifacts {
+    Write-Section 'Creating distributable archive'
+    if (Test-Path $ArtifactZip) {
+        Remove-Item $ArtifactZip -Force
+    }
+    Compress-Archive -Path (Join-Path $DistRoot 'RAVN\*') -DestinationPath $ArtifactZip -Force
+    $hash = Get-FileHash -Algorithm SHA256 -Path $ArtifactZip
+    Set-Content -Path $ChecksumFile -Value ("{0}  {1}" -f $hash.Hash, (Split-Path $ArtifactZip -Leaf))
+    Write-Host "Archive: $ArtifactZip" -ForegroundColor Green
+    Write-Host "Checksum: $ChecksumFile" -ForegroundColor Green
+}
+
+function Show-EnvironmentSummary {
+    Write-Section 'Environment summary'
+    & $PythonExe --version
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Python is not available.'
+    }
+    Write-Host "Project root: $ProjectRoot"
+    Write-Host "Bundled FFmpeg root: $AssetsRoot"
+    Write-Host "Spec file: $(Join-Path $ProjectRoot 'ravn.spec')"
+}
+
+Push-Location $ProjectRoot
+try {
+    Assert-Windows
+    switch ($Action) {
+        'check' {
+            Show-EnvironmentSummary
+            Ensure-BuildDependencies
+            Ensure-BundledFFmpeg
+        }
+        'test' {
+            Ensure-BuildDependencies
+            Invoke-Verification
+        }
+        'bundle-ffmpeg' {
+            Ensure-BundledFFmpeg
+        }
+        'package' {
+            Show-EnvironmentSummary
+            Ensure-BuildDependencies
+            Ensure-BundledFFmpeg
+            Invoke-Verification
+            Clear-PreviousBuilds
+            Invoke-PackageBuild
+            New-ReleaseArtifacts
+        }
+        'ci-package' {
+            Show-EnvironmentSummary
+            Ensure-BuildDependencies
+            Ensure-BundledFFmpeg
+            if (-not $SkipTests) {
+                Invoke-Verification
+            }
+            Clear-PreviousBuilds
+            Invoke-PackageBuild
+            New-ReleaseArtifacts
+        }
+        'clean' {
+            Clear-PreviousBuilds
+        }
+    }
+}
+finally {
+    Pop-Location
 }

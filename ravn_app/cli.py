@@ -41,6 +41,7 @@ from ravn_app.core.subtitle_manager import SubtitleEmbedder
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
 from ravn_app.core.media_helpers import get_media_helpers
 from ravn_app.core.tool_health import get_tool_health_checker, check_tool_availability
+from ravn_app.utils.ffmpeg_checker import configure_ffmpeg_runtime
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +375,7 @@ def _resolve_download_cli_settings(
 @click.version_option(version="1.0.0", prog_name="ravn")
 def cli():
     """RAVN — Media download and conversion tool."""
+    configure_ffmpeg_runtime()
 
 
 # ---------------------------------------------------------------------------

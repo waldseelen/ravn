@@ -109,6 +109,17 @@ setup.py
 build.ps1
 ravn.spec
 
+.github/
+  workflows/
+    tests.yml
+    windows-package.yml
+    windows-release.yml
+
+assets/
+  ffmpeg/
+    win64/
+      README.md
+
 ravn_app/
   cli.py
   core/
@@ -838,10 +849,10 @@ Verified on 2026-04-05:
 
 - full-suite baseline:
   - `pytest -q`
-  - `633 passed, 1 skipped` (`634` collected)
+  - `641 passed, 1 skipped` (`642` collected)
 - required UI logic sweep:
   - `pytest -q tests/test_ui_logic.py`
-  - `87 passed`
+  - `90 passed`
 - required UI components + builder sweep:
   - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
   - `37 passed`
@@ -888,10 +899,11 @@ Known or acknowledged open areas:
 - Phase 5 release-readiness work is still incomplete
 - direct `subprocess` usage now remains primarily in the runner layer, platform/open-file helpers, tool-health probing, and build/update helpers (see `docs/phase5b_subprocess_audit.md`)
 - list-heavy surfaces now have targeted chunking/measurement, but broader virtualization is intentionally deferred until future measurement justifies it (see `docs/phase5c_ux_scalability.md`)
-- packaging/build scripts/spec files exist but are not yet the finished Windows release story
+- packaging/build scripts/spec files now form a Windows-first release pipeline, but clean-machine packaged-app validation is still the final open release gate
 - canonical desktop feature imports are now documented under `ui/tabs/`, but some legacy-compatible implementation modules remain in `ui/` to avoid risky churn before packaging (see `docs/phase5d_wrapper_boundary_clarity.md`)
 - `plugin_system.py` is explicitly experimental-only and does not imply supported runtime plugin loading today (see `docs/phase5d_wrapper_boundary_clarity.md`)
 - Phase 5E closeout evidence now spans `docs/phase5e_optimization_baseline.md`, `docs/phase5e_dead_code_audit.md`, and `docs/phase5e_benchmark_closeout.md`
+- Phase 5F packaging implementation details and release procedure now live in `docs/phase5f_windows_packaging.md`
 
 ---
 

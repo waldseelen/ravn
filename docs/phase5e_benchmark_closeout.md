@@ -1,4 +1,4 @@
-# Phase 5E — Benchmark Closeout
+# Benchmark Closeout
 
 Verified on 2026-04-05.
 
@@ -103,12 +103,12 @@ The benchmark harness uses small legacy-style simulations for before/after compa
 That means:
 
 - SQL and timing comparisons are still reproducible in one working tree
-- the compared baselines stay close to the concrete hot paths that Phase 5E changed
+- the compared baselines stay close to the concrete hot paths changed during the optimization work
 - results should be treated as engineering evidence for packaging readiness, not as marketing-grade performance claims
 
 ## Outcome
 
-This closes the remaining benchmark/documentation items in `OPTIMIZATIONS.md` and leaves Phase 5E with:
+This closes the remaining benchmark/documentation items in `OPTIMIZATIONS.md` and leaves the optimization track with:
 
 - repeatable benchmark tooling
 - measured SQL counts

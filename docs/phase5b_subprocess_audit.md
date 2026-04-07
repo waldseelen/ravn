@@ -1,8 +1,8 @@
-# Phase 5B — Shared-Runner Convergence / Subprocess Audit
+# Shared Runner / Subprocess Audit
 
 Verified on 2026-04-05.
 
-This document records the repository-wide audit of direct `subprocess` usage for Phase 5B.
+This document records the repository-wide audit of direct `subprocess` usage after the shared-runner cleanup.
 
 ## Goal
 
@@ -19,7 +19,7 @@ Tests are excluded from this audit because they intentionally patch/inspect proc
 
 ## Summary
 
-Phase 5B is complete.
+This audit is complete.
 
 - Active runtime media-execution debt was migrated into the shared runner layer.
 - Remaining direct `subprocess` usage is now limited to:
@@ -120,7 +120,7 @@ These are **platform integration behaviors**, not media-processing flows. Wrappi
 
 ---
 
-## Remaining Direct `subprocess` Usage After Phase 5B
+## Remaining Direct `subprocess` Usage
 
 After migration, remaining direct `subprocess` usage in runtime code is intentional and falls into one of these buckets:
 
@@ -128,7 +128,7 @@ After migration, remaining direct `subprocess` usage in runtime code is intentio
 2. platform integration helper
 3. build/deployment-only helper
 
-No active Phase 5B runtime media-execution debt remains in the main acquisition/studio/utility paths audited here.
+No active runtime media-execution debt remains in the main acquisition/studio/utility paths audited here.
 
 ---
 
@@ -140,13 +140,13 @@ Targeted verification relevant to this phase:
 - `pytest -q tests/test_ui_logic.py tests/test_ui_components.py tests/test_app_builder.py`
 - `pytest -q`
 
-Observed validated baseline after Phase 5B completion:
+Observed validated baseline at the time of this audit:
 
-- targeted Phase 5B sweep: `126 passed`
+- targeted audit sweep: `126 passed`
 - full suite: `609 passed, 1 skipped`
 
 ---
 
 ## Follow-up
 
-At Phase 5B close, the follow-up track was **Phase 5C — UX hardening / scalability investigation**. See `TASKS.md` for the current active phase.
+Later follow-up work moved into UX hardening, optimization, and packaging polish. See `TASKS.md` for the current roadmap.

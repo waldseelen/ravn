@@ -9,7 +9,7 @@
 <h1 align="center">RAVN</h1>
 
 <p align="center">
-  Desktop + CLI media app for downloading, converting, organizing, and reviewing media on Windows.
+  <strong>RAVN is a Windows-first desktop and CLI app for downloading, processing, organizing, and automating local media workflows.</strong>
 </p>
 
 <p align="center">
@@ -31,20 +31,17 @@
 
 ---
 
-## What is RAVN?
+- Download videos, audio, playlists, batches, magnets, and `.torrent` files from one interface
+- Convert, extract, subtitle, filter, mix, and optimize media with FFmpeg-backed tools
+- Keep a local library with history, tags, collections, and export support
+- Run the same core workflows from the CLI with script-friendly JSON output
+- Get clear tool-health feedback so missing dependencies do not feel like an app-wide failure
 
-RAVN is a Windows-first media workstation that combines four things in one app:
+> **RAVN is not just a downloader — it is a local media pipeline.**
 
-- **Download** videos, audio, playlists, batches, magnets, and `.torrent` files
-- **Process** media with FFmpeg-backed conversion, filters, subtitles, mixer, and utilities
-- **Organize** outputs in a local library with history and queue tracking
-- **Automate** the same core flows from the command line
+## Demo
 
-It is built around a desktop UI, a shared-core CLI, queue/history persistence, bundled-runtime packaging, and a practical Windows release flow.
-
----
-
-## Screenshots
+> Demo GIF placeholder: add an end-to-end capture here (`download -> process -> library`) when `docs/demo.gif` is available.
 
 <p align="center">
   <img src="docs/screenshots/home-workspace.png" alt="RAVN Home workspace" width="48%">
@@ -55,113 +52,76 @@ It is built around a desktop UI, a shared-core CLI, queue/history persistence, b
   <img src="docs/screenshots/library-workspace.png" alt="RAVN Library workspace" width="48%">
 </p>
 
----
+## Use Cases
 
-## Highlights
+- **Download playlists and filter content** before committing to large batch jobs.
+- **Extract audio / create karaoke tracks** by combining download, trim, subtitle, mixer, and replace-audio workflows around your own local media assets.
+- **Convert and optimize media files** for archive, sharing, editing, or device playback.
+- **Manage a local media library** with history, tags, collections, search, and export.
+- **Automate workflows via CLI** for repeatable download, processing, and cataloging tasks.
 
-### Unified download workspace
-- one smart source bar for:
-  - media URLs
-  - playlists
-  - batch links
-  - magnets
-  - `.torrent` files
-- automatic source detection with manual override
-- shared **Video / Audio** output switching
-- staged playlist loading with selective download controls
-
-### Media processing toolkit
-- convert video and audio formats
-- embed and process subtitles
-- apply FFmpeg filters
-- mix audio and video workflows
-- use utility helpers like remux, trim, thumbnail, loudnorm, blackdetect, scene preview, and more
-
-### Queue, history, and library
-- background task queue
-- persisted history for downloads and processing operations
-- local media library with tags, collections, search, and export
-- optional auto-add of successful outputs into the media library
-
-### Windows-focused packaging
-- packaged Windows build flow via PyInstaller
-- bundled FFmpeg / FFprobe runtime strategy
-- release zip + SHA256 artifacts
-- GitHub Actions packaging and tagged release publishing
-
----
-
-## Main product areas
+## Features
 
 ### Download
-- single URL downloads
-- playlist review and partial selection
-- batch URL downloads
-- torrent and magnet handling through aria2
-- quality / format selection
-- subtitle preferences and embedding
-- post-download automation
-- reusable acquisition profiles
+- Smart source handling for URLs, playlists, batch links, magnets, and `.torrent` files
+- Playlist review with filtering, range selection, and selective download
+- Video/audio output switching, quality selection, and reusable acquisition profiles
+- Naming presets/templates, subtitle preferences, metadata enrichment, and post-download automation
+- Optional torrent support through `aria2c`
 
-### Studio
-- **Convert**
-- **Subtitle**
-- **Filters**
-- **Mixer**
-- **Utilities**
+### Processing
+- Video and audio conversion
+- Subtitle embed and subtitle-sidecar workflows
+- FFmpeg-based filters and adjustments
+- Audio/video mixer operations
+- Utility helpers for remux, trim, preview, thumbnail, loudness, scene detection, and more
 
 ### Library
-- local media catalog
-- aggregated activity history
-- search, tags, collections, export
+- Local media library with metadata-aware registration
+- Aggregated history for downloads, conversions, and other media operations
+- Tags, collections, search, statistics, and export
+- Background queue visibility with task status and quick actions
 
-### CLI
-- shared-core scripting access for download, convert, history, torrent, mixer, filters, utilities, and library actions
+### Automation
+- CLI commands for `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, and `utilities`
+- Shared core logic between desktop and CLI surfaces
+- `--json` support for automation-friendly output
+- Good fit for repeatable local media workflows and scripting
 
----
+## Quick Start
 
-## Download the app
+### Windows release
 
-### Windows packaged build
+1. Download the latest `RAVN-windows-x64.zip` from [GitHub Releases](https://github.com/waldseelen/ravn/releases).
+2. Extract the archive.
+3. Run `RAVN.exe`.
+4. If the app reports missing tools, install the required dependencies from [DEPENDENCIES.md](DEPENDENCIES.md).
+5. Paste a URL, playlist, magnet link, or local file into the relevant workspace and start working.
 
-RAVN currently targets **Windows packaged releases**.
-
-Pre-release and release artifacts are published on GitHub Releases and include:
-
-- `RAVN-windows-x64.zip`
-- `RAVN-windows-x64.sha256.txt`
-
-If SmartScreen appears, that is expected for unsigned or newly released builds. See the signing note below.
-
----
-
-## Quick start
-
-### Option 1: Run from source
+### Run from source
 
 ```bash
 pip install -r requirements.txt
-python ravn.py
-```
-
-### Option 2: Install editable package
-
-```bash
 pip install -e .
 python ravn.py
+ravn --help
 ```
 
-### CLI examples
+If the `ravn` command is not available on your shell yet, use:
 
 ```bash
-python -m ravn_app.cli download "https://example.com/video" --profile archive --subtitle-lang en --postprocess-embed-subtitles --json
-python -m ravn_app.cli convert input.mp4 --format mkv --quality high
-python -m ravn_app.cli torrent "magnet:?xt=urn:btih:..." --sequential
-ravn library search --query video --format mp4 --tags tutorial --json
-ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
+python -m ravn_app.cli --help
 ```
 
----
+## CLI Examples
+
+```bash
+ravn download "https://example.com/video" --profile archive --format mp4 --quality 1080p
+ravn torrent "magnet:?xt=urn:btih:..." --sequential
+ravn convert input.mp4 --format mkv --quality high
+ravn utilities --operation thumbnail input.mp4 --output thumb.jpg
+ravn library search --query tutorial --tags archive --json
+```
 
 ## Dependencies
 
@@ -173,8 +133,8 @@ ravn utilities input.mp4 --operation thumbnail --output thumb.jpg
 - Python packages from `requirements.txt`
 
 ### Optional
-- `aria2c` for torrent / magnet support
-- `tkinterdnd2` for drag-and-drop
+- `aria2c` for torrent and magnet workflows
+- `tkinterdnd2` for drag-and-drop support
 
 Install Python dependencies:
 
@@ -182,144 +142,25 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-Example `aria2` installs:
+Full setup and troubleshooting guidance lives in [DEPENDENCIES.md](DEPENDENCIES.md).
 
-```bash
-winget install aria2
-brew install aria2
-sudo apt install aria2
-```
+## Platform and Release Notes
 
-For dependency troubleshooting and setup details, see **[DEPENDENCIES.md](DEPENDENCIES.md)**.
-
----
-
-## Desktop workspaces
-
-### Home
-- quick actions
-- tool/dependency health summary
-- recent activity and queue context
-
-### Download
-- smart source routing
-- media / playlist / batch / torrent flows
-- profile-driven acquisition controls
-
-### Studio
-- conversion, subtitle, filters, mixer, utilities
-
-### Library
-- media library browsing
-- history review
-- search and export workflows
-
----
-
-## Release status
-
-Current public release track:
-
-- Windows packaged builds are published through GitHub Releases
-- tagged releases can publish `zip` + `SHA256` artifacts automatically
-- tags that include a hyphen, such as `v1.1.0-rc2`, publish as **GitHub prereleases**
-- bundled FFmpeg / FFprobe runtime lookup is supported in packaged Windows builds
-- Windows child tool console popups are suppressed on the main GUI runtime paths
-
-Latest validated automated test baseline:
-
-- `pytest -q` → `644 passed, 1 skipped`
-
-For the validated implementation snapshot, see **[PROGRESS.md](PROGRESS.md)**.
-
----
-
-## Build and packaging
-
-Local Windows packaging uses:
-
-- `build.ps1`
-- `ravn.spec`
-- `.github/workflows/windows-package.yml`
-- `.github/workflows/windows-release.yml`
-
-Typical commands:
-
-```powershell
-./build.ps1 -Action check
-./build.ps1 -Action package
-./build.ps1 -Action ci-package -DownloadBundledFFmpeg
-```
-
-Smoke validation helper:
-
-```powershell
-pwsh -ExecutionPolicy Bypass -File .\tools\windows_package_smoke.ps1 -PackageRoot .\dist\RAVN
-```
-
-Detailed packaging notes live in **[docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md)**.
-
----
-
-## SmartScreen and code signing
-
-Public Windows builds can still show **SmartScreen** warnings if they are unsigned or newly published.
-
-Current practical guidance:
-
-- download only from GitHub Releases
-- verify the included SHA256 checksum
-- use prereleases for early validation when needed
-- long-term, use a **code-signing certificate** for stronger Windows trust and clearer publisher identity
-
-## Known limitations
-
-- Windows is the primary packaged-release target right now
-- public builds may still trigger SmartScreen until code signing is added and reputation builds over time
-- torrent reliability still depends on peer / tracker availability and local network conditions
-
----
+- **Windows** is the primary packaged-release target.
+- Linux and macOS source checkouts may work, but packaged releases are not currently maintained for those platforms.
+- Packaged Windows builds support bundled FFmpeg/FFprobe lookup.
+- GitHub Releases publish zip artifacts and SHA256 checksum files.
+- If SmartScreen appears, download only from GitHub Releases and verify the published checksum.
 
 ## Documentation
 
-### User and operator docs
 - [DEPENDENCIES.md](DEPENDENCIES.md) — setup, required tools, and troubleshooting
-- [docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md) — Windows packaging, release workflow, smoke validation, and signing notes
-- [PROGRESS.md](PROGRESS.md) — validated repository snapshot
+- [PROGRESS.md](PROGRESS.md) — current release status and verified quality snapshot
+- [TASKS.md](TASKS.md) — public roadmap and near-term priorities
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system overview, runtime layers, and module boundaries
+- [docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md) — Windows packaging and release guide
 
-### Engineering docs
-- [ARCHITECTURE.md](ARCHITECTURE.md) — runtime flows and module boundaries
-- [TASKS.md](TASKS.md) — active backlog and release-readiness plan
-- [OPTIMIZATIONS.md](OPTIMIZATIONS.md) — optimization closeout notes
-
----
-
-## Repository layout
-
-```text
-ravn.py
-build.ps1
-ravn.spec
-ravn_app/
-  cli.py
-  core/
-  ui/
-  translations/
-  utils/
-docs/
-tests/
-tools/
-```
-
-Canonical active desktop feature imports live under:
-
-- `ravn_app.ui.tabs.*`
-
----
-
-## Development and testing
-
-Useful commands:
+## Development and Testing
 
 ```bash
 pytest -q
@@ -328,8 +169,6 @@ pytest -q tests/test_ui_components.py tests/test_app_builder.py
 pytest -q tests/test_config_paths.py tests/test_database_manager.py
 ```
 
----
-
 ## License
 
-Add your preferred license information here if / when the project is published under a formal license.
+[MIT](LICENSE)

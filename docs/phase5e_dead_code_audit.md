@@ -1,8 +1,8 @@
-# Phase 5E — Dead Code / Waste Audit
+# Dead Code and Waste Audit
 
 Verified on 2026-04-05.
 
-This document closes the OPT-01 / OPT-07 audit pass from `OPTIMIZATIONS.md`.
+This document closes the dead-code and compatibility-surface audit summarized in `OPTIMIZATIONS.md`.
 
 ## Scope Reviewed
 
@@ -11,11 +11,11 @@ This document closes the OPT-01 / OPT-07 audit pass from `OPTIMIZATIONS.md`.
 - `ravn_app/core/persistence/`
 - `ravn_app/core/task_manager.py`
 - queue / Home refresh wiring
-- legacy-compatible desktop import surfaces documented during Phase 5D
+- legacy-compatible desktop import surfaces documented in the wrapper-boundary notes
 
 ## Confirmed Unbounded / Wasteful Paths
 
-Already addressed earlier in Phase 5E:
+Already addressed earlier in this optimization track:
 
 - completed in-memory task retention in `ravn_app/core/task_manager.py`
 - `search_history` retention in `ravn_app/core/persistence/media_library.py`
@@ -42,7 +42,7 @@ Re-reviewed `ravn_app.ui.*` compatibility modules and `ravn_app.ui.tabs.*` wrapp
 
 ### Retained intentionally
 
-Still retained for Phase 5 stability/documented import compatibility:
+Still retained for release stability and documented import compatibility:
 
 - `ravn_app/ui/download_tab.py`
 - `ravn_app/ui/converter_tab.py`
@@ -58,7 +58,7 @@ Still retained for Phase 5 stability/documented import compatibility:
 
 ## Safe-Removal Candidates Reviewed But Deferred
 
-Deferred intentionally because ROI/risk did not justify more churn before Phase 5F:
+Deferred intentionally because ROI/risk did not justify more churn before packaging:
 
 - legacy import modules that still encode the documented compatibility contract
 - larger implementation-file moves for converter/subtitle/history/settings bodies
@@ -68,7 +68,7 @@ Deferred intentionally because ROI/risk did not justify more churn before Phase 
 
 ## Outcome
 
-Phase 5E closeout now has:
+This closeout now has:
 
 - explicit retained-state bounds
 - explicit retained compatibility surfaces

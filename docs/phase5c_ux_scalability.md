@@ -1,8 +1,8 @@
-# Phase 5C — UX Hardening / Scalability Investigation
+# UX Hardening and Scalability Notes
 
 Verified on 2026-04-05.
 
-This document records the Phase 5C UX hardening and evidence-driven scalability work.
+This document records the UX hardening and evidence-driven scalability work completed for the current release track.
 
 ## Goal
 
@@ -10,7 +10,7 @@ Improve perceived stability on realistic desktop sizes and investigate scaling r
 
 ---
 
-## Completed Tasks
+## Documented Work
 
 - `UX-REL-01` — Download workspace layout behavior hardened for tighter desktop heights
 - `PERF-01` — Large-playlist stress verification added for Download workspace + playlist dialog logic
@@ -149,7 +149,7 @@ The following were intentionally not added because measurements did not justify 
 
 ## Verification
 
-Key verification commands used for this phase:
+Key verification commands used for this work:
 
 - `pytest -q tests/test_ui_logic.py`
 - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
@@ -157,7 +157,7 @@ Key verification commands used for this phase:
 - `pytest -q tests/test_utilities_tab.py tests/test_i18n_and_design_tokens.py tests/test_ui_logic.py`
 - `pytest -q`
 
-Validated baseline after Phase 5C completion:
+Validated baseline at the time of this document:
 
 - full suite: `614 passed, 1 skipped`
 
@@ -165,7 +165,7 @@ Validated baseline after Phase 5C completion:
 
 ## Outcome
 
-Phase 5C is complete.
+This work is complete.
 
 The project now has:
 - stronger compact-height behavior in the Download workspace
@@ -173,4 +173,4 @@ The project now has:
 - built-in hotspot measurements for the riskiest list-heavy UI paths
 - measured, minimal mitigations instead of premature over-engineering
 
-At Phase 5C close, the follow-up track was **Phase 5D — Codebase cleanup / wrapper / extension-boundary clarity**. See `TASKS.md` for the current active phase.
+Later follow-up work moved into wrapper cleanup, optimization, and packaging polish. See `TASKS.md` for the current roadmap.

@@ -1,8 +1,8 @@
-# Phase 5D — Codebase Cleanup / Wrapper / Extension-Boundary Clarity
+# UI Wrapper and Extension-Boundary Notes
 
 Verified on 2026-04-05.
 
-This document records the Phase 5D cleanup work that clarifies the active desktop UI surface and the current status of RAVN's experimental extension scaffolding.
+This document records the cleanup work that clarifies the active desktop UI surface and the current status of RAVN's experimental extension scaffolding.
 
 ---
 
@@ -55,7 +55,7 @@ These modules remain in the repository so older imports continue to resolve, but
 
 ### Canonical wrappers retained under `ravn_app/ui/tabs/`
 
-Some canonical `ui/tabs/` modules still forward to older implementation modules. This is intentional for now because it keeps behavior stable while the project finishes Phase 5 hardening/packaging work.
+Some canonical `ui/tabs/` modules still forward to older implementation modules. This is intentional for now because it keeps behavior stable while release hardening and packaging work finishes.
 
 Retained canonical wrappers:
 
@@ -70,7 +70,7 @@ These wrappers are now explicitly documented as canonical import surfaces rather
 
 ## Wrapper Cleanup Outcome
 
-Phase 5D focused on reducing ambiguity, not performing a risky UI-file migration.
+This cleanup focused on reducing ambiguity, not performing a risky UI-file migration.
 
 Completed cleanup actions:
 
@@ -83,7 +83,7 @@ Deferred intentionally:
 - moving all legacy implementation bodies into `ravn_app/ui/tabs/`
 - splitting `history_settings_tab.py` into separate implementation files
 
-Those larger file moves are better handled in a later cleanup phase if they provide enough value to justify churn.
+Those larger file moves are better handled later if they provide enough value to justify churn.
 
 ---
 
@@ -108,7 +108,7 @@ Additional clarity applied:
 
 ## Verification
 
-Key verification commands used for this phase:
+Key verification commands used for this work:
 
 - `pytest -q tests/test_import_surfaces.py`
 - `pytest -q tests/test_ui_logic.py`
@@ -116,7 +116,7 @@ Key verification commands used for this phase:
 - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
 - `pytest -q`
 
-Validated baseline after Phase 5D completion:
+Validated baseline at the time of this document:
 
 - full suite: `617 passed, 1 skipped`
 
@@ -124,7 +124,7 @@ Validated baseline after Phase 5D completion:
 
 ## Outcome
 
-Phase 5D is complete.
+This cleanup is complete.
 
 The repository now makes these points explicit:
 
@@ -132,4 +132,4 @@ The repository now makes these points explicit:
 - legacy `ravn_app.ui.*` modules are compatibility surfaces, not equal peers
 - `plugin_system.py` does not imply supported runtime plugin loading today
 
-The next active track is **Phase 5E — Full Optimization / Clean Code / Dead Code Cleanup**.
+Follow-up work moved into optimization and release packaging polish.

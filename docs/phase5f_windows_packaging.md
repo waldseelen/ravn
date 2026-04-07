@@ -1,19 +1,19 @@
-# Phase 5F — Windows Packaging / Release Pipeline
+# Windows Packaging and Release Guide
 
 ## Scope
 
-Phase 5F is Windows-only.
+RAVN's packaged release target is currently **Windows x64**.
 
-The canonical packaging pipeline is now:
+The standard packaging flow is:
 
-1. populate `assets/ffmpeg/win64/` with `ffmpeg.exe` + `ffprobe.exe`
+1. populate `assets/ffmpeg/win64/` with `ffmpeg.exe` and `ffprobe.exe`
 2. run `build.ps1 -Action package`
 3. distribute `dist/RAVN-windows-x64.zip`
-4. use the tag-driven GitHub workflow for public release publishing
+4. publish via the tag-driven GitHub release workflow
 
 ## Bundled runtime strategy
 
-RAVN now treats bundled FFmpeg as the preferred runtime for packaged Windows builds.
+Packaged Windows builds prefer a bundled FFmpeg runtime.
 
 Expected layout:
 
@@ -30,7 +30,7 @@ How it works:
 - `ravn.spec` bundles the top-level `assets/` tree and translations into the PyInstaller output.
 - `ravn_app/utils/ffmpeg_checker.py` looks for bundled FFmpeg/FFprobe before falling back to system `PATH`.
 - `ravn.py` and `ravn_app/cli.py` call `configure_ffmpeg_runtime()` so the bundled directory is prepended to `PATH` automatically.
-- If a user explicitly configures a custom executable path, that explicit path still wins.
+- Explicit user-configured tool paths still take priority.
 
 ## Local Windows packaging
 
@@ -41,7 +41,7 @@ How it works:
 - PyInstaller installable from pip
 - FFmpeg runtime available either:
   - already placed in `assets/ffmpeg/win64/`
-  - or provided through `-FFmpegArchive`
+  - provided through `-FFmpegArchive`
   - or downloaded via `-DownloadBundledFFmpeg`
 
 ### Commands
@@ -58,25 +58,25 @@ Populate bundled FFmpeg from a local archive:
 ./build.ps1 -Action bundle-ffmpeg -FFmpegArchive C:\temp\ffmpeg-release-essentials.zip
 ```
 
-Build package with verification:
+Build a local package:
 
 ```powershell
 ./build.ps1 -Action package
 ```
 
-CI-style package build with runtime download:
+Run a CI-style package build with automatic runtime download:
 
 ```powershell
 ./build.ps1 -Action ci-package -DownloadBundledFFmpeg
 ```
 
-Outputs:
+Expected outputs:
 
 - `dist/RAVN/`
 - `dist/RAVN-windows-x64.zip`
 - `dist/RAVN-windows-x64.sha256.txt`
 
-## Packaged-app smoke helper
+## Smoke validation helper
 
 A Windows validation helper is available at:
 
@@ -97,12 +97,12 @@ What it checks automatically:
 - config/data/cache/log directories are created
 - a smoke report is written to `windows-package-smoke-report.json`
 
-What still remains manual:
+What still needs manual confirmation:
 
 - complete one URL download
 - complete one conversion
 - verify queue/history persistence
-- verify library auto-add basics
+- verify media-library auto-add basics
 
 ## GitHub Actions
 
@@ -129,35 +129,35 @@ Behavior:
 
 - triggers on tags matching `v*`
 - builds the Windows package
-- uploads zip + checksum to the GitHub Release
-- if the tag contains a hyphen (for example `v1.1.0-rc1`), the published GitHub Release is marked as a prerelease
+- uploads the zip and checksum to the GitHub Release
+- treats hyphenated version tags such as `v1.1.0-rc1` as prereleases
 
-## Clean-machine validation checklist
+## Manual release checklist
 
 Use a clean Windows VM or disposable test machine and verify:
 
 1. run `tools/windows_package_smoke.ps1` against the packaged folder
-2. application launches from packaged folder without a Python installation
+2. application launches without a Python installation
 3. config/data directories are created
 4. bundled FFmpeg/FFprobe are detected without PATH edits
 5. a basic URL download succeeds
 6. a conversion succeeds
 7. queue entries appear and finish cleanly
 8. history entries are persisted
-9. media library auto-add basics work for a supported output
+9. media-library auto-add basics work for a supported output
 
-Record results in this document or a release-specific validation note before public distribution.
+A build should not be presented as fully release-ready until this manual pass is complete.
 
-## Minimum viable signing strategy
+## Code-signing guidance
 
-RAVN does not require signing to build artifacts, but signed public releases are the target.
+RAVN can build unsigned artifacts, but signed public releases are the preferred path.
 
-Recommended minimum path:
+Recommended minimum setup:
 
 1. store a code-signing certificate in GitHub Actions secrets as base64 (`WINDOWS_SIGNING_CERT_BASE64`)
 2. store the certificate password in `WINDOWS_SIGNING_CERT_PASSWORD`
-3. import the cert during the release workflow on `windows-latest`
+3. import the certificate during the release workflow on `windows-latest`
 4. sign `dist/RAVN/RAVN.exe` and optionally the generated zip/installer
 5. timestamp the signature with a trusted timestamp server
 
-If signing secrets are not present, the release workflow can still publish unsigned artifacts, but public release notes should make that explicit.
+If signing secrets are not present, the workflow can still publish unsigned artifacts, but release notes should make that explicit.

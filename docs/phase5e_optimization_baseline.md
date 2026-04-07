@@ -1,8 +1,8 @@
-# Phase 5E — Optimization Baseline And Landed Changes
+# Optimization Baseline and Landed Changes
 
 Verified on 2026-04-05.
 
-This document records the first landed Phase 5E optimization set, aligned with the execution order in `OPTIMIZATIONS.md`.
+This document records the first landed optimization set summarized in `OPTIMIZATIONS.md`.
 
 For the final audit/benchmark closeout, also see:
 
@@ -99,7 +99,7 @@ Verified points:
 
 ## Deliberate Non-Changes In This Batch
 
-At the time this first landed slice was recorded, the remaining Phase 5E follow-ups were:
+At the time this first landed slice was recorded, the remaining follow-ups were:
 - playlist metadata staging for very large playlists
 - broader dead-code audit closeout
 - compatibility-wrapper revisit after more cleanup lands
@@ -109,7 +109,7 @@ Those later closeout items are now tracked in the companion documents listed at 
 
 ## Outcome
 
-This landed batch closes the first high-ROI optimization slice from `OPTIMIZATIONS.md` and improves:
+This landed batch closes the first high-ROI optimization slice summarized in `OPTIMIZATIONS.md` and improves:
 - library query efficiency
 - batch auto-add efficiency
 - retained-state bounds

@@ -1,228 +1,69 @@
-# PROGRESS
+# Release Status
 
-## Snapshot
+Verified on 2026-04-07.
 
-Verified on 2026-04-05.
+RAVN is an actively maintained **Windows-first desktop + CLI media product**. The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. The main remaining release work is final packaged-app validation and trust/signing polish for Windows distribution.
 
-This file is the validated implementation snapshot for the current repository state.
+## Product snapshot
 
----
+### Download and acquisition
+- Single URL, playlist, batch, magnet, and `.torrent` flows are available.
+- Playlist review supports filtering, selection, and range-based download.
+- Download profiles, naming presets/templates, subtitle preferences, metadata enrichment, and post-download automation are active.
+- Tool-health checks explain which features are affected when dependencies are missing.
 
-## Confirmed Repository Reality
-
-### Core platform/runtime
-
-- Repository structure is stable: desktop entrypoint, CLI entrypoint, layered core, modular UI, tests, build script, and PyInstaller spec are present.
-- Main external-tool execution paths are consolidated around shared runners in `ravn_app/core/runners/`.
-- Windows runner/tool-health subprocess launches now suppress stray child console windows on the main runtime paths.
-- Structured logging is centralized in `ravn_app/core/logging_config.py`.
-- OS-aware config/data/cache path handling and legacy migration are active through `ravn_app/core/config_paths.py` and `ravn.py`.
-- Drag-and-drop uses `tkinterdnd2` when available and degrades safely.
-- Theme system is strict two-theme (`dark`, `light`) with legacy normalization.
-- Localization is active through `ravn_app/core/i18n.py` and `ravn_app/translations/`.
-- Windows packaging now has a concrete bundled-runtime strategy through `ravn.spec`, `build.ps1`, `assets/ffmpeg/win64/`, and GitHub Actions packaging/release workflows.
-- Tag-driven Windows release publishing now automatically marks hyphenated version tags as GitHub prereleases.
-
-### Desktop shell / UX
-
-- The desktop shell is grouped into workspaces: `Home`, `Download`, `Studio`, `Library`.
-- Queue is exposed through a global right-side panel/drawer instead of top-level navigation.
-- Desktop startup centering now uses taskbar-aware usable bounds and prefers the active monitor on Windows.
-- Settings are exposed as an independent lower-left utility/workspace entry.
-- Theme/language toggles live directly in the shell sidebar utility area.
-- Shell-level command palette is active via `Ctrl+K`.
-- Shell-level settings shortcut is active via `Ctrl+,`.
-- Workspace guidance panels use progressive disclosure.
-- The shell uses mounted workspace switching to reduce redraw flicker.
-- Theme and language changes use lighter in-place refresh behavior than earlier shell rebuild patterns.
-
-### Acquisition / download stack
-
-- Download flow is wired end-to-end with background execution and UI-safe callback scheduling.
-- Single URL, playlist, batch (up to 50 URLs), and torrent/magnet flows are active.
-- Playlist flow supports title/duration filtering, popularity-aware filtering where metadata exists, visible-row bulk actions, and range-based selection.
-- Download naming presets/templates are active through `download_naming.py`.
-- Downloader subtitle automation is active through preferred/fallback language selection, optional auto-generated fallback, and optional auto-embed behavior.
-- Post-download automation is active through `download_postprocess`.
-- Metadata normalization/enrichment is active through `download_metadata.py`.
-- Reusable acquisition profiles are active through `download_profiles.py`.
-- Robustness controls are active through `download_robustness`.
-- Collapsed advanced acquisition settings are active through `download_advanced`.
-- CLI download flow now exposes the same intent-driven acquisition concepts instead of raw yt-dlp flag mirroring.
-
-### Queue / history / library
-
-- Queue/callback infrastructure is active in `ravn_app/core/task_manager.py`.
-- Queue panel supports queued/running/completed visibility and cancel/open-folder actions.
-- History UI aggregates downloads, conversions, and generic Phase 7 operation records.
-- `MediaLibrary` and auto-library registration are active.
-- Successful supported outputs from download/convert/mixer/filter/utility flows can register into the local media library.
-
-### Studio / media tools
-
-- Conversion flow is active through FFmpeg-backed shared logic.
-- Subtitle processing/embed flows are active.
-- Filters and mixer feature tabs are active in desktop + CLI form.
-- Utilities workflow is active with 24 FFmpeg-backed helper operations across quick/audio/video/smart categories.
+### Processing and studio tools
+- Conversion, subtitle embed, filters, mixer, and utility workflows are available in the desktop app.
+- The CLI exposes matching media-processing surfaces for scripting.
 - FFmpeg real-time progress parsing is active.
-- `ErrorPanel` is integrated into converter and subtitle tabs.
+- Inline error presentation is in place for the most failure-prone studio surfaces.
 
-### Torrent stack
+### Library, history, and queue
+- Queue infrastructure is active through `ravn_app/core/task_manager.py`.
+- History persists downloads, conversions, and other media operations.
+- The local media library supports search, tags, collections, statistics, and export.
+- Successful supported outputs can auto-register into the media library.
 
-- `Aria2Runner` is active.
-- `TorrentDownloader` is active.
-- Torrent modes remain stable: `FULL`, `SEQUENTIAL`, `STREAM`.
-- Torrent UI exposes queueable rows, progress metrics, pause/resume controls, filters, and payload child rows.
+### Desktop and CLI runtime
+- Desktop workspaces are grouped into `Home`, `Download`, `Studio`, and `Library`.
+- Queue is exposed as a shared panel instead of a top-level workspace.
+- Settings, theme, and language controls are integrated directly into the shell.
+- The CLI supports `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, and `utilities`.
 
----
+### Platform and packaging
+- Windows packaged builds are the primary distribution target.
+- Packaged Windows builds support bundled FFmpeg/FFprobe lookup.
+- GitHub Actions packaging and tagged-release workflows are in place.
+- Linux and macOS source usage may work, but packaged releases are not currently maintained for those platforms.
 
-## Acquisition Engine Status
+## Quality snapshot
 
-The yt-dlp acquisition-engine upgrade is fully landed.
+Latest automated verification run:
 
-Completed tasks:
+- `pytest -q`
+- `644 passed, 1 skipped`
 
-- `YTD-01` filename templating + naming presets
-- `YTD-02` playlist partial selection/filtering/range support
-- `YTD-03` subtitle automation upgrade
-- `YTD-04` post-download automation pipeline
-- `YTD-05` metadata enrichment / normalization
-- `YTD-06` reusable download profiles
-- `YTD-07` robustness controls
-- `YTD-08` collapsed advanced acquisition settings
-- `YTD-09` CLI acquisition parity
-- `YTD-10` expanded tests for acquisition behavior
-- `YTD-11` documentation sync
+Observed on 2026-04-07.
 
-Resulting acquisition capabilities now include:
+## Current release focus
 
-- reusable profiles (`Custom`, `Music`, `Podcast`, `Archive`, `Social Clip`)
-- naming presets and token templates
-- subtitle preferences + fallback + embed behavior
-- post-download automation
-- normalized acquisition metadata for library registration
-- duplicate skipping via archive tracking
-- partial recovery/resume support
-- fallback format retries
-- optional rate limits
-- browser/cookies.txt auth handoff
-- fragment/network tuning
-- CLI scripting of the same concepts
+The remaining public release polish is concentrated in a short list:
 
----
+- validate packaged behavior on a clean Windows machine / VM
+- tighten signing and release-trust guidance for Windows distribution
+- keep docs, screenshots, and onboarding material aligned with repository reality
 
-## UX / Settings Consolidation Reality
+## Explicit scope notes
 
-Recent validated UX/settings realities:
+- `ffmpeg`, `ffprobe`, and `yt-dlp` are core dependencies.
+- `aria2c` is optional and only required for torrent and magnet workflows.
+- `plugin_system.py` is experimental and is not part of the active packaged runtime.
+- The `serve` CLI command remains a placeholder, not a public product feature.
 
-- `main_window.py` is a thin shell orchestrator.
-- Download-specific logic lives in `ravn_app/ui/tabs/download_tab.py`.
-- Reusable widgets live under `ravn_app/ui/components/`.
-- Settings remain compact and scrollable rather than nested across many sub-tabs.
-- Download settings now expose:
-  - naming presets/templates
-  - subtitle preferences
-  - post-download automation
-  - reliability controls
-  - collapsed advanced acquisition controls
-- Download workspace exposes a compact profile selector instead of a second downloader screen.
-- Playlist sort dialog keeps selected-count/size summaries and visibility-focused table styling.
-- `history_settings_tab.py` width/spacing behavior was tightened to avoid layout stretch issues.
+## Documentation map
 
----
-
-## Phase Completion Status
-
-- **Phase 1** — Complete
-- **Phase 2** — Complete
-- **Phase 3** — Complete
-- **Phase 4A** — Complete
-- **Phase 4B** — Complete
-- **Phase 4C** — Complete
-- **Phase 4D** — Complete
-- **Phase 5** — Open
-- **Phase 6** — Complete
-- **Phase 7** — Complete
-- **Phase 8** — Complete
-
----
-
-## Validation Status
-
-Verified on 2026-04-05:
-
-- Full suite:
-  - `pytest -q`
-  - `644 passed, 1 skipped` (`645` collected)
-- Required UI logic sweep:
-  - `pytest -q tests/test_ui_logic.py`
-  - `90 passed`
-- Required UI components + builder sweep:
-  - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
-  - `37 passed`
-- Required config/database sweep:
-  - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
-  - `58 passed`
-- Packaging/runtime helper sweep:
-  - `pytest -q tests/test_media_helpers.py tests/test_ffmpeg_checker.py`
-  - `9 passed`
-
----
-
-## Functional Highlights
-
-### Acquisition
-
-- quality-based size estimation
-- naming presets/templates with sanitization
-- subtitle preference + fallback behavior
-- post-download automation pipeline
-- metadata normalization + library tags
-- reusable acquisition profiles
-- robustness controls
-- collapsed advanced acquisition controls
-- CLI parity for intent-driven acquisition
-
-### Processing / studio
-
-- conversion
-- subtitle processing/embed
-- filters
-- mixer
-- utilities helpers
-- queue/history integration
-- optional library auto-add
-
-### Organization
-
-- local media library
-- search/tags/collections/export
-- aggregated history for downloads/conversions/operations
-
-### Shell / UX
-
-- grouped workspace shell
-- queue drawer
-- settings workspace entry
-- command palette
-- compact utility toggles
-- adaptive layout behavior
-
----
-
-## Open Reality / Remaining Work
-
-The main open project area is still **Phase 5 release readiness and Windows packaging**.
-
-Current build/distribution artifacts now include a Windows-first packaging pipeline (`build.ps1`, `ravn.spec`, `.github/workflows/windows-package.yml`, `.github/workflows/windows-release.yml`, `assets/ffmpeg/win64/`, and `docs/phase5f_windows_packaging.md`). The remaining open release gate is clean-machine validation of the packaged app before calling Phase 5F complete.
-
----
-
-## Documentation Sync State
-
-Repository documentation was refreshed and aligned around the current runtime model:
-
-- `README.md` now acts as the comprehensive user/project overview
-- `ARCHITECTURE.md` now focuses on system structure, module boundaries, and runtime flows
-- `TASKS.md` now also carries the active hardening + Windows release roadmap
-- `CLAUDE.md` remains the compact engineering entrypoint/addendum
+- [README.md](README.md) — product overview and quick start
+- [TASKS.md](TASKS.md) — public roadmap and near-term priorities
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system structure and runtime boundaries
+- [DEPENDENCIES.md](DEPENDENCIES.md) — setup and troubleshooting
+- [docs/phase5f_windows_packaging.md](docs/phase5f_windows_packaging.md) — Windows packaging and release guide

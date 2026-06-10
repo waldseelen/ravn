@@ -450,14 +450,16 @@ class PlaylistMixin:
                     else:
                         self._on_download_progress(overall, prefix)
 
-                result = self.downloader.download(
+                from ravn_app.core.downloader import DownloadRequest
+                req = DownloadRequest(
                     url=entry_url,
                     output_dir=output_dir,
-                    format_type=format_type,
+                    format=format_type,
                     quality=quality,
                     progress_callback=item_progress,
                     **download_settings,
                 )
+                result = self.downloader.download(req)
 
                 if not result.success:
                     self.after(

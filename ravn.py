@@ -76,6 +76,17 @@ def main():
         from ravn_app.ui.main_window import YouTubeDownloaderApp
 
         app = YouTubeDownloaderApp()
+        
+        try:
+            import sys
+            if hasattr(sys, "frozen"):
+                import pyi_splash
+                if pyi_splash.is_alive():
+                    pyi_splash.update_text("Arayüz yükleniyor...")
+                    pyi_splash.close()
+        except Exception:
+            pass
+
         app.mainloop()
     except KeyboardInterrupt:
         logger.info("Uygulama Ctrl+C ile kapatildi")

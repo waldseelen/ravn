@@ -7,7 +7,9 @@ param(
     [switch]$DownloadBundledFFmpeg,
     [string]$FFmpegArchive = '',
     [string]$FFmpegArchiveUrl = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip',
-    [string]$ArtifactName = 'RAVN-windows-x64'
+    [string]$ArtifactName = 'RAVN-windows-x64',
+    [string]$SignCertBase64 = $env:SIGN_CERT_BASE64,
+    [string]$SignCertPassword = $env:SIGN_CERT_PASSWORD
 )
 
 Set-StrictMode -Version Latest
@@ -149,6 +151,34 @@ function Get-Sha256Hex([string]$FilePath) {
     }
 }
 
+function Invoke-SignTool {
+    if (-not $SignCertBase64 -or -not $SignCertPassword) {
+        Write-Host "Skipping code signing: Credentials not provided." -ForegroundColor Yellow
+        return
+    }
+    Write-Section 'Signing executable'
+    $certPath = Join-Path $BuildRoot 'cert.pfx'
+    [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($SignCertBase64))
+    $exePath = Join-Path $DistRoot 'RAVN\RAVN.exe'
+    
+    if (-not (Test-Path $exePath)) {
+        throw "Executable not found for signing: $exePath"
+    }
+
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certPath, $SignCertPassword)
+    $sig = Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+    
+    if ($sig.Status -ne 'Valid') {
+        Write-Host "Signing failed: $($sig.StatusMessage)" -ForegroundColor Red
+    } else {
+        Write-Host "Successfully signed $exePath" -ForegroundColor Green
+    }
+    
+    if (Test-Path $certPath) {
+        Remove-Item $certPath -Force
+    }
+}
+
 function New-ReleaseArtifacts {
     Write-Section 'Creating distributable archive'
     if (Test-Path $ArtifactZip) {
@@ -195,6 +225,7 @@ try {
             Invoke-Verification
             Clear-PreviousBuilds
             Invoke-PackageBuild
+            Invoke-SignTool
             New-ReleaseArtifacts
         }
         'ci-package' {
@@ -206,6 +237,7 @@ try {
             }
             Clear-PreviousBuilds
             Invoke-PackageBuild
+            Invoke-SignTool
             New-ReleaseArtifacts
         }
         'clean' {

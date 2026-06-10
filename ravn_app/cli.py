@@ -552,14 +552,16 @@ def download_cmd(
 
     downloader = YouTubeDownloader()
     try:
-        result: DownloadResult = downloader.download(
+        from ravn_app.core.downloader import DownloadRequest
+        req = DownloadRequest(
             url=url,
             output_dir=str(output_dir),
-            format_type=dl_format,
+            format=dl_format,
             quality=dl_quality,
             progress_callback=_progress,
             **download_settings,
         )
+        result: DownloadResult = downloader.download(req)
     except Exception as exc:
         _error(str(exc), as_json)
 

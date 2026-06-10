@@ -36,7 +36,8 @@ RAVN relies on external tools for media processing, downloads, and torrent manag
 - Post-download processing
 
 **Installation:**
-- Windows: `winget install FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- **Windows (Packaged App):** FFmpeg is automatically bundled and used by the application. No manual installation is required.
+- Windows (Development/CLI): `winget install FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org/download.html)
 - macOS: `brew install ffmpeg`
 - Linux: `sudo apt install ffmpeg`
 
@@ -73,18 +74,14 @@ ffprobe -version
 - Subtitle download
 
 **Installation:**
-- Windows: `winget install yt-dlp` or `pip install yt-dlp`
+- **Windows (Packaged App):** yt-dlp is automatically downloaded and kept up-to-date in `%LOCALAPPDATA%\ravn\bin`. No manual installation is required.
+- Windows (Development/CLI): `winget install yt-dlp` or `pip install yt-dlp`
 - macOS: `brew install yt-dlp` or `pip install yt-dlp`
 - Linux: `sudo apt install yt-dlp` or `pip install yt-dlp`
 
 **Verification:**
 ```bash
 yt-dlp --version
-```
-
-**Note:** yt-dlp should be kept up-to-date for best compatibility with video platforms:
-```bash
-pip install --upgrade yt-dlp
 ```
 
 ## Optional Dependencies
@@ -112,6 +109,15 @@ aria2c --version
 - Torrent downloads will fail gracefully
 - Magnet links cannot be processed
 - All other features remain fully functional
+
+### SmartScreen and Code Signing (Windows)
+
+**Purpose:** Ensure application integrity and security trust
+**Affected Features:**
+- Windows execution and installation
+
+**Note on SmartScreen:**
+The packaged Windows executable (`RAVN.exe`) is signed with an Authenticode certificate to establish trust. However, depending on the certificate's reputation, Windows SmartScreen may still display a "Windows protected your PC" warning initially. If you downloaded RAVN from the official repository, you can safely click "More info" and then "Run anyway". Over time, as more users download and run the signed executable, SmartScreen trust will build.
 
 ### tkinterdnd2 (Python package)
 

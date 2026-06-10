@@ -25,6 +25,9 @@ jobs:
 
       - name: Build release package
         shell: pwsh
+        env:
+          SIGN_CERT_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+          SIGN_CERT_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
         run: |
           ./build.ps1 -Action ci-package -DownloadBundledFFmpeg
 

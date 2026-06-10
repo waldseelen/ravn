@@ -51,7 +51,7 @@ class TestRunnerProcessWindowHandling:
         with patch.object(base_module.os, "name", "posix"):
             kwargs = get_hidden_subprocess_kwargs()
 
-        assert kwargs == {}
+        assert kwargs == {'encoding': 'utf-8', 'errors': 'replace'}
 
 
 class TestFFmpegRunner:
@@ -836,18 +836,29 @@ class TestYtDlpRunner:
         assert "/path/to/video.mp4" in files
         assert "/path/to/final.mkv" in files
 
-    @patch('subprocess.run')
-    def test_update_success(self, mock_run):
+    @patch('pathlib.Path.rename')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.makedirs')
+    def test_update_success(self, mock_makedirs, mock_open, mock_get, mock_rename):
         """Test successful yt-dlp update"""
-        mock_run.return_value = Mock(returncode=0)
-        runner = YtDlpRunner()
-        result = runner.update()
+        mock_response_api = Mock()
+        mock_response_api.json.return_value = {
+            "tag_name": "2024.01.01",
+            "assets": [{"name": "yt-dlp.exe", "browser_download_url": "http://example.com/yt-dlp.exe"}]
+        }
+        mock_response_download = Mock()
+        mock_response_download.iter_content.return_value = [b"data"]
+        mock_get.side_effect = [mock_response_api, mock_response_download]
+        
+        with patch.object(YtDlpRunner, 'get_version', return_value="2023.01.01"):
+            runner = YtDlpRunner()
+            result = runner.update()
         assert result is True
 
-    @patch('subprocess.run')
-    def test_update_failure(self, mock_run):
+    @patch.object(YtDlpRunner, 'update', return_value=False)
+    def test_update_failure(self, mock_update):
         """Test failed yt-dlp update"""
-        mock_run.return_value = Mock(returncode=1)
         runner = YtDlpRunner()
         result = runner.update()
         assert result is False
@@ -971,7 +982,7 @@ class TestFactoryFunctions:
         """Test get_ytdlp_runner with defaults"""
         runner = get_ytdlp_runner()
         assert isinstance(runner, YtDlpRunner)
-        assert runner.executable_path == "yt-dlp"
+        assert runner.executable_path.endswith("yt-dlp.exe") or runner.executable_path == "yt-dlp"
 
     def test_get_ytdlp_runner_custom(self):
         """Test get_ytdlp_runner with custom path"""

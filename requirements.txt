@@ -4,6 +4,7 @@ yt-dlp
 pytest>=7.0
 requests>=2.31.0
 click>=8.0.0
+mutagen>=1.45.0
 
 # Torrent / magnet support
 # aria2c binary: install via `winget install aria2` (Windows), `brew install aria2` (macOS), `apt install aria2` (Linux)

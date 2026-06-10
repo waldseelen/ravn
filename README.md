@@ -126,11 +126,11 @@ ravn library search --query tutorial --tags archive --json
 ## Dependencies
 
 ### Required
-- Python 3.9+
-- FFmpeg
-- FFprobe
-- yt-dlp
-- Python packages from `requirements.txt`
+- Python 3.9+ (Not required for Windows packaged release)
+- FFmpeg (Bundled in Windows packaged release)
+- FFprobe (Bundled in Windows packaged release)
+- yt-dlp (Self-managed in Windows packaged release)
+- Python packages from `requirements.txt` (Not required for Windows packaged release)
 
 ### Optional
 - `aria2c` for torrent and magnet workflows
@@ -148,9 +148,9 @@ Full setup and troubleshooting guidance lives in [DEPENDENCIES.md](DEPENDENCIES.
 
 - **Windows** is the primary packaged-release target.
 - Linux and macOS source checkouts may work, but packaged releases are not currently maintained for those platforms.
-- Packaged Windows builds support bundled FFmpeg/FFprobe lookup.
+- Packaged Windows builds automatically bundle FFmpeg/FFprobe and self-update `yt-dlp`.
 - GitHub Releases publish zip artifacts and SHA256 checksum files.
-- If SmartScreen appears, download only from GitHub Releases and verify the published checksum.
+- The `RAVN.exe` executable is signed with an Authenticode certificate. If SmartScreen appears, you can safely click "More info" and then "Run anyway". Over time, SmartScreen trust will build. Always verify the downloaded zip against the published SHA256 checksum.
 
 ## Documentation
 

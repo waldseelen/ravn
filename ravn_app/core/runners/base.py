@@ -19,11 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def get_hidden_subprocess_kwargs() -> Dict[str, Any]:
-    """Return Windows-specific subprocess kwargs that suppress child console windows."""
+    """Return Windows-specific subprocess kwargs that suppress child console windows and enforce UTF-8."""
+    kwargs: Dict[str, Any] = {"encoding": "utf-8", "errors": "replace"}
     if os.name != "nt":
-        return {}
-
-    kwargs: Dict[str, Any] = {}
+        return kwargs
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if creationflags:
         kwargs["creationflags"] = creationflags

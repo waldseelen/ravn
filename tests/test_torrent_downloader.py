@@ -195,7 +195,8 @@ class TestOutputCollection:
 
 
 class TestDownloadFlow:
-    def test_download_propagates_progress_and_returns_primary_file(self, tmp_path: Path):
+    @patch('ravn_app.core.runners.aria2.Aria2Runner.is_available', return_value=True)
+    def test_download_propagates_progress_and_returns_primary_file(self, mock_is_avail, tmp_path: Path):
         td = TorrentDownloader()
         target_file = tmp_path / "Movie.mkv"
         target_file.write_bytes(b"1" * 32)
@@ -232,7 +233,8 @@ class TestDownloadFlow:
         assert received[0].percent == 45
         assert received[0].name == "Movie.mkv"
 
-    def test_download_returns_cancelled_result(self, tmp_path: Path):
+    @patch('ravn_app.core.runners.aria2.Aria2Runner.is_available', return_value=True)
+    def test_download_returns_cancelled_result(self, mock_is_avail, tmp_path: Path):
         td = TorrentDownloader()
         with patch.object(
             td._runner,

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ
+from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ, Splash
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
@@ -42,6 +42,7 @@ hiddenimports = sorted(
         *collect_submodules("PIL"),
         *collect_submodules("yt_dlp"),
         *collect_submodules("tkinterdnd2"),
+        *collect_submodules("aria2p"),
         "customtkinter",
     }
 )
@@ -50,21 +51,36 @@ hiddenimports = sorted(
 a = Analysis(
     [str(project_root / "ravn.py")],
     pathex=[str(project_root)],
-    binaries=[],
+    binaries=[
+        ('C:\\Windows\\System32\\vcruntime140.dll', '.'),
+        ('C:\\Windows\\System32\\msvcp140.dll', '.')
+    ],
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['pytest', 'unittest', 'pdb'],
     noarchive=False,
 )
 
 pyz = PYZ(a.pure)
 
+splash = Splash(
+    str(assets_dir / "ravnapp.jpeg"),
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=None,
+    text_size=12,
+    minify_script=True,
+    always_on_top=True,
+)
+
 exe = EXE(
     pyz,
     a.scripts,
+    splash,
+    splash.binaries,
     [],
     exclude_binaries=True,
     name="RAVN",
@@ -75,6 +91,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=str(assets_dir / "ravn.ico") if (assets_dir / "ravn.ico").exists() else None,
+    version='version_info.txt',
 )
 
 coll = COLLECT(

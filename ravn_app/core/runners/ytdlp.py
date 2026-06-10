@@ -643,28 +643,88 @@ class YtDlpRunner(BaseRunner):
 
     def update(self, timeout: int = 300) -> bool:
         """
-        Update yt-dlp to latest version.
+        Update yt-dlp to latest version by downloading yt-dlp.exe from GitHub.
+        Checks version to prevent downgrade loops.
 
         Args:
             timeout: Update timeout in seconds
 
         Returns:
-            True if update successful
+            True if update successful or already up to date
         """
         try:
-            result = subprocess.run(
-                [self.executable_path, "-U"],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                **get_hidden_subprocess_kwargs(),
-            )
-            return result.returncode == 0
+            import requests
+            from pathlib import Path
+            import os
+
+            tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
+            tools_dir.mkdir(parents=True, exist_ok=True)
+            target_exe = tools_dir / "yt-dlp.exe"
+
+            logger.info("Checking latest yt-dlp release...")
+            url = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            data = response.json()
+
+            latest_version = data.get("tag_name", "").strip()
+            current_version = self.get_version()
+
+            if current_version and latest_version:
+                curr_v = current_version.lstrip("v").strip()
+                late_v = latest_version.lstrip("v").strip()
+                if curr_v == late_v:
+                    logger.info("yt-dlp is already up to date: %s", current_version)
+                    self.executable_path = str(target_exe) if target_exe.exists() else self.executable_path
+                    return True
+
+            download_url = None
+            for asset in data.get("assets", []):
+                if asset.get("name") == "yt-dlp.exe":
+                    download_url = asset.get("browser_download_url")
+                    break
+
+            if not download_url:
+                logger.error("yt-dlp.exe asset not found in latest release")
+                return False
+
+            logger.info("Downloading yt-dlp.exe from %s", download_url)
+            dl_response = requests.get(download_url, stream=True, timeout=timeout)
+            dl_response.raise_for_status()
+
+            temp_exe = target_exe.with_suffix(".tmp")
+            with open(temp_exe, "wb") as f:
+                for chunk in dl_response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            if target_exe.exists():
+                try:
+                    target_exe.unlink()
+                except Exception as e:
+                    logger.warning("Could not delete old yt-dlp.exe: %s", e)
+
+            temp_exe.rename(target_exe)
+            logger.info("yt-dlp updated successfully to %s", latest_version)
+
+            self.executable_path = str(target_exe)
+            return True
         except Exception as exc:
             logger.error("yt-dlp update failed: %s", exc)
             return False
 
 
-def get_ytdlp_runner(ytdlp_path: str = "yt-dlp") -> YtDlpRunner:
+def get_ytdlp_runner(ytdlp_path: Optional[str] = None) -> YtDlpRunner:
     """Create and return a YtDlpRunner instance."""
+    from pathlib import Path
+    import os
+
+    if not ytdlp_path:
+        tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
+        local_exe = tools_dir / "yt-dlp.exe"
+        if local_exe.exists():
+            ytdlp_path = str(local_exe)
+        else:
+            ytdlp_path = "yt-dlp"
+
     return YtDlpRunner(ytdlp_path)

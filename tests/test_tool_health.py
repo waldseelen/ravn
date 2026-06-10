@@ -191,10 +191,13 @@ class TestGlobalFunctions:
 
     def test_check_tool_availability(self):
         """Test quick availability check."""
+        checker = get_tool_health_checker()
+        checker.clear_cache()
         with patch('shutil.which', return_value='/usr/bin/ffmpeg'):
             with patch('ravn_app.core.tool_health.ToolHealthChecker._get_tool_version', return_value='version 1.0'):
                 assert check_tool_availability('ffmpeg') is True
         
+        checker.clear_cache()
         with patch('shutil.which', return_value=None):
             assert check_tool_availability('nonexistent') is False
 

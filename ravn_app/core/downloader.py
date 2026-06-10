@@ -66,18 +66,31 @@ _AUDIO_FORMATS = {
 
 
 @dataclass
-class DownloadTask:
-    """İndirme görevi bilgileri"""
+class DownloadRequest:
+    """Tekil indirme isteği konfigürasyonunu sarmalar"""
     url: str
     output_dir: str
     format: DownloadFormat = DownloadFormat.MP4
     quality: DownloadQuality = DownloadQuality.BEST
     progress_callback: Optional[Callable[[int, str], None]] = None
-    metadata: Dict[str, Any] = None
-
-    def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = {}
+    retries: int = 3
+    embed_metadata: bool = True
+    embed_lyrics: bool = True
+    auto_sort: bool = False
+    auto_sort_enabled: Optional[bool] = None
+    auto_sort_mode: str = "artist"
+    audio_bitrate: Optional[str] = None
+    naming_preset: str = "standard"
+    filename_template: Optional[str] = None
+    auto_subtitle_download: bool = False
+    preferred_subtitle_language: str = "tr"
+    subtitle_fallback_language: str = "en"
+    subtitle_include_auto_generated: bool = True
+    auto_embed_subtitles: bool = False
+    postprocess_profile: Optional[Union[Dict[str, Any], 'DownloadPostProcessProfile']] = None
+    robustness_profile: Optional[Union[Dict[str, Any], 'DownloadRobustnessProfile']] = None
+    advanced_profile: Optional[Union[Dict[str, Any], 'DownloadAdvancedProfile']] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -232,9 +245,9 @@ class YouTubeDownloader:
         self._runner = YtDlpRunner(ytdlp_path)
         self.ffmpeg_path = ffmpeg_path
         self.ffprobe_path = ffprobe_path
-        self.download_queue: queue.Queue[DownloadTask] = queue.Queue()
+        self.download_queue: queue.Queue[DownloadRequest] = queue.Queue()
         self.is_worker_active = False
-        self.active_downloads: Dict[str, DownloadTask] = {}
+        self.active_downloads: Dict[str, DownloadRequest] = {}
         self._worker_thread: Optional[threading.Thread] = None
         self._stop_requested = False
         self._media_helpers_factory = lambda: MediaHelpers(
@@ -1087,60 +1100,45 @@ class YouTubeDownloader:
             metadata=metadata,
         )
 
-    def download(
-        self,
-        url: str,
-        output_dir: str,
-        format_type: DownloadFormat = DownloadFormat.MP4,
-        quality: DownloadQuality = DownloadQuality.BEST,
-        progress_callback: Optional[Callable[[int, str], None]] = None,
-        retries: int = DEFAULT_RETRIES,
-        embed_metadata: bool = True,
-        embed_lyrics: bool = True,
-        auto_sort: bool = False,
-        auto_sort_enabled: Optional[bool] = None,
-        auto_sort_mode: str = "artist",
-        audio_bitrate: Optional[str] = None,
-        naming_preset: str = "standard",
-        filename_template: Optional[str] = None,
-        auto_subtitle_download: bool = False,
-        preferred_subtitle_language: str = "tr",
-        subtitle_fallback_language: str = "en",
-        subtitle_include_auto_generated: bool = True,
-        auto_embed_subtitles: bool = False,
-        postprocess_profile: Optional[Union[Dict[str, Any], DownloadPostProcessProfile]] = None,
-        robustness_profile: Optional[Union[Dict[str, Any], DownloadRobustnessProfile]] = None,
-        advanced_profile: Optional[Union[Dict[str, Any], DownloadAdvancedProfile]] = None,
-    ) -> DownloadResult:
+    def download(self, request: Optional[DownloadRequest] = None, **kwargs) -> DownloadResult:
         """
         Video indir
 
         Args:
-            url: Video URL'si
-            output_dir: Çıkış dizini
-            format_type: İndirme formatı
-            quality: Kalite seviyesi
-            progress_callback: İlerleme callback'i
-            retries: Deneme sayısı
-            embed_metadata: Ses dosyalarına ID3/metadata ve albüm kapağı göm
-            embed_lyrics: Metadata gömme sırasında açıklamadan şarkı sözü alanını üretmeye çalış
-            auto_sort: İndirilen dosyaları kanal/sanatçı adına göre klasörlere ayır
-            auto_sort_enabled: auto_sort için yeni isimlendirme (geriye uyumlu)
-            auto_sort_mode: Klasörleme modu: artist veya channel
-            naming_preset: Hazır adlandırma profili (standard/clean/playlist)
-            filename_template: İsteğe bağlı özel şablon ({title}, {uploader}, ...)
-            auto_subtitle_download: İndirme sırasında uygun altyazıları da al
-            preferred_subtitle_language: Öncelikli altyazı dili
-            subtitle_fallback_language: Öncelikli dil yoksa alternatif dil
-            subtitle_include_auto_generated: Gerekirse otomatik üretilen altyazıları kullan
-            auto_embed_subtitles: Video indirmelerinde bulunan altyazıyı dosyaya göm
-            postprocess_profile: İndirme sonrası FFmpeg tabanlı otomasyon profili
-            robustness_profile: İndirme dayanıklılık/tekrar/arsiv ayarları
-            advanced_profile: Çökmeyen/varsayılan UX'i bozmadan saklanan ileri seviye yt-dlp kontrolleri
+            request: İndirme isteği (DownloadRequest)
+            **kwargs: Geriye dönük uyumluluk için eski argümanlar
 
         Returns:
             DownloadResult: İndirme sonucu
         """
+        if request is None:
+            if 'format_type' in kwargs:
+                kwargs['format'] = kwargs.pop('format_type')
+            request = DownloadRequest(**kwargs)
+
+        url = request.url
+        output_dir = request.output_dir
+        format_type = request.format
+        quality = request.quality
+        progress_callback = request.progress_callback
+        retries = request.retries
+        embed_metadata = request.embed_metadata
+        embed_lyrics = request.embed_lyrics
+        auto_sort = request.auto_sort
+        auto_sort_enabled = request.auto_sort_enabled
+        auto_sort_mode = request.auto_sort_mode
+        audio_bitrate = request.audio_bitrate
+        naming_preset = request.naming_preset
+        filename_template = request.filename_template
+        auto_subtitle_download = request.auto_subtitle_download
+        preferred_subtitle_language = request.preferred_subtitle_language
+        subtitle_fallback_language = request.subtitle_fallback_language
+        subtitle_include_auto_generated = request.subtitle_include_auto_generated
+        auto_embed_subtitles = request.auto_embed_subtitles
+        postprocess_profile = request.postprocess_profile
+        robustness_profile = request.robustness_profile
+        advanced_profile = request.advanced_profile
+
         logger.info(f"İndirme başlatılıyor: {url}")
 
         normalized_postprocess = self._normalize_postprocess_profile(postprocess_profile)
@@ -1319,10 +1317,10 @@ class YouTubeDownloader:
                 error_message=result.error_message
             )
 
-    def queue_download(self, task: DownloadTask) -> None:
+    def queue_download(self, request: DownloadRequest) -> None:
         """İndirme kuyruğuna görev ekle"""
-        self.download_queue.put(task)
-        logger.info(f"Kuyruğa eklendi: {task.url}")
+        self.download_queue.put(request)
+        logger.info(f"Kuyruğa eklendi: {request.url}")
 
         # Worker aktif değilse başlat
         if not self.is_worker_active:
@@ -1343,18 +1341,12 @@ class YouTubeDownloader:
         """Kuyruktan görevleri işle"""
         while not self._stop_requested:
             try:
-                task = self.download_queue.get(timeout=1.0)
-                self.active_downloads[task.url] = task
+                request = self.download_queue.get(timeout=1.0)
+                self.active_downloads[request.url] = request
 
-                result = self.download(
-                    url=task.url,
-                    output_dir=task.output_dir,
-                    format_type=task.format,
-                    quality=task.quality,
-                    progress_callback=task.progress_callback
-                )
+                result = self.download(request)
 
-                del self.active_downloads[task.url]
+                del self.active_downloads[request.url]
                 self.download_queue.task_done()
 
             except queue.Empty:

@@ -1194,14 +1194,16 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         def run_download():
             try:
-                result = self.downloader.download(
+                from ravn_app.core.downloader import DownloadRequest
+                req = DownloadRequest(
                     url=url,
                     output_dir=output_dir,
-                    format_type=format_type,
+                    format=format_type,
                     quality=quality,
                     progress_callback=self._on_download_progress,
                     **download_settings,
                 )
+                result = self.downloader.download(req)
                 if result.success:
                     self.after(0, self._on_download_success, result)
                 else:
@@ -1396,16 +1398,17 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
 
         for index, url in enumerate(urls, start=1):
             task_name = t("download.batchTaskName", index=index, total=len(urls))
+            from ravn_app.core.downloader import DownloadRequest
             self.task_queue.add_task(
                 task_type=TaskType.DOWNLOAD,
                 name=task_name,
-                execute_fn=lambda u=url: self.downloader.download(
+                execute_fn=lambda u=url: self.downloader.download(DownloadRequest(
                     url=u,
                     output_dir=output_dir,
-                    format_type=format_type,
+                    format=format_type,
                     quality=quality,
                     **download_settings,
-                ),
+                )),
             )
 
         self.download_status_label.configure(

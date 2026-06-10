@@ -123,14 +123,14 @@ class TestCliCommands:
         )
 
         assert result.exit_code == 0
-        kwargs = mock_downloader.download.call_args.kwargs
-        assert kwargs["output_dir"].endswith("Music")
-        assert kwargs["format_type"].value[0] == "mp3"
-        assert kwargs["quality"].value == "bestaudio/best"
-        assert kwargs["naming_preset"] == "clean"
-        assert kwargs["postprocess_profile"]["extract_audio"] is True
-        assert kwargs["postprocess_profile"]["convert_enabled"] is True
-        assert kwargs["postprocess_profile"]["convert_format"] == "m4a"
+        request = mock_downloader.download.call_args[0][0]
+        assert request.output_dir.endswith("Music")
+        assert request.format.value[0] == "mp3"
+        assert request.quality.value == "bestaudio/best"
+        assert request.naming_preset == "clean"
+        assert request.postprocess_profile["extract_audio"] is True
+        assert request.postprocess_profile["convert_enabled"] is True
+        assert request.postprocess_profile["convert_format"] == "m4a"
         assert '"profile": "music"' in result.output
         assert '"effective"' in result.output
 
@@ -203,12 +203,12 @@ class TestCliCommands:
         )
 
         assert result.exit_code == 0
-        kwargs = mock_downloader.download.call_args.kwargs
-        assert kwargs["output_dir"].endswith("Archive")
-        assert kwargs["format_type"].value[0] == "mkv"
-        assert kwargs["naming_preset"] == "playlist"
-        assert kwargs["auto_subtitle_download"] is True
-        assert kwargs["postprocess_profile"]["embed_subtitles"] is True
+        request = mock_downloader.download.call_args[0][0]
+        assert request.output_dir.endswith("Archive")
+        assert request.format.value[0] == "mkv"
+        assert request.naming_preset == "playlist"
+        assert request.auto_subtitle_download is True
+        assert request.postprocess_profile["embed_subtitles"] is True
 
     @patch("ravn_app.cli.VideoConverter")
     @patch("ravn_app.cli.DatabaseManager")

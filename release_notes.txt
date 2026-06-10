@@ -1,0 +1,18 @@
+﻿# RAVN v1.0.0 - Initial Release & Stability Update
+
+This is the first stable release of RAVN, bringing robust video downloading, audio conversion, and library management with significant architectural improvements.
+
+## 🚀 Key Improvements & Features
+* **yt-dlp Dynamic Self-Update:** Seamlessly updates the underlying yt-dlp binary from GitHub Releases to prevent breakages caused by upstream platform changes.
+* **Code Signing & Integrity:** Windows builds are now Authenticode-signed and provide SHA-256 checksums to build SmartScreen trust and ensure payload integrity.
+* **Splash Screen Integration:** Added a sleek, non-blocking splash screen during initial application load for a better user experience.
+* **Strict UTF-8 IPC:** Enforced strict UTF-8 encoding and fallback replacements in subprocess pipes (fmpeg, yt-dlp, ria2c), preventing crashes on systems with non-standard OEM codepages.
+* **Isolated Sandbox Testing:** Shipped a built-in Windows Sandbox profile (windows_sandbox.wsb) to quickly test the application in a globally isolated, dependency-free environment.
+* **Dependency & Size Optimization:** Bundled essential MSVC C++ runtimes (cruntime140.dll, msvcp140.dll) and stripped unused Python libraries (pytest, distutils, pdb) to reduce the final portable .exe size.
+* **API Stabilization:** The 27-parameter signature in the core download system was successfully collapsed into a strongly-typed DownloadRequest dataclass, hardening the core data flow.
+
+## 🔧 Installation
+RAVN is shipped as a portable executable for Windows. 
+1. Download the RAVN-windows-x64.zip asset.
+2. Extract the folder and launch RAVN.exe.
+*Note: Depending on the certificate's accumulated reputation, Windows SmartScreen might appear initially. Simply click "More info" and then "Run anyway" if the ZIP checksum matches.*

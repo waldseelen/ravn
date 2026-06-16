@@ -129,6 +129,18 @@ class DownloadWorkspace(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         )
         self.source_browse_button.pack(side="right")
+        
+        self.source_preview_button = ctk.CTkButton(
+            source_actions,
+            text=t("download.previewAction") if t("download.previewAction") != "download.previewAction" else "Önizleme",
+            command=self._preview_source,
+            font=Fonts.SMALL,
+            height=Sizes.BTN_HEIGHT_SM,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+        )
+        self.source_preview_button.pack(side="right", padx=(0, Spacing.XS))
 
         override_row = ctk.CTkFrame(self, fg_color="transparent")
         override_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
@@ -159,6 +171,24 @@ class DownloadWorkspace(ctk.CTkFrame):
         media_output_row = ctk.CTkFrame(self, fg_color="transparent")
         media_output_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
         self.media_output_row = media_output_row
+        
+        ctk.CTkLabel(
+            media_output_row,
+            text="Önayar:" if t("download.presetLabel") == "download.presetLabel" else t("download.presetLabel"),
+            font=Fonts.LABEL,
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left", padx=(0, Spacing.SM))
+        
+        self.preset_selector = ctk.CTkComboBox(
+            media_output_row,
+            values=["Özel (Custom)", "Arşiv (Archive)", "Mobil (Mobile)", "Yayın (Broadcast)"],
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_MD,
+            fg_color=Colors.BG_INPUT,
+            border_color=Colors.BORDER,
+            command=self._on_preset_selected,
+        )
+        self.preset_selector.pack(side="left", padx=(0, Spacing.MD))
 
         ctk.CTkLabel(
             media_output_row,
@@ -344,6 +374,18 @@ class DownloadWorkspace(ctk.CTkFrame):
 
     def _on_media_output_selected(self, selected_label: str) -> None:
         self.set_output_surface(self._media_output_value_to_key.get(selected_label, "video"))
+
+    def _on_preset_selected(self, selected_label: str) -> None:
+        pass  # Will coordinate with DownloadTab for advanced preset logic
+        
+    def _preview_source(self) -> None:
+        source_text = self.get_source_text()
+        if not source_text:
+            return
+        if self.download_tab is not None and hasattr(self.download_tab, "set_status_text"):
+            self.download_tab.set_status_text("Önizleme yükleniyor...")
+            # Trigger analysis
+            self.download_tab._start_analysis()
 
     def _on_source_text_changed(self, _event=None) -> None:
         self._apply_workspace_state()

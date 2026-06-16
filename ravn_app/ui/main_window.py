@@ -142,6 +142,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         self._quick_action_buttons = {}
         self._current_view_key = None
         self._active_drawer_key = None
+        self._sidebar_expanded = True
 
         shell = ctk.CTkFrame(self, fg_color=Colors.BG_PRIMARY)
         shell.pack(fill="both", expand=True)
@@ -181,7 +182,19 @@ class YouTubeDownloaderApp(ctk.CTk):
             text_color=Colors.TEXT_PRIMARY,
             anchor="w",
         )
-        self.brand_heading_label.pack(anchor="w")
+        self.brand_heading_label.pack(side="left")
+
+        self.sidebar_toggle_button = ctk.CTkButton(
+            brand,
+            text="☰",
+            width=30,
+            command=self._toggle_sidebar,
+            fg_color="transparent",
+            hover_color=Colors.BG_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+            cursor=Cursors.POINTER,
+        )
+        self.sidebar_toggle_button.pack(side="right")
 
         self.brand_subtitle_label = ctk.CTkLabel(
             brand,
@@ -249,6 +262,10 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def _create_sidebar_button(self, parent, view_key: str, text: str) -> None:
         self._sidebar_button_labels[view_key] = text
+        icon = text.split("  ")[0] if "  " in text else ""
+        self._sidebar_button_icons = getattr(self, "_sidebar_button_icons", {})
+        self._sidebar_button_icons[view_key] = icon
+
         button = ctk.CTkButton(
             parent,
             text=text,
@@ -266,6 +283,22 @@ class YouTubeDownloaderApp(ctk.CTk):
         )
         button.pack(fill="x", pady=(0, Spacing.SM))
         self._sidebar_buttons[view_key] = button
+
+    def _toggle_sidebar(self) -> None:
+        self._sidebar_expanded = not self._sidebar_expanded
+        width = 230 if self._sidebar_expanded else 60
+        self.sidebar.configure(width=width)
+        
+        if self._sidebar_expanded:
+            self.brand_heading_label.pack(side="left")
+            self.brand_subtitle_label.pack(anchor="w", pady=(Spacing.XS, 0))
+            self.sidebar_hint_label.pack(anchor="w", pady=(Spacing.XS, 0))
+        else:
+            self.brand_heading_label.pack_forget()
+            self.brand_subtitle_label.pack_forget()
+            self.sidebar_hint_label.pack_forget()
+            
+        self._update_navigation_state()
 
     def _refresh_sidebar_utility_controls(self) -> None:
         theme_id = ThemeManager.normalize_theme_name(self.config_manager.get("theme", "dark"))
@@ -769,9 +802,13 @@ class YouTubeDownloaderApp(ctk.CTk):
         active_view = self._current_view_key
         for view_key, button in self._sidebar_buttons.items():
             base_label = self._sidebar_button_labels.get(view_key, button.cget("text"))
+            icon = self._sidebar_button_icons.get(view_key, "")
+            
+            display_text = base_label if self._sidebar_expanded else icon
+            
             if view_key == active_view:
                 button.configure(
-                    text=f"› {base_label}",
+                    text=f"› {display_text}",
                     fg_color=Colors.ACCENT,
                     hover_color=Colors.ACCENT_HOVER,
                     text_color=Colors.BG_PRIMARY,
@@ -781,7 +818,7 @@ class YouTubeDownloaderApp(ctk.CTk):
                 )
             else:
                 button.configure(
-                    text=base_label,
+                    text=display_text,
                     fg_color="transparent",
                     hover_color=Colors.BG_HOVER,
                     text_color=Colors.TEXT_PRIMARY,

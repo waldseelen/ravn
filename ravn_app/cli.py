@@ -470,6 +470,7 @@ def cli():
     help="Output directory base (profile subfolders still apply).",
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+@click.option("--dry-run", is_flag=True, default=False, help="Print intent and skip actual download.")
 @click.pass_context
 def download_cmd(
     ctx: click.Context,
@@ -502,6 +503,7 @@ def download_cmd(
     socket_timeout: int,
     output: Optional[Path],
     as_json: bool,
+    dry_run: bool,
 ):
     """Download media from URL using intent-driven acquisition settings."""
     # Check required tools
@@ -545,6 +547,14 @@ def download_cmd(
         click.echo(_tr("cli.downloadStarting", url=url))
         click.echo(_tr("cli.downloadStatus", quality=_quality_label_for_payload(dl_quality), format=_format_key_for_payload(dl_format), output=str(output_dir)))
         click.echo(f"  preset: {_normalize_profile_key(profile)}")
+
+    if dry_run:
+        if as_json:
+            _output(json.loads(summary_json), as_json=True)
+        else:
+            click.echo("\n--- DRY RUN SUMMARY ---")
+            _output(json.loads(summary_json), as_json=False)
+        return
 
     def _progress(percent: int, status: str) -> None:
         if not as_json:

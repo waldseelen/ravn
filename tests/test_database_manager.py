@@ -3,9 +3,10 @@ Tests for DatabaseManager and ConfigManager behavior.
 """
 
 import json
+import sqlite3
 from pathlib import Path
 from unittest.mock import patch
-import sqlite3
+
 import pytest
 
 from ravn_app.core.database import ConfigManager, ConversionRecord, DatabaseManager, DownloadRecord, OperationRecord
@@ -517,7 +518,9 @@ class TestPluginHooks:
         plugin.on_convert_start("in.mp4", "mp4")
         plugin.on_convert_complete("out.mp4")
 
-    def test_plugin_manager_trigger_and_error_path(self, capsys):
+    def test_plugin_manager_trigger_and_error_path(self, caplog):
+        import logging
+
         from ravn_app.core.database import PluginInterface, PluginManager
 
         class GoodPlugin(PluginInterface):
@@ -537,8 +540,8 @@ class TestPluginHooks:
         manager.register_plugin(good)
         manager.register_plugin(bad)
 
-        manager.trigger("on_download_start", {"title": "ok"})
+        with caplog.at_level(logging.ERROR, logger="ravn_app.core.database"):
+            manager.trigger("on_download_start", {"title": "ok"})
         assert good.called is True
-        captured = capsys.readouterr().out
-        assert "Plugin hatası" in captured
+        assert "Plugin hatası" in caplog.text
 

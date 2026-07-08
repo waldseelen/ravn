@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
-
 _BRACKETED_SEGMENT_RE = re.compile(r"\s*([\[(])([^\])]+)([\])])\s*")
 _MULTI_SPACE_RE = re.compile(r"\s+")
 _SEPARATOR_RE = re.compile(r"\s*[-–—|]+\s*")

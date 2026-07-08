@@ -19,8 +19,8 @@ from ravn_app.core.persistence import MediaLibraryAutoAdder
 from ravn_app.core.platform_support import PlatformManager
 from ravn_app.core.task_manager import get_task_queue
 from ravn_app.ui.advanced_features import NotificationManager, SystemTrayIntegration, ThemeManager
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 from ravn_app.ui.components.command_palette import CommandPaletteDialog, PaletteCommand
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 from ravn_app.ui.tabs.download_workspace import DownloadWorkspace
 from ravn_app.ui.tabs.home_workspace import HomeWorkspace
 from ravn_app.ui.tabs.library_workspace import LibraryWorkspace
@@ -28,7 +28,6 @@ from ravn_app.ui.tabs.queue_tab import QueueTab
 from ravn_app.ui.tabs.settings_tab import SettingsTab
 from ravn_app.ui.tabs.studio_workspace import StudioWorkspace
 from ravn_app.ui.ui_components import ToastManager, Tooltip
-
 
 logger = get_logger(__name__)
 
@@ -42,6 +41,13 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        # CustomTkinter's Windows dark-titlebar sync (_windows_set_titlebar_color) hides
+        # and re-shows the ENTIRE native window on every ctk.set_appearance_mode() call —
+        # that is the actual visible "blink" during theme toggling, independent of widget
+        # count. RAVN draws its own themed top bar, so the OS titlebar strip matching
+        # dark/light is cosmetic; disabling this keeps the window on screen and eliminates
+        # the flash. Trade-off: the native titlebar color may lag one toggle behind.
+        self._deactivate_windows_window_header_manipulation = True
         self.configure(fg_color=Colors.BG_PRIMARY)
         self.withdraw()
 
@@ -85,6 +91,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         self._task_callback_after_id = None
         self._ui_callback_queue: queue.Queue = queue.Queue()
         self._workspace_frames: dict[str, ctk.CTkFrame] = {}
+        self._lazy_workspace_builders: dict[str, Any] = {}
         self._drawer_frames: dict[str, ctk.CTkFrame] = {}
         self._sidebar_buttons: dict[str, ctk.CTkButton] = {}
         self._sidebar_button_labels: dict[str, str] = {}
@@ -147,14 +154,10 @@ class YouTubeDownloaderApp(ctk.CTk):
         shell = ctk.CTkFrame(self, fg_color=Colors.BG_PRIMARY)
         shell.pack(fill="both", expand=True)
 
-        self.sidebar = ctk.CTkFrame(shell, fg_color=Colors.BG_SURFACE, width=230, corner_radius=0)
-        self.sidebar.pack(side="left", fill="y")
-        self.sidebar.pack_propagate(False)
-
         self.content_shell = ctk.CTkFrame(shell, fg_color=Colors.BG_PRIMARY)
-        self.content_shell.pack(side="left", fill="both", expand=True)
+        self.content_shell.pack(side="top", fill="both", expand=True)
 
-        self._build_sidebar()
+        self._build_topnav()
         self._build_header()
         self._build_main_stage()
         self._build_footer()
@@ -171,98 +174,70 @@ class YouTubeDownloaderApp(ctk.CTk):
         else:
             self._refresh_header_actions()
 
-    def _build_sidebar(self) -> None:
-        brand = ctk.CTkFrame(self.sidebar, fg_color=Colors.BG_SURFACE)
-        brand.pack(fill="x", padx=Spacing.MD, pady=(Spacing.LG, Spacing.LG))
+    def _build_topnav(self) -> None:
+        """Horizontal top navigation bar: brand + primary destinations + utilities."""
+        self.topnav = ctk.CTkFrame(self.content_shell, fg_color=Colors.BG_SURFACE, corner_radius=0, height=58)
+        self.topnav.pack(side="top", fill="x")
+        self.topnav.pack_propagate(False)
+
+        inner = ctk.CTkFrame(self.topnav, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.SM)
 
         self.brand_heading_label = ctk.CTkLabel(
-            brand,
+            inner,
             text=t("common.appHeading"),
-            font=Fonts.TITLE,
-            text_color=Colors.TEXT_PRIMARY,
+            font=Fonts.H1,
+            text_color=Colors.ACCENT,
             anchor="w",
         )
-        self.brand_heading_label.pack(side="left")
+        self.brand_heading_label.pack(side="left", padx=(0, Spacing.LG))
 
-        self.sidebar_toggle_button = ctk.CTkButton(
-            brand,
-            text="☰",
-            width=30,
-            command=self._toggle_sidebar,
-            fg_color="transparent",
-            hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            cursor=Cursors.POINTER,
-        )
-        self.sidebar_toggle_button.pack(side="right")
+        nav_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        nav_frame.pack(side="left")
+        self._create_nav_button(nav_frame, "home", Icons.HOME, t("workspace.home"))
+        self._create_nav_button(nav_frame, "download", Icons.DOWNLOAD, t("workspace.download"))
+        self._create_nav_button(nav_frame, "studio", Icons.STUDIO, t("workspace.studio"))
+        self._create_nav_button(nav_frame, "library", Icons.LIBRARY, t("workspace.library"))
 
-        self.brand_subtitle_label = ctk.CTkLabel(
-            brand,
-            text=t("common.appSubtitle"),
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
-            anchor="w",
-        )
-        self.brand_subtitle_label.pack(anchor="w", pady=(Spacing.XS, 0))
-
-        nav_frame = ctk.CTkFrame(self.sidebar, fg_color=Colors.BG_SURFACE)
-        nav_frame.pack(fill="x", padx=Spacing.MD)
-
-        self._create_sidebar_button(nav_frame, "home", f"{Icons.BROWSE}  {t('workspace.home')}")
-        self._create_sidebar_button(nav_frame, "download", f"{Icons.DOWNLOAD}  {t('workspace.download')}")
-        self._create_sidebar_button(nav_frame, "studio", f"{Icons.CONVERT}  {t('workspace.studio')}")
-        self._create_sidebar_button(nav_frame, "library", f"{Icons.LIBRARY}  {t('workspace.library')}")
-
-        helper = ctk.CTkFrame(self.sidebar, fg_color=Colors.BG_SURFACE)
-        helper.pack(side="bottom", fill="x", padx=Spacing.MD, pady=Spacing.MD)
-
-        toggle_row = ctk.CTkFrame(helper, fg_color=Colors.BG_SURFACE)
-        toggle_row.pack(fill="x", pady=(0, Spacing.SM))
+        utils = ctk.CTkFrame(inner, fg_color="transparent")
+        utils.pack(side="right")
 
         self.theme_toggle_button = ctk.CTkButton(
-            toggle_row,
+            utils,
             text="",
             command=self._toggle_theme,
-            height=Sizes.BTN_HEIGHT_LG,
+            width=46,
+            height=Sizes.BTN_HEIGHT_MD,
             fg_color=Colors.BG_CARD,
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
             font=Fonts.LABEL_BOLD,
             cursor=Cursors.POINTER,
         )
-        self.theme_toggle_button.pack(side="left", fill="x", expand=True, padx=(0, Spacing.XS))
+        self.theme_toggle_button.pack(side="left", padx=(0, Spacing.XS))
         self._theme_toggle_tooltip = Tooltip(self.theme_toggle_button, "")
 
         self.language_toggle_button = ctk.CTkButton(
-            toggle_row,
+            utils,
             text="",
             command=self._toggle_language,
-            height=Sizes.BTN_HEIGHT_LG,
+            width=46,
+            height=Sizes.BTN_HEIGHT_MD,
             fg_color=Colors.BG_CARD,
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
             font=Fonts.LABEL_BOLD,
             cursor=Cursors.POINTER,
         )
-        self.language_toggle_button.pack(side="left", fill="x", expand=True, padx=(Spacing.XS, 0))
+        self.language_toggle_button.pack(side="left", padx=(0, Spacing.SM))
         self._language_toggle_tooltip = Tooltip(self.language_toggle_button, "")
 
-        self._create_sidebar_button(helper, "settings", f"{Icons.SETTINGS}  {t('mainWindow.settingsAction')}")
+        self._create_nav_button(utils, "settings", Icons.SETTINGS, t("mainWindow.settingsAction"))
         self._refresh_sidebar_utility_controls()
 
-        self.sidebar_hint_label = ctk.CTkLabel(
-            helper,
-            text=t("mainWindow.sidebarHint"),
-            font=Fonts.SMALL,
-            text_color=Colors.TEXT_MUTED,
-            justify="left",
-            wraplength=180,
-        )
-        self.sidebar_hint_label.pack(anchor="w", pady=(Spacing.XS, 0))
-
-    def _create_sidebar_button(self, parent, view_key: str, text: str) -> None:
+    def _create_nav_button(self, parent, view_key: str, icon: str, label: str) -> None:
+        text = f"{icon}  {label}"
         self._sidebar_button_labels[view_key] = text
-        icon = text.split("  ")[0] if "  " in text else ""
         self._sidebar_button_icons = getattr(self, "_sidebar_button_icons", {})
         self._sidebar_button_icons[view_key] = icon
 
@@ -270,35 +245,17 @@ class YouTubeDownloaderApp(ctk.CTk):
             parent,
             text=text,
             command=lambda key=view_key: self.show_workspace(key),
-            anchor="w",
-            height=Sizes.BTN_HEIGHT_LG,
+            height=Sizes.BTN_HEIGHT_MD,
             fg_color="transparent",
             hover_color=Colors.BG_HOVER,
             text_color=Colors.TEXT_PRIMARY,
-            border_width=0,
-            border_color=Colors.BG_SURFACE,
             corner_radius=Sizes.CORNER_MD,
             cursor=Cursors.POINTER,
             font=Fonts.LABEL,
         )
-        button.pack(fill="x", pady=(0, Spacing.SM))
+        button.pack(side="left", padx=(0, Spacing.XS))
         self._sidebar_buttons[view_key] = button
-
-    def _toggle_sidebar(self) -> None:
-        self._sidebar_expanded = not self._sidebar_expanded
-        width = 230 if self._sidebar_expanded else 60
-        self.sidebar.configure(width=width)
-        
-        if self._sidebar_expanded:
-            self.brand_heading_label.pack(side="left")
-            self.brand_subtitle_label.pack(anchor="w", pady=(Spacing.XS, 0))
-            self.sidebar_hint_label.pack(anchor="w", pady=(Spacing.XS, 0))
-        else:
-            self.brand_heading_label.pack_forget()
-            self.brand_subtitle_label.pack_forget()
-            self.sidebar_hint_label.pack_forget()
-            
-        self._update_navigation_state()
+        Tooltip(button, label)
 
     def _refresh_sidebar_utility_controls(self) -> None:
         theme_id = ThemeManager.normalize_theme_name(self.config_manager.get("theme", "dark"))
@@ -584,57 +541,16 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.home_workspace.grid(row=0, column=0, sticky="nsew")
         self._workspace_frames["home"] = self.home_workspace
 
-        self.download_workspace = DownloadWorkspace(
-            self.workspace_host,
-            downloader=self.downloader,
-            config_manager=self.config_manager,
-            platform_manager=self.platform_manager,
-            task_queue=self.task_queue,
-            animation_manager=self.animation_manager,
-            toast_manager_getter=lambda: self.toast_manager,
-            queue_paused_getter=lambda: self.queue_paused,
-            show_queue_callback=self.show_queue_view,
-            auto_add_to_library_callback=self._auto_add_outputs_to_library,
-            fg_color=Colors.BG_PRIMARY,
-        )
-        self.download_workspace.grid(row=0, column=0, sticky="nsew")
-        self.download_tab = self.download_workspace.download_tab
-        self.torrent_tab = self.download_workspace.torrent_tab
-        self._workspace_frames["download"] = self.download_workspace
-
-        self.studio_workspace = StudioWorkspace(
-            self.workspace_host,
-            config_manager=self.config_manager,
-            db_manager=self.db_manager,
-            task_queue=self.task_queue,
-            animation_manager=self.animation_manager,
-            toast_manager_getter=lambda: self.toast_manager,
-            show_queue_callback=self.show_queue_view,
-            notify_conversion_complete=self._notify_conversion_complete,
-            auto_add_to_library_callback=self._auto_add_outputs_to_library,
-            fg_color=Colors.BG_PRIMARY,
-        )
-        self.studio_workspace.grid(row=0, column=0, sticky="nsew")
-        self.converter_tab = self.studio_workspace.converter_tab
-        self.subtitle_tab = self.studio_workspace.subtitle_tab
-        self.filters_tab = self.studio_workspace.filters_tab
-        self.mixer_tab = self.studio_workspace.mixer_tab
-        self._workspace_frames["studio"] = self.studio_workspace
-
-        self.library_workspace = LibraryWorkspace(
-            self.workspace_host,
-            config_manager=self.config_manager,
-            db_manager=self.db_manager,
-            task_queue=self.task_queue,
-            animation_manager=self.animation_manager,
-            toast_manager_getter=lambda: self.toast_manager,
-            show_queue_callback=self.show_queue_view,
-            fg_color=Colors.BG_PRIMARY,
-        )
-        self.library_workspace.grid(row=0, column=0, sticky="nsew")
-        self.library_tab = self.library_workspace.library_tab
-        self.history_tab = self.library_workspace.history_tab
-        self._workspace_frames["library"] = self.library_workspace
+        # Download/Studio/Library are heavy (hundreds of widgets each) and every live
+        # CustomTkinter widget gets touched synchronously on every theme toggle. Building
+        # them eagerly at startup made theme switching freeze/flicker for ~0.5-1.6s
+        # (measured: ~924 tracked widgets). Defer construction to first visit instead —
+        # _show_view() calls the matching builder below exactly once, on demand.
+        self._lazy_workspace_builders = {
+            "download": self._build_download_workspace,
+            "studio": self._build_studio_workspace,
+            "library": self._build_library_workspace,
+        }
 
         self.queue_tab = QueueTab(
             self.drawer_content_host,
@@ -654,6 +570,61 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.settings_tab.pack(fill="both", expand=True)
         settings_page.grid(row=0, column=0, sticky="nsew")
         self._workspace_frames["settings"] = settings_page
+
+    def _build_download_workspace(self) -> None:
+        self.download_workspace = DownloadWorkspace(
+            self.workspace_host,
+            downloader=self.downloader,
+            config_manager=self.config_manager,
+            platform_manager=self.platform_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            queue_paused_getter=lambda: self.queue_paused,
+            show_queue_callback=self.show_queue_view,
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
+            fg_color=Colors.BG_PRIMARY,
+        )
+        self.download_workspace.grid(row=0, column=0, sticky="nsew")
+        self.download_tab = self.download_workspace.download_tab
+        self.torrent_tab = self.download_workspace.torrent_tab
+        self._workspace_frames["download"] = self.download_workspace
+
+    def _build_studio_workspace(self) -> None:
+        self.studio_workspace = StudioWorkspace(
+            self.workspace_host,
+            config_manager=self.config_manager,
+            db_manager=self.db_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            show_queue_callback=self.show_queue_view,
+            notify_conversion_complete=self._notify_conversion_complete,
+            auto_add_to_library_callback=self._auto_add_outputs_to_library,
+            fg_color=Colors.BG_PRIMARY,
+        )
+        self.studio_workspace.grid(row=0, column=0, sticky="nsew")
+        self.converter_tab = self.studio_workspace.converter_tab
+        self.subtitle_tab = self.studio_workspace.subtitle_tab
+        self.filters_tab = self.studio_workspace.filters_tab
+        self.mixer_tab = self.studio_workspace.mixer_tab
+        self._workspace_frames["studio"] = self.studio_workspace
+
+    def _build_library_workspace(self) -> None:
+        self.library_workspace = LibraryWorkspace(
+            self.workspace_host,
+            config_manager=self.config_manager,
+            db_manager=self.db_manager,
+            task_queue=self.task_queue,
+            animation_manager=self.animation_manager,
+            toast_manager_getter=lambda: self.toast_manager,
+            show_queue_callback=self.show_queue_view,
+            fg_color=Colors.BG_PRIMARY,
+        )
+        self.library_workspace.grid(row=0, column=0, sticky="nsew")
+        self.library_tab = self.library_workspace.library_tab
+        self.history_tab = self.library_workspace.history_tab
+        self._workspace_frames["library"] = self.library_workspace
 
     def _build_footer(self) -> None:
         footer = ctk.CTkFrame(self.content_shell, fg_color=Colors.BG_PRIMARY)
@@ -736,6 +707,11 @@ class YouTubeDownloaderApp(ctk.CTk):
         palette.bind("<Destroy>", lambda _event: self.__dict__.__setitem__("_command_palette", None), add="+")
 
     def _show_view(self, view_key: str) -> None:
+        if view_key not in self._workspace_frames:
+            builder = self.__dict__.get("_lazy_workspace_builders", {}).get(view_key)
+            if builder is not None:
+                builder()
+
         target = self._workspace_frames.get(view_key)
         if target is None:
             return
@@ -801,19 +777,14 @@ class YouTubeDownloaderApp(ctk.CTk):
     def _update_navigation_state(self) -> None:
         active_view = self._current_view_key
         for view_key, button in self._sidebar_buttons.items():
-            base_label = self._sidebar_button_labels.get(view_key, button.cget("text"))
-            icon = self._sidebar_button_icons.get(view_key, "")
-            
-            display_text = base_label if self._sidebar_expanded else icon
-            
+            display_text = self._sidebar_button_labels.get(view_key, button.cget("text"))
+
             if view_key == active_view:
                 button.configure(
                     text=f"› {display_text}",
                     fg_color=Colors.ACCENT,
                     hover_color=Colors.ACCENT_HOVER,
                     text_color=Colors.BG_PRIMARY,
-                    border_width=1,
-                    border_color=Colors.ACCENT,
                     font=Fonts.LABEL_BOLD,
                 )
             else:
@@ -822,8 +793,6 @@ class YouTubeDownloaderApp(ctk.CTk):
                     fg_color="transparent",
                     hover_color=Colors.BG_HOVER,
                     text_color=Colors.TEXT_PRIMARY,
-                    border_width=0,
-                    border_color=Colors.BG_SURFACE,
                     font=Fonts.LABEL,
                 )
 
@@ -863,10 +832,6 @@ class YouTubeDownloaderApp(ctk.CTk):
         compact = width < 1320
         wide = width >= 1700
 
-        sidebar_width = 210 if compact else 230
-        if wide:
-            sidebar_width = 248
-
         drawer_width = 340 if compact else 380
         if width >= 1500:
             drawer_width = 400
@@ -894,7 +859,6 @@ class YouTubeDownloaderApp(ctk.CTk):
         }
 
         try:
-            self.sidebar.configure(width=sidebar_width)
             self.header.pack_configure(padx=padx)
             self.stage_frame.pack_configure(padx=padx)
             self.footer_status_label.master.pack_configure(padx=padx)
@@ -1381,9 +1345,9 @@ class YouTubeDownloaderApp(ctk.CTk):
 
         self._sidebar_button_labels.update(
             {
-                "home": f"{Icons.BROWSE}  {t('workspace.home')}",
+                "home": f"{Icons.HOME}  {t('workspace.home')}",
                 "download": f"{Icons.DOWNLOAD}  {t('workspace.download')}",
-                "studio": f"{Icons.CONVERT}  {t('workspace.studio')}",
+                "studio": f"{Icons.STUDIO}  {t('workspace.studio')}",
                 "library": f"{Icons.LIBRARY}  {t('workspace.library')}",
                 "settings": f"{Icons.SETTINGS}  {t('mainWindow.settingsAction')}",
             }

@@ -10,6 +10,7 @@ import math
 import os
 import sys
 from typing import Any, Callable, Optional
+
 import customtkinter as ctk
 
 
@@ -47,7 +48,7 @@ def detect_reduced_motion() -> bool:
     elif sys.platform == "darwin":
         try:
             # macOS: check accessibility setting
-            from subprocess import run, PIPE
+            from subprocess import run
             result = run(
                 ["defaults", "read", "-g", "reduceMotion"],
                 capture_output=True,

@@ -2,25 +2,29 @@
 Video Converter UI Sekmesi - CustomTkinter ile oluşturulmuş
 """
 
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from typing import Optional, Callable
 import os
 from pathlib import Path
 from threading import Thread
+from tkinter import filedialog, messagebox
+from typing import Callable, Optional
 
-from ravn_app.core.converter import (
-    VideoConverter, BatchConverter, ConversionSettings,
-    VideoCodec, AudioCodec, VideoQuality, AudioBitrate, CodecManager
-)
+import customtkinter as ctk
+
 from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.core.converter import (
+    AudioBitrate,
+    CodecManager,
+    ConversionSettings,
+    VideoConverter,
+    VideoQuality,
+)
 from ravn_app.core.i18n import t
 from ravn_app.ui.components.error_panel import ErrorPanel
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
-from ravn_app.ui.ui_components import Tooltip, style_combo, style_entry, bind_focus_ring, set_button_loading_state
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
+from ravn_app.ui.ui_components import Tooltip, bind_focus_ring, set_button_loading_state, style_combo, style_entry
 
 try:
-    from tkinterdnd2 import DND_FILES, TkinterDnD
+    from tkinterdnd2 import DND_FILES
     HAS_DND = True
 except ImportError:
     HAS_DND = False

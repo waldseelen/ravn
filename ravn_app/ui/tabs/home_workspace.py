@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from ravn_app.core.i18n import t
 from ravn_app.core.tool_health import get_tool_health_checker
+from ravn_app.ui.components.clickable_card import ClickableCard
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 
 
@@ -15,7 +16,9 @@ class _SummaryCard(ctk.CTkFrame):
     def __init__(self, parent, title: str, value: str, subtitle: str, **kwargs):
         kwargs.setdefault("fg_color", Colors.BG_SURFACE)
         super().__init__(parent, **kwargs)
-        self.configure(corner_radius=Sizes.CORNER_MD)
+        # A hairline border gives the card definition against the page: BG_SURFACE sits only
+        # a hair off BG_PRIMARY, so without it the cards read as flat, borderless beige blocks.
+        self.configure(corner_radius=Sizes.CORNER_MD, border_width=1, border_color=Colors.BORDER)
 
         self.title_label = ctk.CTkLabel(
             self,
@@ -48,24 +51,6 @@ class _SummaryCard(ctk.CTkFrame):
         self.title_label.configure(text=title)
         self.value_label.configure(text=value)
         self.subtitle_label.configure(text=subtitle)
-
-
-class _ActionCard(ctk.CTkButton):
-    def __init__(self, parent, title: str, detail: str, command: Callable[[], None], **kwargs):
-        kwargs.setdefault("fg_color", Colors.BG_SURFACE)
-        kwargs.setdefault("hover_color", Colors.BG_HOVER)
-        super().__init__(
-            parent,
-            text=f"{title}\n{detail}",
-            command=command,
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_PRIMARY,
-            height=96,
-            anchor="w",
-            corner_radius=Sizes.CORNER_MD,
-            cursor=Cursors.POINTER,
-            **kwargs,
-        )
 
 
 class HomeWorkspace(ctk.CTkFrame):
@@ -110,7 +95,7 @@ class HomeWorkspace(ctk.CTkFrame):
         """Build compact tool health status banner."""
         checker = get_tool_health_checker()
         summary = checker.get_health_summary()
-        
+
         # Only show if there are issues or user wants to see it
         if summary['overall_status'] == 'critical' or summary['overall_status'] == 'degraded':
             health_frame = ctk.CTkFrame(
@@ -121,10 +106,10 @@ class HomeWorkspace(ctk.CTkFrame):
                 corner_radius=Sizes.CORNER_MD
             )
             health_frame.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.MD))
-            
+
             inner = ctk.CTkFrame(health_frame, fg_color="transparent")
             inner.pack(fill="x", padx=Spacing.MD, pady=Spacing.SM)
-            
+
             if summary['overall_status'] == 'critical':
                 icon = Icons.ERROR
                 status_text = t("home.toolHealthCritical")
@@ -133,7 +118,7 @@ class HomeWorkspace(ctk.CTkFrame):
                 icon = Icons.WARNING
                 status_text = t("home.toolHealthDegraded")
                 status_color = Colors.WARNING
-            
+
             ctk.CTkLabel(
                 inner,
                 text=f"{icon}  {status_text}",
@@ -141,7 +126,7 @@ class HomeWorkspace(ctk.CTkFrame):
                 text_color=status_color,
                 anchor="w"
             ).pack(anchor="w")
-            
+
             # Show missing tools
             if summary['missing_required']:
                 missing_text = t("home.toolHealthMissingRequired", tools=", ".join(summary['missing_required']))
@@ -153,7 +138,7 @@ class HomeWorkspace(ctk.CTkFrame):
                     anchor="w",
                     wraplength=1000
                 ).pack(anchor="w", pady=(Spacing.XS, 0))
-            
+
             if summary['missing_optional']:
                 missing_text = t("home.toolHealthMissingOptional", tools=", ".join(summary['missing_optional']))
                 ctk.CTkLabel(
@@ -164,7 +149,7 @@ class HomeWorkspace(ctk.CTkFrame):
                     anchor="w",
                     wraplength=1000
                 ).pack(anchor="w", pady=(Spacing.XS, 0))
-            
+
             # Show affected features
             if summary['unavailable_features']:
                 features_text = t(
@@ -173,7 +158,7 @@ class HomeWorkspace(ctk.CTkFrame):
                 )
                 if len(summary['unavailable_features']) > 5:
                     features_text += f" +{len(summary['unavailable_features']) - 5} more"
-                
+
                 ctk.CTkLabel(
                     inner,
                     text=features_text,
@@ -182,7 +167,7 @@ class HomeWorkspace(ctk.CTkFrame):
                     anchor="w",
                     wraplength=1000
                 ).pack(anchor="w", pady=(Spacing.XS, 0))
-            
+
             # Help link
             ctk.CTkLabel(
                 inner,
@@ -213,16 +198,16 @@ class HomeWorkspace(ctk.CTkFrame):
             actions_grid.grid_columnconfigure(column, weight=1)
 
         actions = [
-            (t("home.actionPasteUrl"), t("home.actionPasteUrlDetail"), lambda: self.open_download_view("url")),
-            (t("home.actionPlaylist"), t("home.actionPlaylistDetail"), lambda: self.open_download_view("playlist")),
-            (t("home.actionTorrent"), t("home.actionTorrentDetail"), lambda: self.open_download_view("torrent")),
-            (t("home.actionConvert"), t("home.actionConvertDetail"), lambda: self.open_studio_view("convert")),
-            (t("home.actionFilters"), t("home.actionFiltersDetail"), lambda: self.open_studio_view("filters")),
-            (t("home.actionLibrary"), t("home.actionLibraryDetail"), lambda: self.open_library_view("library")),
+            (Icons.LINK, t("home.actionPasteUrl"), t("home.actionPasteUrlDetail"), lambda: self.open_download_view("url")),
+            (Icons.QUEUE, t("home.actionPlaylist"), t("home.actionPlaylistDetail"), lambda: self.open_download_view("playlist")),
+            (Icons.TORRENT, t("home.actionTorrent"), t("home.actionTorrentDetail"), lambda: self.open_download_view("torrent")),
+            (Icons.CONVERT, t("home.actionConvert"), t("home.actionConvertDetail"), lambda: self.open_studio_view("convert")),
+            (Icons.FILTERS, t("home.actionFilters"), t("home.actionFiltersDetail"), lambda: self.open_studio_view("filters")),
+            (Icons.LIBRARY, t("home.actionLibrary"), t("home.actionLibraryDetail"), lambda: self.open_library_view("library")),
         ]
-        for index, (title, detail, command) in enumerate(actions):
+        for index, (icon, title, detail, command) in enumerate(actions):
             row, column = divmod(index, 3)
-            _ActionCard(actions_grid, title=title, detail=detail, command=command).grid(
+            ClickableCard(actions_grid, title=title, detail=detail, command=command, icon=icon).grid(
                 row=row,
                 column=column,
                 sticky="nsew",
@@ -257,7 +242,10 @@ class HomeWorkspace(ctk.CTkFrame):
             card.grid(row=0, column=column, sticky="nsew", padx=Spacing.XS, pady=Spacing.XS)
             self._summary_cards[key] = card
 
-        recent = ctk.CTkFrame(self, fg_color=Colors.BG_SURFACE, corner_radius=Sizes.CORNER_MD)
+        recent = ctk.CTkFrame(
+            self, fg_color=Colors.BG_SURFACE, corner_radius=Sizes.CORNER_MD,
+            border_width=1, border_color=Colors.BORDER,
+        )
         recent.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, Spacing.LG))
 
         recent_header = ctk.CTkFrame(recent, fg_color="transparent")

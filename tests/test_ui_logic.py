@@ -4,17 +4,19 @@ UI logic tests for tab widgets without rendering.
 
 import queue
 from pathlib import Path
-from types import MethodType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from ravn_app.core.persistence import LibraryRegistrationResult
-from ravn_app.core.task_manager import TaskResult, TaskStatus
 from ravn_app.core.converter import AudioBitrate, VideoQuality
 from ravn_app.core.i18n import t
+from ravn_app.core.persistence import LibraryRegistrationResult
 from ravn_app.core.runners import TorrentProgressSnapshot
-from ravn_app.ui.main_window import YouTubeDownloaderApp
-from ravn_app.ui.components.command_palette import PaletteCommand, CommandPaletteDialog
+from ravn_app.core.task_manager import TaskResult, TaskStatus
+from ravn_app.ui.components.command_palette import CommandPaletteDialog, PaletteCommand
 from ravn_app.ui.components.playlist_sort_dialog import PlaylistSortDialog
+from ravn_app.ui.design_tokens import Colors, Icons
+from ravn_app.ui.main_window import YouTubeDownloaderApp
+from ravn_app.ui.queue_panel import QueueItemWidget, QueuePanel
 from ravn_app.ui.tabs.converter_tab import ConverterTab
 from ravn_app.ui.tabs.download_tab import DownloadTab
 from ravn_app.ui.tabs.download_workspace import DownloadWorkspace
@@ -25,8 +27,6 @@ from ravn_app.ui.tabs.mixer_tab import MixerTab
 from ravn_app.ui.tabs.settings_tab import SettingsTab
 from ravn_app.ui.tabs.subtitle_tab import SubtitleTab
 from ravn_app.ui.tabs.torrent_tab import TorrentTab
-from ravn_app.ui.queue_panel import QueueItemWidget, QueuePanel
-from ravn_app.ui.design_tokens import Colors, Icons
 
 
 class _FakeEntry:
@@ -1238,6 +1238,35 @@ class TestMainWindowLogic:
         assert workspace._source_override_key == "torrent"
         workspace._apply_workspace_state.assert_called_once()
 
+    def test_direct_source_edit_self_corrects_a_sticky_override(self):
+        """A prior quick-action (e.g. Home's Playlist card) pins the override away from
+        'auto'. If the user then directly edits the source box, detection must not stay
+        stuck on the stale override -- otherwise the badge can show the correct type
+        while the actual downstream mode (and DownloadTab wiring) silently stays wrong,
+        exactly what was reported: a pasted playlist URL behaving like batch/media mode.
+        """
+        workspace = DownloadWorkspace.__new__(DownloadWorkspace)
+        workspace._source_override_key = "playlist"
+        workspace._apply_workspace_state = Mock()
+
+        workspace._on_source_text_changed()
+
+        assert workspace._source_override_key == "auto"
+        workspace._apply_workspace_state.assert_called_once()
+
+    def test_paste_event_defers_reclassification_until_after_insertion(self):
+        """<<Paste>> fires on the widget-level bindtag before Tk's own class-level
+        binding performs the actual insertion, so reacting synchronously would read
+        stale (pre-paste) content. The handler must defer via after()."""
+        workspace = DownloadWorkspace.__new__(DownloadWorkspace)
+        workspace.after = Mock()
+        workspace._on_source_text_changed = Mock()
+
+        workspace._on_source_pasted()
+
+        workspace.after.assert_called_once_with(1, workspace._on_source_text_changed)
+        workspace._on_source_text_changed.assert_not_called()
+
     def test_download_workspace_switches_back_from_torrent_when_content_host_exists(self):
         workspace = DownloadWorkspace.__new__(DownloadWorkspace)
         workspace.content_host = _FakeFrame()
@@ -1379,7 +1408,7 @@ class TestMainWindowLogic:
 
         app._apply_responsive_shell_state(1200)
 
-        assert app.sidebar.config["width"] == 210
+        # Navigation moved to a horizontal top bar; the shell no longer resizes a sidebar.
         assert app.drawer_shell.config["width"] == 340
         assert app.command_palette_button.cget("text")
         assert "Paste" in app._quick_action_buttons["paste"].cget("text") or "Yapistir" in app._quick_action_buttons["paste"].cget("text")
@@ -2016,6 +2045,114 @@ class TestMainWindowLogic:
         app._playlist_sort_dialog_window.refresh_entries.assert_called_once()
         app._update_playlist_summary.assert_called_once()
         app._update_size_estimate.assert_called_once()
+
+    def test_on_playlist_entry_resolved_updates_open_dialog_row(self):
+        """yt-dlp library progressive path: one resolved video should update just its
+        row in the open PlaylistSortDialog, not wait for the rest of the playlist."""
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_source_url = "https://example.com/list"
+        app.playlist_entries = [
+            {"title": "Video 1", "url": "https://example.com/1", "duration": 61},
+            {"title": "Video 2", "url": "https://example.com/2", "duration": 90},
+        ]
+        app.quality_menu = _FakeCombo("720p")
+        app._playlist_detail_fetch_token = 3
+        app._playlist_detail_fetch_inflight = False
+
+        dialog = SimpleNamespace(
+            winfo_exists=lambda: True,
+            update_entry_at_index=Mock(),
+        )
+        app._playlist_sort_dialog_window = dialog
+
+        resolved_entry = {
+            "title": "Video 2",
+            "filesize_mb": 42.0,
+            "resolution": "1280x720",
+            "format_note": "720p",
+            "size_by_quality_mb": {"720p": 42.0},
+            "resolution_by_quality": {"720p": "1280x720"},
+            "format_note_by_quality": {"720p": "720p"},
+        }
+
+        app._on_playlist_entry_resolved("https://example.com/list", 1, resolved_entry, 3)
+
+        assert app.playlist_entries[1]["filesize_mb"] == 42.0
+        assert "filesize_mb" not in app.playlist_entries[0]
+        assert app._playlist_detail_fetch_inflight is True
+        dialog.update_entry_at_index.assert_called_once_with(1, app.playlist_entries[1], quality_label="720p")
+
+    def test_on_playlist_entry_resolved_ignores_stale_token(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_source_url = "https://example.com/list"
+        app.playlist_entries = [{"title": "Video 1", "url": "https://example.com/1", "duration": 61}]
+        app._playlist_detail_fetch_token = 5
+        app._playlist_sort_dialog_window = SimpleNamespace(
+            winfo_exists=lambda: True,
+            update_entry_at_index=Mock(),
+        )
+
+        app._on_playlist_entry_resolved(
+            "https://example.com/list", 0, {"filesize_mb": 99.0}, 4  # stale token
+        )
+
+        assert "filesize_mb" not in app.playlist_entries[0]
+        app._playlist_sort_dialog_window.update_entry_at_index.assert_not_called()
+
+    def test_on_playlist_entry_resolved_updates_inline_row_without_dialog(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_source_url = "https://example.com/list"
+        entry = {"title": "Video 1", "url": "https://example.com/1", "duration": 61}
+        app.playlist_entries = [entry]
+        app.quality_menu = _FakeCombo("720p")
+        app._playlist_detail_fetch_token = 1
+        app._playlist_sort_dialog_window = None
+        app._update_playlist_summary = Mock()
+        app._update_size_estimate = Mock()
+
+        captured = []
+
+        class _FakePlaylistItem:
+            def set_detail_text(self, detail_text):
+                captured.append(detail_text)
+
+        app.playlist_detail_rows = [(_FakePlaylistItem(), entry)]
+
+        resolved_entry = {
+            "filesize_mb": 12.3,
+            "resolution": "1280x720",
+            "format_note": "720p",
+            "size_by_quality_mb": {"720p": 12.3},
+            "resolution_by_quality": {"720p": "1280x720"},
+            "format_note_by_quality": {"720p": "720p"},
+        }
+        app._on_playlist_entry_resolved("https://example.com/list", 0, resolved_entry, 1)
+
+        assert entry["filesize_mb"] == 12.3
+        assert any("12.3 MB" in text for text in captured)
+        app._update_playlist_summary.assert_called_once()
+        app._update_size_estimate.assert_called_once()
+
+    def test_on_playlist_details_all_resolved_marks_dialog_complete(self):
+        app = DownloadTab.__new__(DownloadTab)
+        app.playlist_source_url = "https://example.com/list"
+        app.playlist_entries = [{"title": "Video 1"}]
+        app._playlist_detail_fetch_token = 7
+        app._playlist_detail_fetch_inflight = True
+        app._update_playlist_summary = Mock()
+        app._update_size_estimate = Mock()
+        app._record_perf_metric = Mock()
+
+        dialog = SimpleNamespace(winfo_exists=lambda: True, mark_details_complete=Mock())
+        app._playlist_sort_dialog_window = dialog
+
+        app._on_playlist_details_all_resolved("https://example.com/list", 7, 12.4)
+
+        assert app._playlist_detail_fetch_inflight is False
+        dialog.mark_details_complete.assert_called_once()
+        app._record_perf_metric.assert_called_once()
+        _name, kwargs = app._record_perf_metric.call_args[0][0], app._record_perf_metric.call_args[1]
+        assert kwargs["progressive"] is True
 
     def test_library_render_results_large_dataset_records_chunked_metrics(self):
         tab = LibraryTab.__new__(LibraryTab)

@@ -13,8 +13,31 @@ from typing import Any, Callable, Dict, List, Optional
 
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, get_hidden_subprocess_kwargs
 
-
 logger = logging.getLogger(__name__)
+
+# yt-dlp is a heavy import (~0.5s) and is only needed for the progressive library-based
+# preview path -- not for downloads (which always use the self-updating binary). Import it
+# lazily on first use so it never taxes app startup, and cache the resolved module (or the
+# _UNAVAILABLE sentinel) so a broken/missing install is only probed once.
+_UNAVAILABLE = object()
+_yt_dlp_lib: Optional[object] = None
+
+
+def _get_ytdlp_library():
+    """Lazily import the yt-dlp Python library; returns the module or None if unavailable."""
+    global _yt_dlp_lib
+    if _yt_dlp_lib is None:
+        try:
+            import yt_dlp as module
+            _yt_dlp_lib = module
+        except Exception:  # pragma: no cover - defensive guard for broken/missing installs
+            _yt_dlp_lib = _UNAVAILABLE
+    return None if _yt_dlp_lib is _UNAVAILABLE else _yt_dlp_lib
+
+
+def is_ytdlp_library_available() -> bool:
+    """Whether the yt-dlp Python library (not the standalone binary) can be imported."""
+    return _get_ytdlp_library() is not None
 
 
 class YtDlpRunner(BaseRunner):
@@ -165,7 +188,6 @@ class YtDlpRunner(BaseRunner):
 
     def _extract_downloaded_files(self, stdout: str) -> List[str]:
         """Extract list of downloaded files from yt-dlp output."""
-        files: List[str] = []
         patterns = [
             r"\[download\] Destination: (.+)",
             r"\[Merger\] Merging formats into \"(.+)\"",
@@ -610,6 +632,135 @@ class YtDlpRunner(BaseRunner):
 
         return normalized_entries
 
+    @staticmethod
+    def _normalize_shallow_entry(stub: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Normalize a yt-dlp library shallow (unresolved) playlist entry to RAVN's schema."""
+        entry_url = stub.get("url")
+        if not isinstance(entry_url, str) or not entry_url.startswith(("http://", "https://")):
+            video_id = stub.get("id")
+            if not video_id:
+                return None
+            entry_url = f"https://www.youtube.com/watch?v={video_id}"
+
+        thumbnails = stub.get("thumbnails") or []
+        thumbnail_url = ""
+        if isinstance(thumbnails, list) and thumbnails:
+            last = thumbnails[-1]
+            if isinstance(last, dict):
+                thumbnail_url = last.get("url") or ""
+
+        return {
+            "title": stub.get("title") or stub.get("id") or "Unknown",
+            "url": entry_url,
+            "duration": stub.get("duration", 0),
+            "uploader": stub.get("uploader") or stub.get("channel") or "",
+            "channel": stub.get("channel") or stub.get("uploader") or "",
+            "album": "",
+            "view_count": stub.get("view_count", 0),
+            "like_count": stub.get("like_count", 0),
+            "upload_date": stub.get("upload_date") or "",
+            "thumbnail_url": thumbnail_url,
+        }
+
+    @classmethod
+    def _build_detail_fields(cls, full_info: Dict[str, Any], quality_label: str) -> Dict[str, Any]:
+        """Compute the same size/quality detail fields extract_playlist_entries(with_details=True) produces."""
+        size_maps = cls.compute_size_by_quality(full_info)
+        size_by_quality = size_maps["size_by_quality_mb"]
+        resolution_by_quality = size_maps["resolution_by_quality"]
+        format_note_by_quality = size_maps["format_note_by_quality"]
+
+        selected_size = size_by_quality.get(quality_label)
+        selected_resolution = resolution_by_quality.get(quality_label)
+        selected_note = format_note_by_quality.get(quality_label)
+
+        if selected_size is None or selected_size <= 0.0:
+            selected_size = size_by_quality.get("En İyi", 0.0)
+        if not selected_resolution:
+            selected_resolution = resolution_by_quality.get("En İyi", "Unknown")
+        if selected_note is None:
+            selected_note = format_note_by_quality.get("En İyi", "")
+
+        return {
+            "filesize_mb": selected_size,
+            "resolution": selected_resolution,
+            "format_note": selected_note,
+            "size_by_quality_mb": size_by_quality,
+            "resolution_by_quality": resolution_by_quality,
+            "format_note_by_quality": format_note_by_quality,
+        }
+
+    def extract_playlist_entries_progressive(
+        self,
+        url: str,
+        quality_label: str,
+        on_shallow_ready: Callable[[List[Dict[str, Any]]], None],
+        on_entry_resolved: Callable[[int, Dict[str, Any]], None],
+        is_cancelled: Optional[Callable[[], bool]] = None,
+    ) -> bool:
+        """
+        Extract playlist entries via the yt-dlp Python library instead of two blocking
+        subprocess calls. Yields results progressively: the shallow (fast) list arrives
+        via on_shallow_ready almost immediately (also carries real thumbnail URLs), then
+        each entry's real size/quality/resolution is resolved one video at a time and
+        reported via on_entry_resolved as soon as it's ready -- instead of the previous
+        approach where NOTHING arrived until every video in the playlist had been fully
+        resolved (a single blocking call that could take tens of seconds to minutes).
+
+        Both callbacks are invoked synchronously on the calling thread; callers running
+        this from a background thread must bridge to the UI thread themselves.
+
+        Returns True if the library path was used, False if the library is unavailable
+        (caller should fall back to extract_playlist_entries()).
+        """
+        ytdlp_lib = _get_ytdlp_library()
+        if ytdlp_lib is None:
+            return False
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": "discard_in_playlist",
+        }
+
+        try:
+            with ytdlp_lib.YoutubeDL(ydl_opts) as ydl:
+                shallow_result = ydl.extract_info(url, download=False, process=False)
+                stubs = list((shallow_result or {}).get("entries") or [])
+
+                normalized_entries: List[Dict[str, Any]] = []
+                valid_stubs: List[Dict[str, Any]] = []
+                for stub in stubs:
+                    if not isinstance(stub, dict):
+                        continue
+                    normalized = self._normalize_shallow_entry(stub)
+                    if normalized is None:
+                        continue
+                    normalized_entries.append(normalized)
+                    valid_stubs.append(stub)
+
+                on_shallow_ready(normalized_entries)
+
+                for index, stub in enumerate(valid_stubs):
+                    if is_cancelled is not None and is_cancelled():
+                        break
+                    try:
+                        full_info = ydl.process_ie_result(stub, download=False)
+                    except Exception as exc:
+                        logger.warning("yt-dlp progressive resolve failed for entry %s: %s", index, exc)
+                        continue
+
+                    detail_fields = self._build_detail_fields(full_info, quality_label)
+                    resolved_entry = dict(normalized_entries[index])
+                    resolved_entry.update(detail_fields)
+                    on_entry_resolved(index, resolved_entry)
+
+            return True
+        except Exception as exc:
+            logger.error("yt-dlp library playlist extraction failed: %s", exc)
+            return False
+
     def list_formats(self, url: str) -> Optional[List[Dict[str, Any]]]:
         """
         List available formats for a URL.
@@ -637,8 +788,8 @@ class YtDlpRunner(BaseRunner):
             )
             if result.returncode == 0:
                 return result.stdout.strip()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("yt-dlp version probe failed: %s", exc)
         return None
 
     def update(self, timeout: int = 300) -> bool:
@@ -653,9 +804,10 @@ class YtDlpRunner(BaseRunner):
             True if update successful or already up to date
         """
         try:
-            import requests
-            from pathlib import Path
             import os
+            from pathlib import Path
+
+            import requests
 
             tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
             tools_dir.mkdir(parents=True, exist_ok=True)
@@ -716,8 +868,8 @@ class YtDlpRunner(BaseRunner):
 
 def get_ytdlp_runner(ytdlp_path: Optional[str] = None) -> YtDlpRunner:
     """Create and return a YtDlpRunner instance."""
-    from pathlib import Path
     import os
+    from pathlib import Path
 
     if not ytdlp_path:
         tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"

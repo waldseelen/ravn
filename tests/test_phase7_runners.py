@@ -1,7 +1,6 @@
 """Tests for Phase 7 runner helpers."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from ravn_app.core.runners import AudioMixerRunner, AudioTrack, RunnerResult, VideoMixerRunner
 

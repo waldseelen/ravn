@@ -1,7 +1,7 @@
 """Regression tests for MediaHelpers shared-runner convergence."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from ravn_app.core.media_helpers import MediaHelpers
 from ravn_app.core.runners.base import RunnerResult

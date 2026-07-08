@@ -11,7 +11,6 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from ravn_app.core.runners.ffmpeg import FFmpegRunner
 
-
 _PLATFORM_FFMPEG_DIR = {
     "win32": "win64",
     "cygwin": "win64",
@@ -138,8 +137,8 @@ class FFmpegCodecChecker:
     """Inspect available codecs using the resolved FFmpeg runtime."""
 
     def __init__(self, ffmpeg_path: str = "ffmpeg", ffprobe_path: str = "ffprobe"):
-        self.codecs_cache = None
-        self.encoders_cache = None
+        self.codecs_cache: Optional[List[str]] = None
+        self.encoders_cache: Optional[List[str]] = None
         resolved_ffmpeg, resolved_ffprobe = configure_ffmpeg_runtime(ffmpeg_path, ffprobe_path)
         self.runner = FFmpegRunner(ffmpeg_path=resolved_ffmpeg, ffprobe_path=resolved_ffprobe)
 

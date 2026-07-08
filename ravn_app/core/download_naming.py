@@ -10,7 +10,6 @@ from typing import Any, Dict, Iterable, Optional
 
 from ravn_app.utils.file_utils import sanitize_filename
 
-
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_TOKEN_RE = re.compile(r"{([a-z_]+)}")

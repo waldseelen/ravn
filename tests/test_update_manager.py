@@ -2,17 +2,16 @@
 Otomatik Güncelleme Sistemi Testleri
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 from ravn_app.core.update_manager import (
-    UpdateManager,
-    UpdateStatus,
     ReleaseInfo,
+    UpdateManager,
     UpdateNotification,
+    UpdateStatus,
 )
 
 

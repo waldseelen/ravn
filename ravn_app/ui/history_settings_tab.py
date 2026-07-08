@@ -5,19 +5,23 @@ Canonical desktop imports should use ``ravn_app.ui.tabs.history_tab`` and
 module while Phase 5 clarifies feature ownership without risky UI rewrites.
 """
 
-import customtkinter as ctk
-from tkinter import messagebox, filedialog
-import tkinter.ttk as ttk
-from pathlib import Path
+import threading
 import unicodedata
-from ..core.database import DatabaseManager, ConfigManager
+from pathlib import Path
+from tkinter import filedialog, messagebox
+
+import customtkinter as ctk
+
+from ravn_app.core import tool_installer
 from ravn_app.core.download_naming import normalize_naming_preset
 from ravn_app.core.i18n import t
-from .advanced_features import SearchFilter, ThemeManager
-from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
-from ravn_app.ui.ui_components import style_combo, style_entry, Tooltip
 from ravn_app.core.tool_health import get_tool_health_checker
+from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
+from ravn_app.ui.ui_components import Tooltip, style_combo, style_entry
+
+from ..core.database import ConfigManager, DatabaseManager
+from .advanced_features import SearchFilter, ThemeManager
 
 
 class HistoryTab(ctk.CTkFrame):
@@ -262,13 +266,16 @@ class HistoryTab(ctk.CTkFrame):
         """Dosyayı aç"""
         import os
         import platform
+        import subprocess
 
+        # subprocess with an argument LIST (never a shell string) so a maliciously-named
+        # file path can't inject shell commands — os.system(f'open "{path}"') was exploitable.
         if platform.system() == 'Windows':
-            os.startfile(file_path)
+            os.startfile(file_path)  # noqa: S606 - Windows-native, not a shell
         elif platform.system() == 'Darwin':  # macOS
-            os.system(f'open "{file_path}"')
+            subprocess.run(["open", file_path], check=False)
         else:  # Linux
-            os.system(f'xdg-open "{file_path}"')
+            subprocess.run(["xdg-open", file_path], check=False)
 
     @staticmethod
     def format_size(size_bytes: int) -> str:
@@ -516,6 +523,21 @@ class SettingsTab(ctk.CTkFrame):
         )
         refresh_btn.pack(side="right")
 
+        self.install_missing_tools_button = ctk.CTkButton(
+            header_frame,
+            text=t("settings.toolHealthInstallMissing"),
+            command=self._install_missing_tools_clicked,
+            fg_color=Colors.ACCENT,
+            hover_color=Colors.ACCENT_HOVER,
+            text_color=Colors.BG_PRIMARY,
+            font=Fonts.LABEL_BOLD,
+            height=Sizes.BTN_HEIGHT_SM,
+            width=150,
+            cursor=Cursors.POINTER,
+        )
+        self.install_missing_tools_button.pack(side="right", padx=(0, Spacing.XS))
+        Tooltip(self.install_missing_tools_button, t("settings.toolHealthInstallTooltip"))
+
         # Overall status
         self.tool_health_status_label = ctk.CTkLabel(
             health_frame,
@@ -543,10 +565,33 @@ class SettingsTab(ctk.CTkFrame):
             help_frame.destroy()
             self.tool_health_help_frame = None
 
-        # Get health checker
-        checker = get_tool_health_checker()
-        checker.clear_cache()  # Force fresh check
-        summary = checker.get_health_summary()
+        # The health check spawns subprocess version probes for each tool; run them off the
+        # UI thread so opening/refreshing Settings never freezes (previously ~1-2s, and up to
+        # each tool's 5s timeout if a binary hangs).
+        self.tool_health_status_label.configure(
+            text=t("settings.toolHealthChecking"), text_color=Colors.TEXT_MUTED
+        )
+
+        def _worker():
+            checker = get_tool_health_checker()
+            checker.clear_cache()  # Force fresh check
+            summary = checker.get_health_summary()
+            self.after(0, lambda: self._render_tool_health(summary))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _render_tool_health(self, summary) -> None:
+        """Render the tool-health UI from a computed summary (runs on the main thread)."""
+        if not self.winfo_exists():
+            return
+
+        # Clear any prior details/help (idempotent against back-to-back refreshes).
+        for widget in self.tool_health_details_frame.winfo_children():
+            widget.destroy()
+        help_frame = getattr(self, 'tool_health_help_frame', None)
+        if help_frame is not None:
+            help_frame.destroy()
+            self.tool_health_help_frame = None
 
         # Update overall status
         status_text = ""
@@ -564,6 +609,17 @@ class SettingsTab(ctk.CTkFrame):
 
         status_text += f" • {t('settings.toolHealthAvailable', count=summary['available_tools'], total=summary['total_tools'])}"
         self.tool_health_status_label.configure(text=status_text, text_color=status_color)
+
+        missing_tools = summary['missing_required'] + summary['missing_optional']
+        install_button = self.__dict__.get("install_missing_tools_button")
+        if install_button is not None:
+            install_button.configure(state="normal", text=t("settings.toolHealthInstallMissing"))
+            if missing_tools and tool_installer.is_winget_available():
+                if not install_button.winfo_manager():
+                    install_button.pack(side="right", padx=(0, Spacing.XS))
+            else:
+                if install_button.winfo_manager():
+                    install_button.pack_forget()
 
         # Display each tool
         for tool_name, tool_info in summary['tools'].items():
@@ -672,11 +728,61 @@ class SettingsTab(ctk.CTkFrame):
                 wraplength=540
             ).pack(fill="x", padx=Spacing.XS, pady=(0, Spacing.XS))
 
+    def _install_missing_tools_clicked(self) -> None:
+        """Install every currently-missing tool via winget, in the background, then re-check."""
+        checker = get_tool_health_checker()
+        checker.clear_cache()
+        summary = checker.get_health_summary()
+        missing_tools = summary['missing_required'] + summary['missing_optional']
+
+        if not missing_tools:
+            return
+
+        if not tool_installer.is_winget_available():
+            messagebox.showerror(
+                t("settings.toolHealthInstallTitle"),
+                t("settings.toolHealthInstallNoWinget"),
+            )
+            return
+
+        self.install_missing_tools_button.configure(
+            state="disabled",
+            text=t("settings.toolHealthInstalling"),
+        )
+        self.tool_health_status_label.configure(text=t("settings.toolHealthInstalling"))
+
+        def _worker() -> None:
+            results = tool_installer.install_missing_tools(missing_tools)
+            self.after(0, lambda: self._on_install_missing_tools_done(results))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_install_missing_tools_done(self, results) -> None:
+        if not self.winfo_exists():
+            return
+
+        failed_tools = [name for name, outcome in results.items() if not outcome.success]
+
+        # Tool status refreshes immediately (in-process PATH was already merged
+        # by install_missing_tools), no application restart required.
+        self._refresh_tool_health()
+
+        if failed_tools:
+            messagebox.showwarning(
+                t("settings.toolHealthInstallTitle"),
+                t("settings.toolHealthInstallPartial", tools=", ".join(failed_tools)),
+            )
+        else:
+            messagebox.showinfo(
+                t("settings.toolHealthInstallTitle"),
+                t("settings.toolHealthInstallDone"),
+            )
+
     def create_general_settings(self, parent):
         """Genel ayarlar"""
         # Tool Health Status
         self._create_tool_health_section(parent)
-        
+
         # Tema
         theme_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
         theme_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)

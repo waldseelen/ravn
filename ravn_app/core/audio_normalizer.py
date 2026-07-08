@@ -3,15 +3,13 @@ Ses normalizasyonu ve video birleştirme modülü - Faz 3: Orta Vadeli Özellikl
 FFmpegRunner üzerinden çalışır
 """
 
-import os
-import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Optional, Callable
+import os
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
 
-from ravn_app.core.runners import FFmpegRunner, RunnerResult
-
+from ravn_app.core.runners import FFmpegRunner
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +55,7 @@ class AudioNormalizer:
             logger.info(f"Ses analizi başarılı: {input_file}")
             return {"status": "analyzed", "probe_data": probe_result}
         else:
-            logger.error(f"Ses analizi hatası")
+            logger.error("Ses analizi hatası")
             return None
 
     def _build_audio_filter(self, settings: AudioNormalizationSettings) -> str:
@@ -167,9 +165,9 @@ class VideoMerger:
         # Concat demuxer input dosyası oluştur
         concat_file = settings.output_file + ".concat.txt"
         try:
-            with open(concat_file, 'w') as f:
+            with open(concat_file, 'w') as concat_fh:
                 for input_file in settings.input_files:
-                    f.write(f"file '{os.path.abspath(input_file)}'\n")
+                    concat_fh.write(f"file '{os.path.abspath(input_file)}'\n")
             logger.info(f"Concat dosyası oluşturuldu: {concat_file}")
         except Exception as e:
             logger.error(f"Concat dosyası oluşturulamadı: {str(e)}")
@@ -236,7 +234,7 @@ class VideoMerger:
             logger.error("Birleştirmek için en az 2 dosya gerekli")
             return False
 
-        logger.info(f"Geçişli video birleştirmesi başlanıyor")
+        logger.info("Geçişli video birleştirmesi başlanıyor")
         logger.info(f"Geçiş süresi: {settings.transition_duration}s")
 
         if len(settings.input_files) == 2:
@@ -264,12 +262,12 @@ class VideoMerger:
                 ):
                     return False
 
-                # Eski temp dosyasını sil
+                # Eski temp dosyasını sil (best-effort; kalırsa sonraki temizlik alır)
                 if i > 1:
                     try:
                         os.remove(input1)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Geçici dosya silinemedi (%s): %s", input1, exc)
 
             return True
 
@@ -303,7 +301,7 @@ class VideoMerger:
         )
 
         if result.success:
-            logger.info(f"İki video birleştirmesi başarılı")
+            logger.info("İki video birleştirmesi başarılı")
             return True
         else:
             logger.error(f"İki video birleştirmesi hatası: {result.error_message}")

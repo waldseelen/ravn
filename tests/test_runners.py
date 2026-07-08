@@ -2,23 +2,20 @@
 Tests for FFmpegRunner and YtDlpRunner classes
 """
 
-import os
 import json
-import pytest
 from types import SimpleNamespace
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 from ravn_app.core.runners import (
+    Aria2Runner,
     FFmpegRunner,
-    YtDlpRunner,
     RunnerResult,
     RunnerStatus,
+    TorrentProgressSnapshot,
+    YtDlpRunner,
+    get_aria2c_runner,
     get_ffmpeg_runner,
     get_ytdlp_runner,
-    Aria2Runner,
-    TorrentProgressSnapshot,
-    get_aria2c_runner,
 )
 from ravn_app.core.runners.aria2 import _Aria2ProgressParser, emit_torrent_progress
 from ravn_app.core.runners.base import get_hidden_subprocess_kwargs
@@ -850,7 +847,7 @@ class TestYtDlpRunner:
         mock_response_download = Mock()
         mock_response_download.iter_content.return_value = [b"data"]
         mock_get.side_effect = [mock_response_api, mock_response_download]
-        
+
         with patch.object(YtDlpRunner, 'get_version', return_value="2023.01.01"):
             runner = YtDlpRunner()
             result = runner.update()
@@ -926,6 +923,138 @@ class TestYtDlpRunner:
         assert result.success is False
         # Should not retry 3 times for unavailable videos
         assert mock_popen.call_count == 1
+
+    # -- Progressive (yt-dlp library) playlist extraction -----------------------
+
+    def test_normalize_shallow_entry_prefers_url_field(self):
+        stub = {
+            "title": "Some Video",
+            "url": "https://www.youtube.com/watch?v=abc123",
+            "duration": 90,
+            "uploader": "Some Channel",
+            "view_count": 42,
+            "thumbnails": [{"url": "small.jpg"}, {"url": "big.jpg"}],
+        }
+        entry = YtDlpRunner._normalize_shallow_entry(stub)
+        assert entry["url"] == "https://www.youtube.com/watch?v=abc123"
+        assert entry["thumbnail_url"] == "big.jpg"
+        assert entry["duration"] == 90
+        assert entry["view_count"] == 42
+
+    def test_normalize_shallow_entry_falls_back_to_id_for_url(self):
+        stub = {"title": "Some Video", "id": "xyz789", "duration": 10}
+        entry = YtDlpRunner._normalize_shallow_entry(stub)
+        assert entry["url"] == "https://www.youtube.com/watch?v=xyz789"
+        assert entry["thumbnail_url"] == ""
+
+    def test_normalize_shallow_entry_returns_none_without_url_or_id(self):
+        assert YtDlpRunner._normalize_shallow_entry({"title": "No id"}) is None
+
+    def test_extract_playlist_entries_progressive_returns_false_when_library_missing(self):
+        with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=None):
+            runner = YtDlpRunner()
+            used = runner.extract_playlist_entries_progressive(
+                "https://example.com/playlist",
+                quality_label="En İyi",
+                on_shallow_ready=Mock(),
+                on_entry_resolved=Mock(),
+            )
+        assert used is False
+
+    def test_extract_playlist_entries_progressive_streams_shallow_then_each_entry(self):
+        stubs = [
+            {"title": "Video 1", "url": "https://example.com/watch?v=1", "duration": 60},
+            {"title": "Video 2", "url": "https://example.com/watch?v=2", "duration": 120},
+        ]
+        resolved_infos = [
+            {"formats": [], "duration": 60},
+            {"formats": [], "duration": 120},
+        ]
+
+        fake_ydl = MagicMock()
+        fake_ydl.__enter__.return_value = fake_ydl
+        fake_ydl.__exit__.return_value = False
+        fake_ydl.extract_info.return_value = {"entries": stubs}
+        fake_ydl.process_ie_result.side_effect = resolved_infos
+
+        fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
+
+        shallow_calls = []
+        resolved_calls = []
+
+        with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=fake_lib):
+            runner = YtDlpRunner()
+            used = runner.extract_playlist_entries_progressive(
+                "https://example.com/playlist",
+                quality_label="En İyi",
+                on_shallow_ready=lambda entries: shallow_calls.append(entries),
+                on_entry_resolved=lambda index, entry: resolved_calls.append((index, entry)),
+            )
+
+        assert used is True
+        assert len(shallow_calls) == 1
+        assert [e["title"] for e in shallow_calls[0]] == ["Video 1", "Video 2"]
+        assert [index for index, _entry in resolved_calls] == [0, 1]
+        assert resolved_calls[0][1]["title"] == "Video 1"
+        fake_ydl.extract_info.assert_called_once_with(
+            "https://example.com/playlist", download=False, process=False
+        )
+
+    def test_extract_playlist_entries_progressive_respects_cancellation(self):
+        stubs = [
+            {"title": "Video 1", "url": "https://example.com/watch?v=1", "duration": 60},
+            {"title": "Video 2", "url": "https://example.com/watch?v=2", "duration": 120},
+        ]
+        fake_ydl = MagicMock()
+        fake_ydl.__enter__.return_value = fake_ydl
+        fake_ydl.__exit__.return_value = False
+        fake_ydl.extract_info.return_value = {"entries": stubs}
+        fake_ydl.process_ie_result.return_value = {"formats": [], "duration": 60}
+
+        fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
+        resolved_calls = []
+
+        with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=fake_lib):
+            runner = YtDlpRunner()
+            runner.extract_playlist_entries_progressive(
+                "https://example.com/playlist",
+                quality_label="En İyi",
+                on_shallow_ready=Mock(),
+                on_entry_resolved=lambda index, entry: resolved_calls.append(index),
+                is_cancelled=lambda: True,
+            )
+
+        assert resolved_calls == []
+        fake_ydl.process_ie_result.assert_not_called()
+
+    def test_extract_playlist_entries_progressive_skips_failed_entry_but_continues(self):
+        stubs = [
+            {"title": "Broken", "url": "https://example.com/watch?v=1", "duration": 60},
+            {"title": "OK", "url": "https://example.com/watch?v=2", "duration": 60},
+        ]
+        fake_ydl = MagicMock()
+        fake_ydl.__enter__.return_value = fake_ydl
+        fake_ydl.__exit__.return_value = False
+        fake_ydl.extract_info.return_value = {"entries": stubs}
+        fake_ydl.process_ie_result.side_effect = [
+            RuntimeError("video removed"),
+            {"formats": [], "duration": 60},
+        ]
+
+        fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
+        resolved_calls = []
+
+        with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=fake_lib):
+            runner = YtDlpRunner()
+            used = runner.extract_playlist_entries_progressive(
+                "https://example.com/playlist",
+                quality_label="En İyi",
+                on_shallow_ready=Mock(),
+                on_entry_resolved=lambda index, entry: resolved_calls.append(index),
+            )
+
+        assert used is True
+        assert resolved_calls == [1]
 
 
 class TestRunnerResult:

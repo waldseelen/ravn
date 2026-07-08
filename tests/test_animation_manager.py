@@ -7,9 +7,8 @@ Tests verify that easing functions produce correct curves for smooth transitions
 import os
 import unittest
 from unittest.mock import patch
-from ravn_app.core.animation_manager import (
-    EasingFunction, AnimationManager, detect_reduced_motion
-)
+
+from ravn_app.core.animation_manager import AnimationManager, EasingFunction, detect_reduced_motion
 
 
 class TestEasingFunction(unittest.TestCase):

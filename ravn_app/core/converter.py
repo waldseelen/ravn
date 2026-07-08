@@ -4,18 +4,15 @@ Desteklenen formatlar: MP4, MKV, AVI, MOV, WEBM, FLV
 Desteklenen codec'ler: H.264, H.265, VP8, VP9, AV1 (video), AAC, MP3, Opus, Vorbis, FLAC (audio)
 """
 
-import os
-import json
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Callable
-from enum import Enum
-from dataclasses import dataclass
-from threading import Thread
-import queue
 import logging
+import os
+import queue
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from ravn_app.core.runners import FFmpegRunner, RunnerResult, RunnerStatus
-
+from ravn_app.core.runners import FFmpegRunner
 
 # Logging konfigürasyonu
 logger = logging.getLogger(__name__)
@@ -209,7 +206,7 @@ class VideoConverter:
         self.ffprobe_path = ffprobe_path
         self._runner = FFmpegRunner(ffmpeg_path, ffprobe_path)
         self.is_running = False
-        self.progress = 0
+        self.progress: float = 0.0
         self.status_callback: Optional[Callable[[str], None]] = None
         self.progress_callback: Optional[Callable[[float, str], None]] = None
 
@@ -246,7 +243,7 @@ class VideoConverter:
             self.progress_callback(self.progress, status)
 
     @staticmethod
-    def _format_size(bytes_size: int) -> str:
+    def _format_size(bytes_size: float) -> str:
         """Dosya boyutunu insan okunur formata çevir"""
         for unit in ['B', 'KB', 'MB', 'GB']:
             if bytes_size < 1024:
@@ -428,8 +425,8 @@ class BatchConverter:
         """
         self.converter = converter
         self.max_workers = max_workers
-        self.queue = queue.Queue()
-        self.results = []
+        self.queue: queue.Queue = queue.Queue()
+        self.results: List[Any] = []
         self.is_processing = False
 
     def add_files(self, files: List[str], settings_template: ConversionSettings):
@@ -548,7 +545,7 @@ class VideoInfo:
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
     @staticmethod
-    def _format_size(bytes_size: int) -> str:
+    def _format_size(bytes_size: float) -> str:
         """Boyutu insan okunur formata çevir"""
         for unit in ['B', 'KB', 'MB', 'GB']:
             if bytes_size < 1024:
@@ -579,8 +576,8 @@ class VideoAnalyzer:
             format_info = data.get('format', {})
             streams = data.get('streams', [])
 
-            video_stream = next((s for s in streams if s.get('codec_type') == 'video'), {})
-            audio_stream = next((s for s in streams if s.get('codec_type') == 'audio'), {})
+            video_stream: dict = next((s for s in streams if s.get('codec_type') == 'video'), {})
+            audio_stream: dict = next((s for s in streams if s.get('codec_type') == 'audio'), {})
 
             fps_str = video_stream.get('r_frame_rate', '30/1')
             if '/' in fps_str:

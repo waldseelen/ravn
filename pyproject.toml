@@ -1,0 +1,40 @@
+[tool.ruff]
+# RAVN is a Windows-first CustomTkinter media app. Keep the line length generous
+# (the codebase predates strict formatting) and target the versions CI runs.
+line-length = 120
+target-version = "py311"
+extend-exclude = ["build", "dist", "*.spec"]
+
+[tool.ruff.lint]
+# Pragmatic, high-signal rule set: pyflakes (F) catches real bugs (undefined names,
+# unused imports/vars), pycodestyle (E/W) whitespace + bare-except, bugbear (B) common
+# footguns, isort (I) import order, comprehensions (C4). PEP-604/585 annotation
+# modernization (UP) is intentionally left OUT: the project targets Python 3.9+ and
+# `X | None` / `list[x]` annotations would require 3.10+ at runtime without a
+# `from __future__ import annotations` sweep — not worth the churn/risk for a lint gate.
+select = ["F", "E", "W", "B", "I", "C4"]
+ignore = [
+    "E501",   # line length is handled by the formatter target, not enforced hard
+    "B008",   # function calls in argument defaults (common, intentional in this UI code)
+    "B905",   # zip(strict=) requires Python 3.10+; project still targets 3.9+
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test failure-path assertions legitimately use broad `pytest.raises(Exception)` (B017)
+# and the odd debug-assert-False (B011); relax those in tests only.
+"tests/*" = ["B011", "B017"]
+
+[tool.mypy]
+# Analyze as 3.12 (the packaged/CI runtime). Keeps mypy from choking on modern
+# syntax in third-party stubs (e.g. numpy's PEP 695 `type` statements) while still
+# accepting the 3.11-compatible source we ship.
+python_version = "3.12"
+# Gradual typing: the codebase is ~56% return-annotated. Run in a lenient mode so the
+# gate flags real contradictions (bad attribute access, wrong argument types) without
+# demanding full annotations up front. Tighten these toggles as coverage rises.
+warn_redundant_casts = true
+warn_unused_ignores = false
+ignore_missing_imports = true
+follow_imports = "silent"
+disable_error_code = ["annotation-unchecked"]
+exclude = ["build/", "dist/"]

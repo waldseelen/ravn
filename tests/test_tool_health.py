@@ -1,14 +1,13 @@
 """Tests for tool health checking system."""
 
-import pytest
 from unittest.mock import Mock, patch
+
 from ravn_app.core.tool_health import (
     ToolHealthChecker,
     ToolStatus,
-    ToolInfo,
-    get_tool_health_checker,
     check_tool_availability,
     get_missing_tools_message,
+    get_tool_health_checker,
 )
 
 
@@ -21,7 +20,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', return_value='/usr/bin/ffmpeg'):
             with patch.object(checker, '_get_tool_version', return_value='ffmpeg version 4.4'):
                 info = checker.check_tool('ffmpeg', use_cache=False)
-                
+
                 assert info.name == 'ffmpeg'
                 assert info.status == ToolStatus.AVAILABLE
                 assert info.path == '/usr/bin/ffmpeg'
@@ -34,7 +33,7 @@ class TestToolHealthChecker:
         checker = ToolHealthChecker()
         with patch('shutil.which', return_value=None):
             info = checker.check_tool('aria2c', use_cache=False)
-            
+
             assert info.name == 'aria2c'
             assert info.status == ToolStatus.MISSING
             assert info.path is None
@@ -49,14 +48,16 @@ class TestToolHealthChecker:
                 # First call should hit shutil.which
                 info1 = checker.check_tool('ffmpeg', use_cache=True)
                 assert mock_which.call_count == 1
-                
+
                 # Second call with cache should not hit shutil.which again
                 info2 = checker.check_tool('ffmpeg', use_cache=True)
                 assert mock_which.call_count == 1
-                
+                assert info2 is info1  # cached call returns the same object
+
                 # Third call without cache should hit shutil.which
                 info3 = checker.check_tool('ffmpeg', use_cache=False)
                 assert mock_which.call_count == 2
+                assert info3.name == info1.name  # fresh check, same tool
 
     def test_clear_cache(self):
         """Test cache clearing."""
@@ -65,7 +66,7 @@ class TestToolHealthChecker:
             with patch.object(checker, '_get_tool_version', return_value='ffmpeg version 4.4'):
                 checker.check_tool('ffmpeg')
                 assert len(checker._cache) > 0
-                
+
                 checker.clear_cache()
                 assert len(checker._cache) == 0
 
@@ -75,7 +76,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', return_value='/usr/bin/tool'):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 results = checker.check_all_tools(use_cache=False)
-                
+
                 assert 'ffmpeg' in results
                 assert 'ffprobe' in results
                 assert 'yt-dlp' in results
@@ -88,7 +89,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', side_effect=lambda x: '/usr/bin/ffmpeg' if x == 'ffmpeg' else None):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 missing = checker.get_missing_required_tools()
-                
+
                 # ffmpeg should be available, ffprobe and yt-dlp should be missing
                 assert 'ffmpeg' not in missing
                 assert 'ffprobe' in missing
@@ -101,7 +102,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', side_effect=lambda x: '/usr/bin/tool' if x != 'aria2c' else None):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 missing = checker.get_missing_optional_tools()
-                
+
                 assert 'aria2c' in missing
                 assert 'ffmpeg' not in missing
                 assert len(missing) == 1
@@ -109,12 +110,12 @@ class TestToolHealthChecker:
     def test_get_affected_features(self):
         """Test getting affected features for a tool."""
         checker = ToolHealthChecker()
-        
+
         ffmpeg_features = checker.get_affected_features('ffmpeg')
         assert 'video_conversion' in ffmpeg_features
         assert 'audio_extraction' in ffmpeg_features
         assert 'filters' in ffmpeg_features
-        
+
         aria2c_features = checker.get_affected_features('aria2c')
         assert 'torrent_download' in aria2c_features
         assert 'magnet_download' in aria2c_features
@@ -126,7 +127,7 @@ class TestToolHealthChecker:
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 # video_conversion requires ffmpeg (available)
                 assert checker.is_feature_available('video_conversion') is True
-                
+
                 # torrent_download requires aria2c (not available)
                 assert checker.is_feature_available('torrent_download') is False
 
@@ -136,7 +137,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', return_value='/usr/bin/tool'):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 summary = checker.get_health_summary()
-                
+
                 assert summary['overall_status'] == 'healthy'
                 assert summary['total_tools'] == 4
                 assert summary['available_tools'] == 4
@@ -150,7 +151,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', side_effect=lambda x: '/usr/bin/tool' if x != 'aria2c' else None):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 summary = checker.get_health_summary()
-                
+
                 assert summary['overall_status'] == 'degraded'
                 assert summary['available_tools'] == 3
                 assert len(summary['missing_required']) == 0
@@ -163,7 +164,7 @@ class TestToolHealthChecker:
         with patch('shutil.which', side_effect=lambda x: None if x == 'ffmpeg' else '/usr/bin/tool'):
             with patch.object(checker, '_get_tool_version', return_value='version 1.0'):
                 summary = checker.get_health_summary()
-                
+
                 assert summary['overall_status'] == 'critical'
                 assert 'ffmpeg' in summary['missing_required']
 
@@ -186,7 +187,7 @@ class TestGlobalFunctions:
         """Test that get_tool_health_checker returns singleton."""
         checker1 = get_tool_health_checker()
         checker2 = get_tool_health_checker()
-        
+
         assert checker1 is checker2
 
     def test_check_tool_availability(self):
@@ -196,7 +197,7 @@ class TestGlobalFunctions:
         with patch('shutil.which', return_value='/usr/bin/ffmpeg'):
             with patch('ravn_app.core.tool_health.ToolHealthChecker._get_tool_version', return_value='version 1.0'):
                 assert check_tool_availability('ffmpeg') is True
-        
+
         checker.clear_cache()
         with patch('shutil.which', return_value=None):
             assert check_tool_availability('nonexistent') is False
@@ -208,7 +209,7 @@ class TestGlobalFunctions:
                 # Clear cache to ensure fresh check
                 checker = get_tool_health_checker()
                 checker.clear_cache()
-                
+
                 message = get_missing_tools_message()
                 assert message is None
 
@@ -218,7 +219,7 @@ class TestGlobalFunctions:
             # Clear cache to ensure fresh check
             checker = get_tool_health_checker()
             checker.clear_cache()
-            
+
             message = get_missing_tools_message()
             assert message is not None
             assert 'ffmpeg' in message.lower()
@@ -231,7 +232,7 @@ class TestGlobalFunctions:
                 # Clear cache to ensure fresh check
                 checker = get_tool_health_checker()
                 checker.clear_cache()
-                
+
                 message = get_missing_tools_message()
                 assert message is not None
                 assert 'aria2c' in message.lower()
@@ -247,7 +248,7 @@ class TestToolVersionExtraction:
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021"
-        
+
         with patch('subprocess.run', return_value=mock_result):
             version = checker._get_tool_version('ffmpeg', '/usr/bin/ffmpeg')
             assert version == "ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021"
@@ -258,7 +259,7 @@ class TestToolVersionExtraction:
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "aria2 version 1.36.0"
-        
+
         with patch('subprocess.run', return_value=mock_result):
             version = checker._get_tool_version('aria2c', '/usr/bin/aria2c')
             assert version == "aria2 version 1.36.0"
@@ -268,7 +269,7 @@ class TestToolVersionExtraction:
         checker = ToolHealthChecker()
         mock_result = Mock()
         mock_result.returncode = 1
-        
+
         with patch('subprocess.run', return_value=mock_result):
             version = checker._get_tool_version('ffmpeg', '/usr/bin/ffmpeg')
             assert version is None
@@ -276,7 +277,7 @@ class TestToolVersionExtraction:
     def test_version_extraction_timeout(self):
         """Test version extraction with timeout."""
         checker = ToolHealthChecker()
-        
+
         with patch('subprocess.run', side_effect=TimeoutError):
             version = checker._get_tool_version('ffmpeg', '/usr/bin/ffmpeg')
             assert version is None

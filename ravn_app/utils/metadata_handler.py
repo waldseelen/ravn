@@ -11,7 +11,6 @@ from typing import Any, Optional
 
 from ravn_app.core.runners.ffmpeg import FFmpegRunner
 
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -38,8 +37,8 @@ class MetadataHandler:
 
         format_info = probe_data.get("format", {})
         streams = probe_data.get("streams", [])
-        video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), {})
-        audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), {})
+        video_stream: dict = next((stream for stream in streams if stream.get("codec_type") == "video"), {})
+        audio_stream: dict = next((stream for stream in streams if stream.get("codec_type") == "audio"), {})
         fps = self._parse_fps(video_stream.get("r_frame_rate", "0/1"))
         tags = format_info.get("tags", {}) or {}
 

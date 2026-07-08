@@ -2,17 +2,10 @@
 AudioNormalizer ve VideoMerger testleri
 """
 
-import pytest
-import tempfile
-import os
-from unittest.mock import Mock, patch, MagicMock
-import subprocess
+from unittest.mock import patch
 
-from ravn_app.core.audio_normalizer import (
-    AudioNormalizer, VideoMerger, AudioNormalizationSettings,
-    VideoMergeSettings
-)
-from ravn_app.core.runners import RunnerResult, RunnerStatus
+from ravn_app.core.audio_normalizer import AudioNormalizationSettings, AudioNormalizer, VideoMerger, VideoMergeSettings
+from ravn_app.core.runners import RunnerResult
 
 
 class TestAudioNormalizer:
@@ -44,13 +37,13 @@ class TestAudioNormalizer:
     def test_analyze_loudness_success(self, mock_exists):
         """Başarılı LUFS analizi test edilir"""
         mock_exists.return_value = True
-        
+
         normalizer = AudioNormalizer()
         probe_result = self._create_mock_result(
             success=True,
             metadata={'probe_data': {'format': {'duration': '120.5'}}}
         )
-        
+
         with patch.object(normalizer._runner, 'probe', return_value=probe_result):
             result = normalizer.analyze_loudness("test.mp3")
 
@@ -74,7 +67,7 @@ class TestAudioNormalizer:
 
         normalizer = AudioNormalizer()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = AudioNormalizationSettings(
             input_file="input.mp3",
             output_file="output.mp3",
@@ -84,7 +77,7 @@ class TestAudioNormalizer:
 
         with patch.object(normalizer._runner, 'run', return_value=mock_result):
             result = normalizer.normalize(settings)
-        
+
         assert result is True
 
     @patch('os.path.exists')
@@ -94,7 +87,7 @@ class TestAudioNormalizer:
 
         normalizer = AudioNormalizer()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = AudioNormalizationSettings(
             input_file="input.mp3",
             output_file="output.mp3",
@@ -104,7 +97,7 @@ class TestAudioNormalizer:
 
         with patch.object(normalizer._runner, 'run', return_value=mock_result):
             result = normalizer.normalize(settings)
-        
+
         assert result is True
 
     @patch('os.path.exists')
@@ -200,7 +193,7 @@ class TestVideoMerger:
 
         merger = VideoMerger()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = VideoMergeSettings(
             input_files=["video1.mp4", "video2.mp4"],
             output_file="merged.mp4"
@@ -208,7 +201,7 @@ class TestVideoMerger:
 
         with patch.object(merger._runner, 'run_raw', return_value=mock_result):
             result = merger.merge(settings)
-        
+
         assert result is True
 
     @patch('os.path.exists')
@@ -223,7 +216,7 @@ class TestVideoMerger:
 
         merger = VideoMerger()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = VideoMergeSettings(
             input_files=["video1.mp4", "video2.mp4"],
             output_file="merged.mp4"
@@ -245,7 +238,7 @@ class TestVideoMerger:
 
         merger = VideoMerger()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = VideoMergeSettings(
             input_files=["video1.mp4", "video2.mp4"],
             output_file="merged.mp4",
@@ -254,7 +247,7 @@ class TestVideoMerger:
 
         with patch.object(merger._runner, 'run_raw', return_value=mock_result):
             result = merger.merge_with_transitions(settings)
-        
+
         assert result is True
 
     @patch('os.path.exists')
@@ -264,7 +257,7 @@ class TestVideoMerger:
 
         merger = VideoMerger()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = VideoMergeSettings(
             input_files=["video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4"],
             output_file="merged.mp4"
@@ -272,7 +265,7 @@ class TestVideoMerger:
 
         with patch.object(merger._runner, 'run_raw', return_value=mock_result):
             result = merger.merge_with_transitions(settings)
-        
+
         assert result is True
 
     @patch('os.path.exists')
@@ -282,7 +275,7 @@ class TestVideoMerger:
 
         merger = VideoMerger()
         mock_result = self._create_mock_result(success=True)
-        
+
         settings = VideoMergeSettings(
             input_files=["video1.mp4", "video2.mp4"],
             output_file="merged.mp4",
@@ -292,5 +285,5 @@ class TestVideoMerger:
         with patch.object(merger._runner, 'run_raw', return_value=mock_result):
             with patch('builtins.open', create=True):
                 result = merger.merge_with_transitions(settings)
-        
+
         assert result is True

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import threading
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Dict, List, Optional
 
@@ -187,6 +187,36 @@ class PlaylistMixin:
         self._playlist_detail_fetch_inflight = False
 
         def run_playlist_fetch():
+            progressive_started = perf_counter()
+
+            def on_shallow_ready(entries):
+                self.after(0, self._on_playlist_fetch_complete, url, entries)
+
+            def on_entry_resolved(index, entry):
+                self.after(0, self._on_playlist_entry_resolved, url, index, entry, active_detail_token)
+
+            def is_cancelled():
+                return active_detail_token != getattr(self, "_playlist_detail_fetch_token", 0)
+
+            used_progressive = self.downloader.extract_playlist_entries_progressive(
+                url,
+                quality_label=selected_quality,
+                on_shallow_ready=on_shallow_ready,
+                on_entry_resolved=on_entry_resolved,
+                is_cancelled=is_cancelled,
+            )
+            if used_progressive:
+                self.after(
+                    0,
+                    self._on_playlist_details_all_resolved,
+                    url,
+                    active_detail_token,
+                    perf_counter() - progressive_started,
+                )
+                return
+
+            # Fallback: yt-dlp Python library unavailable -- two blocking subprocess
+            # calls (fast list, then one all-at-once detail pass) as before.
             entries = self.downloader.extract_playlist_entries(
                 url,
                 quality_label=selected_quality,
@@ -283,6 +313,70 @@ class PlaylistMixin:
                 duration_seconds=duration_seconds,
                 chunked=False,
                 merged_count=merged_count,
+            )
+
+    _PROGRESSIVE_DETAIL_KEYS = (
+        "filesize_mb",
+        "resolution",
+        "format_note",
+        "size_by_quality_mb",
+        "resolution_by_quality",
+        "format_note_by_quality",
+    )
+
+    def _on_playlist_entry_resolved(self, url: str, index: int, entry: Dict[str, Any], detail_token: int) -> None:
+        """One playlist video's real size/quality just resolved (yt-dlp library
+        progressive path) -- update just that row instead of waiting for every
+        video in the playlist to finish before showing any real numbers."""
+        if detail_token != getattr(self, "_playlist_detail_fetch_token", 0):
+            return
+        if url != self.playlist_source_url or index >= len(self.playlist_entries):
+            return
+
+        self._playlist_detail_fetch_inflight = True
+        for key in self._PROGRESSIVE_DETAIL_KEYS:
+            if key in entry:
+                self.playlist_entries[index][key] = entry[key]
+
+        quality_label = self._get_selected_quality_label()
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            if hasattr(dialog, "update_entry_at_index"):
+                dialog.update_entry_at_index(index, self.playlist_entries[index], quality_label=quality_label)
+            return
+
+        # Inline (non-dialog) render mode: refresh just the one matching row widget.
+        for item_widget, row_entry in self.playlist_detail_rows:
+            if row_entry is self.playlist_entries[index] and hasattr(item_widget, "set_detail_text"):
+                item_widget.set_detail_text(self._build_playlist_detail_text(row_entry, quality_label))
+                break
+        self._update_playlist_summary()
+        self._update_size_estimate()
+
+    def _on_playlist_details_all_resolved(self, url: str, detail_token: int, duration_seconds: float) -> None:
+        """All playlist entries have finished resolving via the progressive path."""
+        if detail_token != getattr(self, "_playlist_detail_fetch_token", 0):
+            return
+
+        self._playlist_detail_fetch_inflight = False
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            if hasattr(dialog, "mark_details_complete"):
+                dialog.mark_details_complete()
+
+        if url != self.playlist_source_url:
+            return
+
+        self._update_playlist_summary()
+        self._update_size_estimate()
+        if hasattr(self, "_record_perf_metric"):
+            self._record_perf_metric(
+                "playlist_detail_enrichment",
+                item_count=len(self.playlist_entries),
+                duration_seconds=duration_seconds,
+                chunked=False,
+                merged_count=len(self.playlist_entries),
+                progressive=True,
             )
 
     def _render_inline_playlist_entries(self, entries: List[Dict[str, Any]], quality_label: str):

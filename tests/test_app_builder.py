@@ -2,10 +2,9 @@
 PyInstaller Desktop Uygulaması Testleri
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import tempfile
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 from ravn_app.core.app_builder import AppBuilder, Platform
 

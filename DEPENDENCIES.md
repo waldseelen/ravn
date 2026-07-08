@@ -138,10 +138,19 @@ pip install tkinterdnd2
 
 ## Python Package Dependencies
 
-All required Python packages are listed in `requirements.txt`. Install with:
+Direct dependencies live in `requirements.in` (the human-edited source of truth).
+`requirements.txt` is the fully-pinned lock compiled from it with `pip-compile` — this is
+what CI and the packaged build install for reproducibility. Install with:
 
 ```bash
 pip install -r requirements.txt
+```
+
+To change a dependency, edit `requirements.in` and regenerate the lock:
+
+```bash
+pip install pip-tools
+pip-compile requirements.in -o requirements.txt --strip-extras
 ```
 
 Key packages include:
@@ -149,6 +158,10 @@ Key packages include:
 - `click` - CLI framework
 - `yt-dlp` - Download engine (also available as system package)
 - Other supporting libraries
+
+> Torrent/magnet support shells out to the `aria2c` **binary** via subprocess, so the
+> `aria2p` Python library is **not** a dependency (install the aria2c binary instead —
+> see Optional Dependencies below).
 
 ## Checking Tool Health
 

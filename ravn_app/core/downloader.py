@@ -3,15 +3,15 @@ YouTube indirme motoru - yt-dlp entegrasyonu
 YtDlpRunner üzerinden çalışır
 """
 
+import logging
 import os
+import queue
 import re
 import threading
-import queue
-import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Callable, Any, Iterable, Tuple, Union
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from ravn_app.core.config_paths import get_download_archive_file_path
 from ravn_app.core.converter import (
@@ -25,9 +25,8 @@ from ravn_app.core.converter import (
 from ravn_app.core.download_metadata import build_enriched_download_metadata
 from ravn_app.core.download_naming import apply_naming_template, template_needs_video_info
 from ravn_app.core.media_helpers import MediaHelpers
-from ravn_app.core.runners import YtDlpRunner, RunnerResult
+from ravn_app.core.runners import YtDlpRunner
 from ravn_app.core.subtitle_manager import SubtitleDownloader, SubtitleEmbedder
-
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ class DownloadResult:
     error_message: str = ""
     title: str = ""
     duration: float = 0.0
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -180,7 +179,7 @@ _AUDIO_CODEC_BY_EXTENSION = {
     "opus": "libopus",
     "wav": "pcm_s16le",
 }
-_CONVERSION_PRESETS = {
+_CONVERSION_PRESETS: Dict[str, Dict[str, Any]] = {
     "mp4": {
         "video_codec": VideoCodec.H264,
         "audio_codec": AudioCodec.AAC,
@@ -285,7 +284,7 @@ class YouTubeDownloader:
             return None
         except Exception as e:
             logger.error(f"Bilgi alınamadı: {e}")
-            raise Exception(f"Bilgi alınamadı: {str(e)}")
+            raise RuntimeError(f"Bilgi alınamadı: {str(e)}") from e
 
     def extract_playlist_entries(
         self,
@@ -305,6 +304,29 @@ class YouTubeDownloader:
         except Exception as e:
             logger.error(f"Playlist bilgisi alınamadı: {e}")
             return []
+
+    def extract_playlist_entries_progressive(
+        self,
+        url: str,
+        quality_label: str,
+        on_shallow_ready,
+        on_entry_resolved,
+        is_cancelled=None,
+    ) -> bool:
+        """Progressive playlist extraction via the yt-dlp library; see YtDlpRunner for details.
+        Returns False if the library is unavailable, so callers can fall back to
+        extract_playlist_entries() (subprocess-based, all-at-once)."""
+        try:
+            return self._runner.extract_playlist_entries_progressive(
+                url,
+                quality_label=quality_label,
+                on_shallow_ready=on_shallow_ready,
+                on_entry_resolved=on_entry_resolved,
+                is_cancelled=is_cancelled,
+            )
+        except Exception as e:
+            logger.error(f"Progressive playlist bilgisi alınamadı: {e}")
+            return False
 
     @staticmethod
     def merge_playlist_entry_detail_fields(
@@ -587,7 +609,7 @@ class YouTubeDownloader:
             return
 
         try:
-            from mutagen.id3 import ID3, ID3NoHeaderError, TALB, TIT2, TPE1, USLT
+            from mutagen.id3 import ID3, TALB, TIT2, TPE1, USLT, ID3NoHeaderError
             from mutagen.mp3 import MP3
             from mutagen.mp4 import MP4
         except Exception:
@@ -1345,6 +1367,12 @@ class YouTubeDownloader:
                 self.active_downloads[request.url] = request
 
                 result = self.download(request)
+                if not getattr(result, "success", True):
+                    logger.warning(
+                        "Kuyruk indirmesi başarısız: %s — %s",
+                        request.url,
+                        getattr(result, "error_message", ""),
+                    )
 
                 del self.active_downloads[request.url]
                 self.download_queue.task_done()

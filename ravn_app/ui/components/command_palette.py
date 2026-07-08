@@ -8,7 +8,7 @@ from typing import Callable, Iterable, List, Sequence
 import customtkinter as ctk
 
 from ravn_app.core.i18n import t
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Sizes, Spacing
+from ravn_app.ui.design_tokens import Colors, Fonts, Sizes, Spacing
 
 
 @dataclass

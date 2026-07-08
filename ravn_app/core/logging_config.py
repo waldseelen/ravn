@@ -3,14 +3,14 @@ RAVN - Structured Logging System
 Unified logging configuration for all modules
 """
 
+import json
+import logging
 import os
 import sys
-import logging
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
-import json
 
 
 def get_log_directory() -> Path:
@@ -23,17 +23,17 @@ def get_log_directory() -> Path:
     else:  # Linux and others
         xdg_state = os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local' / 'state'))
         log_dir = Path(xdg_state) / 'ravn' / 'logs'
-        
+
         # Fallback to ~/.config/ravn/logs if state doesn't exist
         if not Path(xdg_state).exists():
             log_dir = Path.home() / '.config' / 'ravn' / 'logs'
-    
+
     return log_dir
 
 
 class JsonFormatter(logging.Formatter):
     """JSON log formatter for structured logging"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         from datetime import timezone
         log_entry = {
@@ -45,21 +45,21 @@ class JsonFormatter(logging.Formatter):
             'function': record.funcName,
             'line': record.lineno
         }
-        
+
         # Add exception info if present
         if record.exc_info:
             log_entry['exception'] = self.formatException(record.exc_info)
-        
+
         # Add extra fields if any
         if hasattr(record, 'extra_data'):
             log_entry['extra'] = record.extra_data
-        
+
         return json.dumps(log_entry)
 
 
 class ColoredFormatter(logging.Formatter):
     """Colored console formatter for better readability"""
-    
+
     COLORS = {
         'DEBUG': '\033[36m',     # Cyan
         'INFO': '\033[32m',      # Green
@@ -68,12 +68,12 @@ class ColoredFormatter(logging.Formatter):
         'CRITICAL': '\033[35m',  # Magenta
     }
     RESET = '\033[0m'
-    
+
     def format(self, record: logging.LogRecord) -> str:
         # Don't colorize on Windows without proper terminal support
         if sys.platform == 'win32' and not os.environ.get('TERM'):
             return super().format(record)
-        
+
         color = self.COLORS.get(record.levelname, '')
         record.levelname = f"{color}{record.levelname}{self.RESET}"
         return super().format(record)
@@ -119,7 +119,7 @@ def setup_logging(
 ) -> logging.Logger:
     """
     Set up the RAVN logging system
-    
+
     Args:
         level: Logging level (default: INFO)
         enable_file_logging: Write logs to file
@@ -128,7 +128,7 @@ def setup_logging(
         max_file_size_mb: Maximum size of log file before rotation
         backup_count: Number of backup files to keep
         json_format: Use JSON format for file logs
-    
+
     Returns:
         Root logger instance
     """
@@ -147,24 +147,24 @@ def setup_logging(
 
     root_logger.setLevel(level)
     root_logger.propagate = False
-    
+
     # Console handler
     if enable_console_logging:
         console_handler = logging.StreamHandler(SafeConsoleWriter(sys.stdout))
         console_handler.setLevel(level)
-        
+
         console_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
         console_handler.setFormatter(ColoredFormatter(console_format, datefmt='%H:%M:%S'))
-        
+
         root_logger.addHandler(console_handler)
-    
+
     # File handler
     if enable_file_logging:
         log_dir = get_log_directory()
         log_dir.mkdir(parents=True, exist_ok=True)
-        
+
         log_file = log_dir / log_file_name
-        
+
         file_handler = RotatingFileHandler(
             log_file,
             maxBytes=max_file_size_mb * 1024 * 1024,
@@ -172,21 +172,22 @@ def setup_logging(
             encoding='utf-8'
         )
         file_handler.setLevel(level)
-        
+
         if json_format:
             file_handler.setFormatter(JsonFormatter())
         else:
             file_format = '%(asctime)s [%(levelname)s] %(name)s.%(funcName)s:%(lineno)d - %(message)s'
             file_handler.setFormatter(logging.Formatter(file_format))
-        
+
         root_logger.addHandler(file_handler)
-    
+
     # Log startup info
     root_logger.info(f"RAVN logging initialized - level={logging.getLevelName(level)}")
     if enable_file_logging:
         root_logger.info(f"Log file: {log_dir / log_file_name}")
 
-    root_logger._ravn_logging_initialized = True
+    # Custom idempotency flag read back via getattr() at the top of this function.
+    root_logger._ravn_logging_initialized = True  # type: ignore[attr-defined]
     _initialized = True
     return root_logger
 
@@ -194,10 +195,10 @@ def setup_logging(
 def get_logger(name: str) -> logging.Logger:
     """
     Get a logger for a specific module
-    
+
     Args:
         name: Logger name (usually __name__)
-    
+
     Returns:
         Logger instance
     """
@@ -213,7 +214,7 @@ def log_operation(
 ):
     """
     Log an operation result with structured data
-    
+
     Args:
         logger: Logger instance
         operation: Name of the operation
@@ -222,20 +223,20 @@ def log_operation(
         **extra_data: Additional data to log
     """
     status = "completed" if success else "failed"
-    
+
     message = f"{operation} {status}"
     if duration_seconds is not None:
         message += f" in {duration_seconds:.2f}s"
-    
+
     extra = {
         'operation': operation,
         'success': success,
         'duration_seconds': duration_seconds,
         **extra_data
     }
-    
+
     record_level = logging.INFO if success else logging.ERROR
-    
+
     # Create a record with extra data
     record = logger.makeRecord(
         logger.name,
@@ -247,7 +248,7 @@ def log_operation(
         None
     )
     record.extra_data = extra
-    
+
     logger.handle(record)
 
 
@@ -260,7 +261,7 @@ def log_ffmpeg_operation(
 ):
     """Log an FFmpeg operation with stderr details"""
     success = return_code == 0
-    
+
     log_operation(
         logger,
         "FFmpeg",

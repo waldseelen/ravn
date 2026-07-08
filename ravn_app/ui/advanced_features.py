@@ -3,11 +3,13 @@ RAVN - Advanced UI/UX Features (Faz 5)
 Gelişmiş kullanıcı arayüzü özellikleri
 """
 
-import customtkinter as ctk
-from tkinter import filedialog
-from typing import Optional, Callable, List
+import logging
 import threading
 import time
+from tkinter import filedialog
+from typing import Callable, List, Optional
+
+import customtkinter as ctk
 
 from ravn_app.core.theme_catalog import (
     THEMES,
@@ -17,6 +19,8 @@ from ravn_app.core.theme_catalog import (
     normalize_theme_id,
 )
 from ravn_app.ui.design_tokens import Icons, Spacing
+
+logger = logging.getLogger(__name__)
 
 
 class DragDropFrame(ctk.CTkFrame):
@@ -86,7 +90,6 @@ class SystemTrayIntegration:
 
         try:
             from pystray import Icon, Menu, MenuItem
-            from PIL import Image, ImageDraw
 
             self.Icon = Icon
             self.Menu = Menu
@@ -94,7 +97,7 @@ class SystemTrayIntegration:
             self._create_icon()
             self.available = True
         except ImportError:
-            print("Sistem tray desteği için pystray kütüphanesi gerekli")
+            logger.info("Sistem tray desteği için pystray kütüphanesi gerekli")
 
     def _create_icon(self):
         """Tray ikonu oluştur"""
@@ -159,8 +162,8 @@ class NotificationManager:
                 daemon=True
             ).start()
         except ImportError:
-            # Fallback: tkinter messagebox
-            print(f"Bildirim: {title} - {message}")
+            # Fallback: plyer not available — surface the notification in the log
+            logger.info("Bildirim: %s - %s", title, message)
 
     @staticmethod
     def show_download_complete(file_name: str):
@@ -314,187 +317,3 @@ class ProgressAnimator:
 
             self.progress_bar.set(value)
             time.sleep(0.05)
-
-
-class AdvancedSettingsDialog(ctk.CTkToplevel):
-    """Gelişmiş ayarlar dialogu"""
-
-    def __init__(self, parent, config_manager):
-        super().__init__(parent)
-        self.config_manager = config_manager
-
-        self.title("Ayarlar")
-        self.geometry("600x500")
-
-        # Sekme sistemi
-        self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
-
-        # Genel ayarlar sekmesi
-        general_tab = self.tabview.add("Genel")
-        self._create_general_settings(general_tab)
-
-        # İndirme ayarları sekmesi
-        download_tab = self.tabview.add("İndirme")
-        self._create_download_settings(download_tab)
-
-        # Dönüştürme ayarları sekmesi
-        conversion_tab = self.tabview.add("Dönüştürme")
-        self._create_conversion_settings(conversion_tab)
-
-        # Butonlar
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
-
-        ctk.CTkButton(
-            button_frame,
-            text="Kaydet",
-            command=self._save_settings,
-            fg_color=Colors.ACCENT,
-            hover_color=Colors.ACCENT_HOVER,
-        ).pack(side="left", padx=Spacing.XS)
-
-        ctk.CTkButton(
-            button_frame,
-            text="İptal",
-            command=self.destroy,
-            fg_color=Colors.BTN_SECONDARY,
-            hover_color=Colors.BTN_SECONDARY_HOVER,
-        ).pack(side="left", padx=Spacing.XS)
-
-    def _create_general_settings(self, parent):
-        """Genel ayarlar"""
-        # Tema seçimi
-        ctk.CTkLabel(parent, text="Tema:").pack(pady=Spacing.XS)
-        self.theme_combo = ctk.CTkComboBox(
-            parent,
-            values=ThemeManager.get_theme_names()
-        )
-        self.theme_combo.pack(pady=Spacing.XS)
-
-        # Dil seçimi
-        ctk.CTkLabel(parent, text="Dil:").pack(pady=Spacing.XS)
-        self.language_combo = ctk.CTkComboBox(
-            parent,
-            values=["Türkçe", "English"]
-        )
-        self.language_combo.pack(pady=Spacing.XS)
-
-        # Bildirimler
-        self.notifications_var = ctk.BooleanVar(
-            value=self.config_manager.get('notifications_enabled', True)
-        )
-        ctk.CTkCheckBox(
-            parent,
-            text="Bildirimleri etkinleştir",
-            variable=self.notifications_var
-        ).pack(pady=Spacing.XS)
-
-    def _create_download_settings(self, parent):
-        """İndirme ayarları"""
-        # Varsayılan kalite
-        ctk.CTkLabel(parent, text="Varsayılan Kalite:").pack(pady=Spacing.XS)
-        self.quality_combo = ctk.CTkComboBox(
-            parent,
-            values=["En İyi", "1080p", "720p", "480p"]
-        )
-        self.quality_combo.pack(pady=Spacing.XS)
-
-        # Eşzamanlı indirme
-        ctk.CTkLabel(parent, text="Eşzamanlı İndirme:").pack(pady=Spacing.XS)
-        self.concurrent_slider = ctk.CTkSlider(
-            parent,
-            from_=1,
-            to=5,
-            number_of_steps=4
-        )
-        self.concurrent_slider.pack(pady=Spacing.XS)
-
-    def _create_conversion_settings(self, parent):
-        """Dönüştürme ayarları"""
-        # Varsayılan codec
-        ctk.CTkLabel(parent, text="Varsayılan Video Codec:").pack(pady=Spacing.XS)
-        self.video_codec_combo = ctk.CTkComboBox(
-            parent,
-            values=["H.264", "H.265", "VP9"]
-        )
-        self.video_codec_combo.pack(pady=Spacing.XS)
-
-    def _save_settings(self):
-        """Ayarları kaydet"""
-        self.config_manager.set('notifications_enabled', self.notifications_var.get())
-        # Diğer ayarları kaydet...
-        self.destroy()
-
-
-class HistoryViewer(ctk.CTkFrame):
-    """Geçmiş görüntüleyici"""
-
-    def __init__(self, parent, database_manager, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.db = database_manager
-
-        # Arama çubuğu
-        search_frame = ctk.CTkFrame(self)
-        search_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
-
-        self.search_entry = ctk.CTkEntry(
-            search_frame,
-            placeholder_text="Ara..."
-        )
-        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-
-        ctk.CTkButton(
-            search_frame,
-            text=Icons.SEARCH,
-            width=40,
-            command=self._search,
-            fg_color=Colors.BTN_SECONDARY,
-            hover_color=Colors.BTN_SECONDARY_HOVER,
-        ).pack(side="left")
-
-        # Filtreler
-        filter_frame = ctk.CTkFrame(self)
-        filter_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.XS)
-
-        self.format_filter = ctk.CTkComboBox(
-            filter_frame,
-            values=["Tümü", "MP4", "MP3", "MKV"],
-            command=self._apply_filters
-        )
-        self.format_filter.pack(side="left", padx=Spacing.XS)
-
-        # Tablo (scrollable frame)
-        self.scrollable_frame = ctk.CTkScrollableFrame(self)
-        self.scrollable_frame.pack(fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
-
-        self._load_history()
-
-    def _load_history(self):
-        """Geçmişi yükle"""
-        downloads = self.db.get_downloads(limit=100)
-
-        for download in downloads:
-            item_frame = ctk.CTkFrame(self.scrollable_frame)
-            item_frame.pack(fill="x", pady=2)
-
-            ctk.CTkLabel(
-                item_frame,
-                text=download.title,
-                anchor="w"
-            ).pack(side="left", fill="x", expand=True, padx=Spacing.XS)
-
-            ctk.CTkLabel(
-                item_frame,
-                text=download.format,
-                width=60
-            ).pack(side="left", padx=Spacing.XS)
-
-    def _search(self):
-        """Arama yap"""
-        search_term = self.search_entry.get()
-        # Arama mantığı...
-
-    def _apply_filters(self, choice):
-        """Filtreleri uygula"""
-        # Filtreleme mantığı...

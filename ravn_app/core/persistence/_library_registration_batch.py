@@ -10,7 +10,6 @@ from typing import Any, Optional
 
 from ravn_app.core.persistence.media_library import MediaLibrary
 
-
 logger = logging.getLogger(__name__)
 
 

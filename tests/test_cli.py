@@ -5,8 +5,8 @@ CLI tests using click.testing.CliRunner.
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from click.testing import CliRunner
 import pytest
+from click.testing import CliRunner
 
 import ravn_app.cli as cli_module
 from ravn_app.cli import cli

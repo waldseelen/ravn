@@ -42,6 +42,13 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         self._perf_metrics: Dict[str, Dict[str, Any]] = {}
         self._sort_key = "index"
         self._descending = False
+        # Rows open with flat-pass data only (title/duration, no real size yet); a slower
+        # background pass enriches per-video size/resolution afterward via refresh_entries().
+        # Without a visible "still loading" cue, the table just shows blank/zero sizes for
+        # however long that enrichment takes, which reads as broken rather than in-progress.
+        self._details_enriched = False
+        # Treeview drops any PhotoImage it can't reach, so hold references here keyed by iid.
+        self._thumb_refs: Dict[str, Any] = {}
 
         self._all_rows = self._build_rows(entries)
         self._rows = list(self._all_rows)
@@ -51,6 +58,12 @@ class PlaylistSortDialog(ctk.CTkToplevel):
 
         self._build_ui()
         self._apply_filters()
+
+    def _info_label_text(self) -> str:
+        base = t("download.playlistSortQuality", quality=self._quality_label)
+        if self._details_enriched:
+            return base
+        return f"{base} • {t('download.playlistSortEnrichingDetails')}"
 
     @staticmethod
     def _resolve_color(token: str | tuple[str, str]) -> str:
@@ -108,7 +121,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
     def _build_ui(self) -> None:
         self.info_label = ctk.CTkLabel(
             self,
-            text=t("download.playlistSortQuality", quality=self._quality_label),
+            text=self._info_label_text(),
             text_color=Colors.TEXT_PRIMARY,
             font=Fonts.LABEL,
             anchor="w",
@@ -272,7 +285,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
             foreground=body_fg,
             bordercolor=self._resolve_color(Colors.BORDER),
             borderwidth=0,
-            rowheight=26,
+            rowheight=44,  # tall enough to seat a 16:9 cover thumbnail in the #0 column
         )
         style.configure(
             "Ravn.Treeview.Heading",
@@ -296,7 +309,10 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         )
 
         columns = ("selected", "title", "size", "duration", "album", "channel")
-        self.tree = ttk.Treeview(frame, columns=columns, show="headings", height=16, style="Ravn.Treeview")
+        # "tree headings" keeps the #0 column visible so each row can show a cover thumbnail.
+        self.tree = ttk.Treeview(frame, columns=columns, show="tree headings", height=16, style="Ravn.Treeview")
+        self.tree.heading("#0", text="")
+        self.tree.column("#0", width=76, minwidth=76, anchor=tk.CENTER, stretch=False)
         self.tree.heading("selected", text=t("download.playlistSortSelect"), command=self._toggle_all)
         self.tree.heading("title", text=t("download.playlistSortName"), command=lambda: self._sort_by("title"))
         self.tree.heading("size", text=t("download.playlistSortSize"), command=lambda: self._sort_by("size"))
@@ -516,16 +532,58 @@ class PlaylistSortDialog(ctk.CTkToplevel):
         )
         return filtered_rows
 
+    def update_entry_at_index(self, index: int, entry: Dict[str, Any], quality_label: Optional[str] = None) -> None:
+        """Apply a single progressively-resolved entry's detail fields without rebuilding
+        the whole table -- used by the yt-dlp library progressive extraction path, which
+        resolves one video at a time instead of delivering every entry's details at once."""
+        if quality_label is not None:
+            self._quality_label = quality_label
+
+        target_row = None
+        for row in self._all_rows:
+            if int(row.get("index") or -1) == index:
+                target_row = row
+                break
+        if target_row is None:
+            return
+
+        metrics = self._metrics_getter(entry, self._quality_label)
+        target_row["size_mb"] = float(metrics.get("size_mb") or 0.0)
+        target_row["entry"] = entry
+
+        item_id = str(index)
+        if self.tree.exists(item_id):
+            size_text = self._size_formatter(target_row["size_mb"]) if target_row["size_mb"] > 0 else "-"
+            self.tree.set(item_id, "size", size_text)
+
+        self._update_playlist_progress_label()
+
+    def mark_details_complete(self) -> None:
+        """Signal that no further per-entry updates will arrive; clears the loading cue."""
+        self._details_enriched = True
+        if hasattr(self, "info_label"):
+            self.info_label.configure(text=self._info_label_text())
+
+    def _update_playlist_progress_label(self) -> None:
+        if self._details_enriched or not hasattr(self, "info_label"):
+            return
+        resolved = sum(1 for row in self._all_rows if row.get("size_mb", 0) > 0)
+        total = len(self._all_rows)
+        base = t("download.playlistSortQuality", quality=self._quality_label)
+        progress = t("download.playlistSortEnrichingProgress", resolved=resolved, total=total)
+        self.info_label.configure(text=f"{base} • {progress}")
+
     def refresh_entries(self, entries: List[Dict[str, Any]], quality_label: Optional[str] = None) -> None:
         """Refresh row metrics after deferred playlist detail enrichment completes."""
         selection_by_index = {
             int(row.get("index") or 0): bool(row.get("selected", True))
             for row in self._all_rows
         }
+        self._details_enriched = True
         if quality_label is not None:
             self._quality_label = quality_label
-            if hasattr(self, "info_label"):
-                self.info_label.configure(text=t("download.playlistSortQuality", quality=self._quality_label))
+        if hasattr(self, "info_label"):
+            self.info_label.configure(text=self._info_label_text())
 
         refreshed_rows = self._build_rows(entries)
         for row in refreshed_rows:
@@ -559,10 +617,42 @@ class PlaylistSortDialog(ctk.CTkToplevel):
 
         self._apply_filters()
 
+    def _request_row_thumbnail(self, iid: str, url: str) -> None:
+        """Ask the shared loader for this row's cover as a tk PhotoImage (Treeview needs tk, not CTkImage)."""
+        if not url:
+            return
+        from ravn_app.ui.components.thumbnail_loader import get_thumbnail_loader
+
+        image = get_thumbnail_loader().request(
+            url,
+            (60, 34),
+            on_ready=lambda img, _iid=iid: self._apply_row_thumbnail(_iid, img),
+            schedule_on_ui=self._schedule_on_ui,
+            image_kind="tk",
+        )
+        if image is not None:
+            self._apply_row_thumbnail(iid, image)
+
+    def _schedule_on_ui(self, fn) -> None:
+        try:
+            self.after(0, fn)
+        except Exception:
+            pass
+
+    def _apply_row_thumbnail(self, iid: str, image) -> None:
+        try:
+            if not self.winfo_exists() or not self.tree.exists(iid):
+                return
+            self._thumb_refs[iid] = image  # keep a reference or Treeview drops it
+            self.tree.item(iid, image=image)
+        except Exception:
+            pass
+
     def _refresh_tree(self) -> None:
         started = perf_counter()
         for item_id in self.tree.get_children():
             self.tree.delete(item_id)
+        self._thumb_refs.clear()
 
         for row in self._rows:
             size_text = self._size_formatter(row["size_mb"]) if row["size_mb"] > 0 else "-"
@@ -570,10 +660,11 @@ class PlaylistSortDialog(ctk.CTkToplevel):
             album_text = row["album"] or "-"
             channel_text = row["channel"] or "-"
             marker = "☑" if row.get("selected", True) else "☐"
+            iid = str(row["index"])
             self.tree.insert(
                 "",
                 "end",
-                iid=str(row["index"]),
+                iid=iid,
                 values=(
                     marker,
                     row["title"],
@@ -583,6 +674,7 @@ class PlaylistSortDialog(ctk.CTkToplevel):
                     channel_text,
                 ),
             )
+            self._request_row_thumbnail(iid, (row.get("entry") or {}).get("thumbnail_url", ""))
         self._update_filter_summary()
         self._update_selection_summary()
         self._record_perf_metric(

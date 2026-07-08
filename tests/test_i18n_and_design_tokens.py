@@ -62,6 +62,28 @@ def test_all_literal_i18n_keys_exist_in_en_and_tr() -> None:
     assert not missing_tr, f"Missing TR translations: {missing_tr}"
 
 
+def test_translation_files_have_identical_key_sets() -> None:
+    """tr.json and en.json must define exactly the same keys — a key added to one
+    language but not the other renders as a raw <MISSING> token at runtime."""
+    def _flatten(d: dict, prefix: str = "") -> set:
+        out: set = set()
+        for key, value in d.items():
+            full = f"{prefix}{key}"
+            if isinstance(value, dict):
+                out |= _flatten(value, full + ".")
+            else:
+                out.add(full)
+        return out
+
+    en_keys = _flatten(_load_translations("en"))
+    tr_keys = _flatten(_load_translations("tr"))
+
+    assert en_keys == tr_keys, (
+        f"Translation parity broken. EN-only: {sorted(en_keys - tr_keys)} | "
+        f"TR-only: {sorted(tr_keys - en_keys)}"
+    )
+
+
 def test_all_design_token_references_are_defined() -> None:
     design_tokens = Path("ravn_app/ui/design_tokens.py")
     tree = ast.parse(design_tokens.read_text(encoding="utf-8"), filename=str(design_tokens))

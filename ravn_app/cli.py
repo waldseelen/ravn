@@ -14,13 +14,6 @@ from typing import Optional
 import click
 from click.core import ParameterSource
 
-from ravn_app.core.download_profiles import apply_profile_overrides, get_download_profile, resolve_profile_output_dir
-from ravn_app.core.downloader import (
-    DownloadFormat,
-    DownloadQuality,
-    DownloadResult,
-    YouTubeDownloader,
-)
 from ravn_app.core.converter import (
     AudioCodec,
     CodecManager,
@@ -34,15 +27,21 @@ from ravn_app.core.database import (
     DatabaseManager,
     DownloadRecord,
 )
+from ravn_app.core.download_profiles import apply_profile_overrides, get_download_profile, resolve_profile_output_dir
+from ravn_app.core.downloader import (
+    DownloadFormat,
+    DownloadQuality,
+    DownloadResult,
+    YouTubeDownloader,
+)
 from ravn_app.core.i18n import get_i18n
+from ravn_app.core.media_helpers import get_media_helpers
 from ravn_app.core.persistence.media_library import MediaLibrary, MediaSearchFilters
 from ravn_app.core.runners import AudioMixerRunner, AudioTrack, FFmpegRunner, VideoMixerRunner
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
+from ravn_app.core.tool_health import check_tool_availability, get_tool_health_checker
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
-from ravn_app.core.media_helpers import get_media_helpers
-from ravn_app.core.tool_health import get_tool_health_checker, check_tool_availability
 from ravn_app.utils.ffmpeg_checker import configure_ffmpeg_runtime
-
 
 # ---------------------------------------------------------------------------
 # Helpers

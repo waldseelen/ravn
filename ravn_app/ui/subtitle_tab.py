@@ -5,26 +5,29 @@ This module remains in place so older imports still resolve while Phase 5 keeps
 wrapper/compatibility cleanup behavior-safe.
 """
 
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
-from pathlib import Path
 import threading
+from pathlib import Path
+from tkinter import filedialog, messagebox
 from typing import Any
-from ..core.subtitle_manager import (
-    SubtitleDownloader,
-    SubtitleConverter,
-    SubtitleEditor,
-    SubtitleEmbedder,
-    SubtitleFormat
-)
+
+import customtkinter as ctk
+
 from ravn_app.core.animation_manager import get_animation_manager
 from ravn_app.core.i18n import t
 from ravn_app.ui.components.error_panel import ErrorPanel
-from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Spacing, Sizes, Icons
-from ravn_app.ui.ui_components import style_combo, style_entry, bind_focus_ring, Tooltip, set_button_loading_state
+from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
+from ravn_app.ui.ui_components import Tooltip, bind_focus_ring, set_button_loading_state, style_combo, style_entry
+
+from ..core.subtitle_manager import (
+    SubtitleConverter,
+    SubtitleDownloader,
+    SubtitleEditor,
+    SubtitleEmbedder,
+    SubtitleFormat,
+)
 
 try:
-    from tkinterdnd2 import DND_FILES, TkinterDnD
+    from tkinterdnd2 import DND_FILES
     HAS_DND = True
 except ImportError:
     HAS_DND = False

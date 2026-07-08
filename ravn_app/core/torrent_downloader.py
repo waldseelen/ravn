@@ -17,7 +17,6 @@ from urllib.parse import parse_qs, unquote_plus, urlparse
 
 from ravn_app.core.runners.aria2 import Aria2Runner, ProgressCallback, TorrentProgressSnapshot, emit_torrent_progress
 
-
 logger = logging.getLogger(__name__)
 
 _VIDEO_AUDIO_EXTENSIONS = {
@@ -145,7 +144,7 @@ class TorrentDownloader:
 
         Returns:
             TorrentDownloadResult with outcome details.
-            
+
         Raises:
             RuntimeError: If aria2c is not available.
         """
@@ -162,7 +161,7 @@ class TorrentDownloader:
                 error_message=error_msg,
                 display_name=self.infer_display_name(source)
             )
-        
+
         sequential = mode in (TorrentDownloadMode.SEQUENTIAL, TorrentDownloadMode.STREAM)
         display_name = self.infer_display_name(source)
         latest_progress: Optional[TorrentProgressSnapshot] = None

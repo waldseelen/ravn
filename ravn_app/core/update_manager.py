@@ -3,19 +3,16 @@ Otomatik Güncelleme Sistemi
 GitHub Release'lerinden yeni sürümleri kontrol et ve indir
 """
 
-import os
-import sys
-import json
 import logging
 import subprocess
 import threading
-from pathlib import Path
-from typing import Optional, Dict, List, Callable
 from dataclasses import dataclass
-from enum import Enum
-import requests
 from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Callable, Dict, Optional
 
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +271,6 @@ class UpdateManager:
             elif downloaded_file.suffix in ['.zip', '.gz']:
                 logger.info(f"Arşiv çıkartılıyor: {downloaded_file}")
 
-                import shutil
                 extract_dir = self.update_dir / "extracted"
 
                 if downloaded_file.suffix == '.zip':

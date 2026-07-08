@@ -10,10 +10,10 @@ import tkinter as tk
 import webbrowser
 from pathlib import Path
 from time import perf_counter
+from tkinter import filedialog, ttk
 from typing import Any, Callable, Dict, Optional
 
 import customtkinter as ctk
-from tkinter import filedialog, ttk
 
 from ravn_app.core.i18n import t
 from ravn_app.core.runners.aria2 import TorrentProgressSnapshot

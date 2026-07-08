@@ -3,14 +3,13 @@ RAVN - Config and Data Path Management
 OS-aware configuration and data directory resolution with migration support.
 """
 
+import logging
 import os
-import sys
-import json
 import shutil
+import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Dict, Any
-import logging
+from typing import Any, Dict, Optional
 
 from ravn_app.core.theme_catalog import get_theme_ids, normalize_theme_id
 
@@ -235,8 +234,10 @@ def migrate_all_legacy_files() -> Dict[str, bool]:
     }
 
 
-# Config schema validation
-CONFIG_SCHEMA = {
+# Config schema validation. Annotated so each entry's mixed-type fields (type / default /
+# allowed / min / max) resolve to Any rather than the `object` supertype mypy would infer
+# from the literal, which otherwise breaks indexing and comparisons on schema values.
+CONFIG_SCHEMA: Dict[str, Dict[str, Any]] = {
     'default_download_path': {'type': str, 'default': None},  # Will use ~/Downloads/RAVN
     'default_format': {'type': str, 'default': 'MP4', 'allowed': ['MP4', 'MKV', 'WEBM', 'AVI', 'MOV']},
     'default_quality': {'type': str, 'default': '1080p', 'allowed': ['360p', '480p', '720p', '1080p', '1440p', '2160p', 'best']},
@@ -376,7 +377,7 @@ def validate_config_value(key: str, value: Any) -> tuple[bool, Any, str]:
         return False, default, f"Invalid type for {key}: expected {expected_type.__name__}"
 
     # Range check for integers
-    if expected_type == int:
+    if expected_type is int:
         if 'min' in schema and value < schema['min']:
             return False, schema['min'], f"{key} must be at least {schema['min']}"
         if 'max' in schema and value > schema['max']:

@@ -46,6 +46,16 @@ class TestUIComponentsImport(unittest.TestCase):
         from ravn_app.ui.ui_components import LoadingSkeleton
         self.assertTrue(callable(LoadingSkeleton))
 
+    def test_import_clickable_card(self):
+        """ClickableCard (Home/Studio hierarchical card) should be importable."""
+        from ravn_app.ui.components.clickable_card import ClickableCard
+        self.assertTrue(callable(ClickableCard))
+
+    def test_import_thumbnail_loader(self):
+        """ThumbnailLoader singleton accessor should be importable."""
+        from ravn_app.ui.components.thumbnail_loader import get_thumbnail_loader
+        self.assertTrue(callable(get_thumbnail_loader))
+
 
 class TestDesignTokensImport(unittest.TestCase):
     """Verify design tokens can be imported and have expected values."""

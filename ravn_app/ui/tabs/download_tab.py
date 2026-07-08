@@ -2,11 +2,11 @@
 
 import threading
 from pathlib import Path
-from time import perf_counter
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
+from ravn_app.core import media_url_utils
 from ravn_app.core.download_profiles import (
     apply_profile_overrides,
     get_download_profile,
@@ -14,10 +14,14 @@ from ravn_app.core.download_profiles import (
 )
 from ravn_app.core.downloader import DownloadFormat, DownloadQuality
 from ravn_app.core.i18n import t
-from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
 from ravn_app.core.task_manager import TaskType
+from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
+from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
 from ravn_app.ui.components.error_panel import ErrorPanel
-from ravn_app.ui.components.playlist_item import PlaylistItemRow
+
+# Re-exported as a module attribute on purpose: PlaylistMixin resolves it via
+# getattr(download_tab_module, "PlaylistItemRow", ...) and tests monkeypatch it here.
+from ravn_app.ui.components.playlist_item import PlaylistItemRow  # noqa: F401
 from ravn_app.ui.components.url_input import UrlInputRow
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Motion, Sizes
 from ravn_app.ui.tabs._download_feedback import FeedbackMixin
@@ -170,8 +174,19 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         )
         title.pack(anchor="w", side="left")
 
-        platform_frame = ctk.CTkFrame(self, fg_color="transparent")
-        platform_frame.pack(fill="x", padx=15, pady=10)
+        # Progressive disclosure: keep the essential video/music download controls visible,
+        # tuck less-used options (platform picker, profile, help text) behind "Advanced".
+        self._advanced_options_panel = CollapsiblePanel(
+            self,
+            title=t("download.advancedTitle"),
+            subtitle=t("download.advancedSubtitle"),
+            expanded=False,
+        )
+        self._advanced_options_panel.pack(fill="x", padx=15, pady=(4, 8))
+        advanced_body = self._advanced_options_panel.content_frame()
+
+        platform_frame = ctk.CTkFrame(advanced_body, fg_color="transparent")
+        platform_frame.pack(fill="x", padx=5, pady=6)
 
         ctk.CTkLabel(platform_frame, text=t("download.platformLabel"), font=Fonts.LABEL).pack(side="left", padx=5)
 
@@ -272,16 +287,16 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         self.batch_url_text.pack(fill="x", padx=5)
 
         self.info_label = ctk.CTkLabel(
-            self,
+            advanced_body,
             text=self._build_default_info_text(platforms),
             text_color=Colors.TEXT_MUTED,
             font=Fonts.SMALL,
             justify="left",
         )
-        self.info_label.pack(fill="x", padx=15, pady=(6, 4))
+        self.info_label.pack(fill="x", padx=5, pady=(6, 4))
 
-        profile_frame = ctk.CTkFrame(self, fg_color="transparent")
-        profile_frame.pack(fill="x", padx=15, pady=(0, 8))
+        profile_frame = ctk.CTkFrame(advanced_body, fg_color="transparent")
+        profile_frame.pack(fill="x", padx=5, pady=(0, 8))
         ctk.CTkLabel(
             profile_frame,
             text=t("download.profileLabel"),
@@ -840,63 +855,19 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         else:
             self._set_url_validation_state(Icons.ERROR_INDICATOR, Colors.ERROR)
 
-    @staticmethod
-    def _detect_url_protocol(url: str) -> str:
-        """Return 'magnet', 'torrent_file', or 'standard'."""
-        normalized = (url or "").strip()
-        lowered = normalized.lower()
-        if lowered.startswith("magnet:?"):
-            return "magnet"
-        if lowered.endswith(".torrent"):
-            return "torrent_file"
-        return "standard"
-
-    @staticmethod
-    def _validate_url(url: str) -> bool:
-        if not url:
-            return False
-        lowered = url.lower()
-        if not (lowered.startswith("http://") or lowered.startswith("https://")):
-            return False
-        known_domains = [
-            "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com",
-            "twitch.tv", "soundcloud.com", "facebook.com", "twitter.com",
-            "tiktok.com", "instagram.com", "bilibili.com", "nicovideo.jp",
-        ]
-        return any(domain in lowered for domain in known_domains)
-
-    @staticmethod
-    def _looks_like_playlist_url(url: str) -> bool:
-        lowered = url.lower()
-        return (
-            "list=" in lowered
-            or "/playlist" in lowered
-            or "/sets/" in lowered
-            or "/collection/" in lowered
-        )
-
-    @staticmethod
-    def _format_duration(seconds: Any) -> str:
-        if not isinstance(seconds, (int, float)) or seconds <= 0:
-            return ""
-        seconds = int(seconds)
-        minutes, sec = divmod(seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:
-            return f"{hours:d}:{minutes:02d}:{sec:02d}"
-        return f"{minutes:d}:{sec:02d}"
+    # These five delegate to pure helpers in ravn_app.core.media_url_utils (unit-tested
+    # there); kept as static methods so existing callers and the playlist mixin keep working.
+    _detect_url_protocol = staticmethod(media_url_utils.detect_url_protocol)
+    _validate_url = staticmethod(media_url_utils.is_supported_video_url)
+    _looks_like_playlist_url = staticmethod(media_url_utils.looks_like_playlist_url)
+    _format_duration = staticmethod(media_url_utils.format_duration)
+    _format_size_from_mb = staticmethod(media_url_utils.format_size_from_mb)
 
     def _get_selected_quality_label(self) -> str:
         try:
             return str(self.quality_menu.get() or t("download.qualityBest"))
         except Exception:
             return t("download.qualityBest")
-
-    @staticmethod
-    def _format_size_from_mb(size_mb: float) -> str:
-        if size_mb >= 1024:
-            return f"{size_mb / 1024:.1f} GB"
-        return f"{size_mb:.1f} MB"
 
     def _on_quality_changed(self):
         if not self.playlist_entries:

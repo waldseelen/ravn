@@ -1,7 +1,6 @@
 """Tests for the Phase 7 media library persistence layer."""
 
 import json
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 from ravn_app.core.persistence.media_library import MediaLibrary, MediaSearchFilters

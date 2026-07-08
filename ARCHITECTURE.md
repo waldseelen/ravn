@@ -109,6 +109,23 @@ Responsibilities:
 - support progress reporting and cancellation
 - keep FFmpeg, yt-dlp, and aria2 behavior consistent across features
 
+#### yt-dlp: two deliberate engines
+
+`ytdlp.py` intentionally uses **two** yt-dlp engines for two different jobs:
+
+- **Downloads and single-video info** go through the yt-dlp **binary** (subprocess). On the
+  packaged Windows build this binary self-updates from GitHub (`YtDlpRunner.update()`), which
+  keeps site compatibility fresh without shipping a new app release.
+- **Playlist preview** uses the yt-dlp **Python library** (`extract_playlist_entries_progressive`)
+  so it can stream results progressively — the shallow (fast) entry list arrives first, then each
+  video's size/quality/resolution resolves one at a time — instead of one blocking subprocess call
+  that returns nothing until the whole playlist is resolved.
+
+The library is imported lazily (first preview only) so it never taxes startup, and if it is
+unavailable the preview transparently falls back to the subprocess path. Preview numbers are
+estimates, so any version skew between the two engines is low-stakes; downloads always use the
+freshest (self-updating) binary.
+
 ### 3.4 Persistence and library layer
 
 Primary files:
@@ -144,6 +161,19 @@ Responsibilities:
 - logging bootstrap
 - user-readable tool/process error shaping
 - packaged/runtime FFmpeg discovery
+
+### 3.6 Platform contract
+
+RAVN is **Windows-first** but written to run (and at minimum not crash) on macOS/Linux:
+
+- OS-specific calls are branched and guarded: `os.startfile` is only reached under a
+  `platform.system() == "Windows"` / `os.name == "nt"` check, with `open` / `xdg-open`
+  (argument-list `subprocess`, never a shell) as the macOS/Linux fallback.
+- Windows-only integrations degrade gracefully when unavailable: the system tray (`pystray`)
+  and drag-and-drop (`tkinterdnd2`) are optional imports gated behind availability flags, and
+  the registry PATH refresh (`winreg`) early-returns on non-Windows.
+- Paths resolve per-OS through `core/config_paths.py`; hidden-subprocess flags are Windows-gated
+  in `core/runners/base.py`. Packaging/signing is the Windows distribution focus.
 
 ---
 

@@ -9,18 +9,18 @@ import os
 import shutil
 import sqlite3
 from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
-from dataclasses import dataclass
-from enum import Enum
 
 from ravn_app.core.config_paths import (
+    ensure_directories_exist,
     get_config_file_path,
     get_database_file_path,
-    ensure_directories_exist,
-    migrate_all_legacy_files,
     get_default_config,
+    migrate_all_legacy_files,
     validate_config,
 )
 
@@ -79,7 +79,7 @@ class OperationRecord:
     task_type: str = ""
     operation: str = ""
     title: str = ""
-    input_paths: List[str] = None
+    input_paths: Optional[List[str]] = None
     output_path: str = ""
     format: str = ""
     started_at: str = ""
@@ -87,7 +87,7 @@ class OperationRecord:
     duration: float = 0.0
     status: str = DownloadStatus.COMPLETED.value
     error_message: str = ""
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.input_paths is None:
@@ -109,13 +109,13 @@ class DatabaseManager:
         # Ensure config directories exist and migrate legacy files
         ensure_directories_exist()
         migrate_all_legacy_files()
-        
+
         if db_path is None:
             self.db_path = str(get_database_file_path())
         else:
             # Support both legacy path and explicit path
             self.db_path = db_path
-        
+
         self.conn = None
         self._connect()
         self._run_migrations()
@@ -131,12 +131,24 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Veritabanı bağlantı hatası: {e}")
 
+    def _require_conn(self) -> sqlite3.Connection:
+        """Return the live connection or fail loudly.
+
+        `self.conn` is best-effort (``_connect`` leaves it None on failure) and can be
+        None after ``close()``. Routing writes/reads through this helper turns a cryptic
+        ``AttributeError: 'NoneType' has no attribute 'cursor'`` into a clear, typed error,
+        and lets the type checker know the connection is non-None past this point.
+        """
+        if self.conn is None:
+            raise RuntimeError("Veritabanı bağlantısı yok (bağlantı kurulamadı veya kapatıldı)")
+        return self.conn
+
     def _create_tables(self):
         """Tabloları oluştur"""
         if not self.conn:
             return
 
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         # İndirme geçmişi tablosu
         cursor.execute('''
@@ -210,7 +222,7 @@ class DatabaseManager:
         ''')
 
         self._create_history_indexes(cursor)
-        self.conn.commit()
+        self._require_conn().commit()
 
     def _run_migrations(self):
         """Run schema migrations with backup protection."""
@@ -250,7 +262,7 @@ class DatabaseManager:
 
     def _ensure_schema_version_table(self):
         """Create schema_version table if not present and initialize row."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS schema_version (
@@ -270,11 +282,11 @@ class DatabaseManager:
                 ''',
                 (self._utc_now_iso(),),
             )
-        self.conn.commit()
+        self._require_conn().commit()
 
     def get_schema_version(self) -> int:
         """Return current schema version."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute('SELECT version FROM schema_version WHERE id = 1')
         row = cursor.fetchone()
         if row is None:
@@ -283,7 +295,7 @@ class DatabaseManager:
 
     def _set_schema_version(self, version: int):
         """Persist schema version after migration."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             UPDATE schema_version
@@ -292,7 +304,7 @@ class DatabaseManager:
             ''',
             (version, self._utc_now_iso()),
         )
-        self.conn.commit()
+        self._require_conn().commit()
 
     @staticmethod
     def _utc_now_iso() -> str:
@@ -340,7 +352,7 @@ class DatabaseManager:
         records the transition in DB metadata so startup can apply versioned DB
         migrations deterministically.
         """
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS migration_history (
@@ -367,11 +379,11 @@ class DatabaseManager:
                 "Recorded Phase 2 config/data relocation migration",
             ),
         )
-        self.conn.commit()
+        self._require_conn().commit()
 
     def _migrate_v2_to_v3(self):
         """Migration script v2 -> v3 for generic Phase 7 operation history."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS migration_history (
@@ -417,11 +429,11 @@ class DatabaseManager:
                 "Added generic operations table for Phase 7 queue/history persistence",
             ),
         )
-        self.conn.commit()
+        self._require_conn().commit()
 
     def _migrate_v3_to_v4(self):
         """Migration script v3 -> v4 for history/top-N query indexes."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             CREATE TABLE IF NOT EXISTS migration_history (
@@ -499,11 +511,11 @@ class DatabaseManager:
                 "Added top-N/history indexes for downloads, conversions, and operations",
             ),
         )
-        self.conn.commit()
+        self._require_conn().commit()
 
     def add_download(self, record: DownloadRecord) -> int:
         """İndirme kaydı ekle"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         cursor.execute('''
             INSERT INTO downloads (
@@ -516,8 +528,8 @@ class DatabaseManager:
             record.status, record.duration, record.thumbnail_url
         ))
 
-        self.conn.commit()
-        return cursor.lastrowid
+        self._require_conn().commit()
+        return cursor.lastrowid or 0
 
     def get_downloads(
         self,
@@ -525,7 +537,7 @@ class DatabaseManager:
         status: Optional[str] = None
     ) -> List[DownloadRecord]:
         """İndirme kayıtlarını getir"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         if status:
             cursor.execute('''
@@ -546,7 +558,7 @@ class DatabaseManager:
 
     def add_conversion(self, record: ConversionRecord) -> int:
         """Dönüştürme kaydı ekle"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         cursor.execute('''
             INSERT INTO conversions (
@@ -559,12 +571,12 @@ class DatabaseManager:
             record.status
         ))
 
-        self.conn.commit()
-        return cursor.lastrowid
+        self._require_conn().commit()
+        return cursor.lastrowid or 0
 
     def get_conversions(self, limit: int = 100) -> List[ConversionRecord]:
         """Dönüştürme kayıtlarını getir"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute('''
             SELECT * FROM conversions
             ORDER BY conversion_date DESC
@@ -576,7 +588,7 @@ class DatabaseManager:
 
     def add_operation(self, record: OperationRecord) -> int:
         """Persist a generic Phase 7 operation history record."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute(
             '''
             INSERT INTO operations (
@@ -599,12 +611,12 @@ class DatabaseManager:
                 json.dumps(record.metadata, ensure_ascii=False),
             ),
         )
-        self.conn.commit()
-        return cursor.lastrowid
+        self._require_conn().commit()
+        return cursor.lastrowid or 0
 
     def get_operations(self, limit: int = 100, task_type: Optional[str] = None) -> List[OperationRecord]:
         """Return persisted generic operation history rows."""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         if task_type:
             cursor.execute(
                 '''
@@ -630,33 +642,33 @@ class DatabaseManager:
     def add_favorite(self, url: str, title: str) -> bool:
         """Favorilere ekle"""
         try:
-            cursor = self.conn.cursor()
+            cursor = self._require_conn().cursor()
             cursor.execute('''
                 INSERT INTO favorites (url, title)
                 VALUES (?, ?)
             ''', (url, title))
-            self.conn.commit()
+            self._require_conn().commit()
             return True
         except sqlite3.IntegrityError:
             return False  # Zaten var
 
     def get_favorites(self) -> List[Dict]:
         """Favorileri getir"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute('SELECT * FROM favorites ORDER BY added_date DESC')
 
         return [dict(row) for row in cursor.fetchall()]
 
     def remove_favorite(self, url: str) -> bool:
         """Favorilerden kaldır"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
         cursor.execute('DELETE FROM favorites WHERE url = ?', (url,))
-        self.conn.commit()
+        self._require_conn().commit()
         return cursor.rowcount > 0
 
     def get_statistics(self) -> Dict[str, Any]:
         """İstatistikleri al"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         stats = {}
 
@@ -695,7 +707,7 @@ class DatabaseManager:
 
     def clear_history(self, table: str = "all") -> bool:
         """Geçmişi temizle"""
-        cursor = self.conn.cursor()
+        cursor = self._require_conn().cursor()
 
         if table == "all":
             cursor.execute('DELETE FROM downloads')
@@ -708,7 +720,7 @@ class DatabaseManager:
         elif table == "operations":
             cursor.execute('DELETE FROM operations')
 
-        self.conn.commit()
+        self._require_conn().commit()
         return True
 
     def _row_to_download_record(self, row) -> DownloadRecord:
@@ -787,13 +799,13 @@ class ConfigManager:
         # Ensure config directories exist and migrate legacy files
         ensure_directories_exist()
         migrate_all_legacy_files()
-        
+
         if config_file is None:
             self.config_file = str(get_config_file_path())
         else:
             # Support both legacy path and explicit path
             self.config_file = config_file
-        
+
         self.config = self._load_config()
         logger.debug(f"ConfigManager initialized with path: {self.config_file}")
 
@@ -832,7 +844,7 @@ class ConfigManager:
             # Ensure parent directory exists
             config_path = Path(self.config_file)
             config_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
             logger.debug(f"Saved config to {self.config_file}")
@@ -866,7 +878,8 @@ class ConfigManager:
             with open(export_path, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
             return True
-        except:
+        except Exception as exc:
+            logger.error("Konfigürasyon dışa aktarılamadı (%s): %s", export_path, exc)
             return False
 
     def import_config(self, import_path: str) -> bool:
@@ -875,7 +888,8 @@ class ConfigManager:
             with open(import_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
             return self.save_config()
-        except:
+        except Exception as exc:
+            logger.error("Konfigürasyon içe aktarılamadı (%s): %s", import_path, exc)
             return False
 
 
@@ -919,4 +933,4 @@ class PluginManager:
                 try:
                     method(*args, **kwargs)
                 except Exception as e:
-                    print(f"Plugin hatası ({event}): {e}")
+                    logger.error("Plugin hatası (%s): %s", event, e)

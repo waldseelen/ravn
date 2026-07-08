@@ -5,7 +5,6 @@ Platform support tests.
 from unittest.mock import Mock, patch
 
 from ravn_app.core.platform_support import (
-    DailymotionDownloader,
     GenericYtDlpDownloader,
     InstagramDownloader,
     Platform,
@@ -13,8 +12,6 @@ from ravn_app.core.platform_support import (
     TikTokDownloader,
     TwitchDownloader,
     TwitterXDownloader,
-    VimeoDownloader,
-    YouTubeDownloader,
 )
 
 

@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 
 from ravn_app.core.runners import YtDlpRunner
 
-
 logger = logging.getLogger(__name__)
 
 

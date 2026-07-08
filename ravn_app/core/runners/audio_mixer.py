@@ -13,7 +13,6 @@ from typing import Callable, Optional, Sequence
 from ravn_app.core.runners.base import RunnerResult
 from ravn_app.core.runners.ffmpeg import FFmpegRunner
 
-
 logger = logging.getLogger(__name__)
 ProgressCallback = Optional[Callable[[int, str], None]]
 

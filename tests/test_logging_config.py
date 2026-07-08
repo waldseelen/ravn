@@ -2,18 +2,23 @@
 Logging Configuration Tests
 """
 
-import pytest
+import logging
 import os
 import sys
 import tempfile
-import logging
 from pathlib import Path
 from unittest.mock import patch
 
 from ravn_app.core.logging_config import (
-    get_log_directory, setup_logging, get_logger,
-    log_operation, log_ffmpeg_operation, log_ytdlp_operation,
-    JsonFormatter, ColoredFormatter, SafeConsoleWriter
+    ColoredFormatter,
+    JsonFormatter,
+    SafeConsoleWriter,
+    get_log_directory,
+    get_logger,
+    log_ffmpeg_operation,
+    log_operation,
+    log_ytdlp_operation,
+    setup_logging,
 )
 
 
@@ -69,7 +74,7 @@ class TestSetupLogging:
             enable_console_logging=True,
             enable_file_logging=False
         )
-        
+
         console_handlers = [
             h for h in logger.handlers
             if isinstance(h, logging.StreamHandler)
@@ -82,7 +87,7 @@ class TestSetupLogging:
             enable_console_logging=False,
             enable_file_logging=False
         )
-        
+
         console_handlers = [
             h for h in logger.handlers
             if isinstance(h, logging.StreamHandler)
@@ -98,14 +103,14 @@ class TestSetupLogging:
                     enable_console_logging=False,
                     enable_file_logging=True
                 )
-                
+
                 from logging.handlers import RotatingFileHandler
                 file_handlers = [
                     h for h in logger.handlers
                     if isinstance(h, RotatingFileHandler)
                 ]
                 assert len(file_handlers) == 1
-                
+
                 # Close handlers to release file lock (Windows)
                 for handler in logger.handlers[:]:
                     handler.close()
@@ -177,7 +182,7 @@ class TestJsonFormatter:
     def test_json_formatter_output(self):
         """JSON formatter should produce valid JSON"""
         import json
-        
+
         formatter = JsonFormatter()
         record = logging.LogRecord(
             name='test',
@@ -188,10 +193,10 @@ class TestJsonFormatter:
             args=(),
             exc_info=None
         )
-        
+
         output = formatter.format(record)
         parsed = json.loads(output)
-        
+
         assert parsed['level'] == 'INFO'
         assert parsed['message'] == 'Test message'
         assert 'timestamp' in parsed
@@ -199,9 +204,9 @@ class TestJsonFormatter:
     def test_json_formatter_with_exception(self):
         """JSON formatter should include exception info"""
         import json
-        
+
         formatter = JsonFormatter()
-        
+
         try:
             raise ValueError("Test error")
         except ValueError:
@@ -214,10 +219,10 @@ class TestJsonFormatter:
                 args=(),
                 exc_info=sys.exc_info()
             )
-        
+
         output = formatter.format(record)
         parsed = json.loads(output)
-        
+
         assert 'exception' in parsed
         assert 'ValueError' in parsed['exception']
 
@@ -237,7 +242,7 @@ class TestColoredFormatter:
             args=(),
             exc_info=None
         )
-        
+
         output = formatter.format(record)
         assert 'Test message' in output
 
@@ -264,7 +269,7 @@ class TestLogOperations:
             success=True,
             duration_seconds=1.5
         )
-        
+
         self.handler.flush()
         assert len(self.handler.buffer) == 1
         record = self.handler.buffer[0]
@@ -278,7 +283,7 @@ class TestLogOperations:
             success=False,
             duration_seconds=1.5
         )
-        
+
         self.handler.flush()
         assert len(self.handler.buffer) == 1
         record = self.handler.buffer[0]
@@ -293,7 +298,7 @@ class TestLogOperations:
             stderr="",
             duration_seconds=5.0
         )
-        
+
         self.handler.flush()
         assert len(self.handler.buffer) == 1
 
@@ -306,7 +311,7 @@ class TestLogOperations:
             output_file="/path/to/video.mp4",
             duration_seconds=30.0
         )
-        
+
         self.handler.flush()
         assert len(self.handler.buffer) == 1
 
@@ -318,16 +323,16 @@ class TestLogDirectoryCreation:
         """Log directory should be created if it doesn't exist"""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_dir = Path(tmpdir) / 'subdir' / 'logs'
-            
+
             with patch('ravn_app.core.logging_config.get_log_directory',
                        return_value=log_dir):
                 logger = setup_logging(
                     enable_console_logging=False,
                     enable_file_logging=True
                 )
-                
+
                 assert log_dir.exists()
-                
+
                 # Close handlers to release file lock (Windows)
                 for handler in logger.handlers[:]:
                     handler.close()

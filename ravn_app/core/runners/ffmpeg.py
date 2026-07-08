@@ -14,7 +14,6 @@ from typing import Any, Callable, Dict, List, Optional
 
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus, get_hidden_subprocess_kwargs
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -242,8 +241,8 @@ class FFmpegRunner(BaseRunner):
             )
             if result.returncode == 0:
                 return result.stdout.split("\n")[0]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("FFmpeg version probe failed: %s", exc)
         return None
 
     def check_codec_support(self, codec: str) -> bool:
@@ -293,7 +292,7 @@ class FFmpegRunner(BaseRunner):
             process_env = os.environ.copy()
             logger.debug("Running FFmpeg with real-time progress: %s", " ".join(progress_cmd))
 
-            self.current_process = subprocess.Popen(
+            process = subprocess.Popen(
                 progress_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -302,16 +301,21 @@ class FFmpegRunner(BaseRunner):
                 env=process_env,
                 **get_hidden_subprocess_kwargs(),
             )
+            self.current_process = process
+            # stdout=PIPE/stderr=PIPE guarantee these streams exist; bind locally so the
+            # reads below are on a known-non-None Popen rather than the Optional attribute.
+            assert process.stdout is not None and process.stderr is not None
+            stderr_stream = process.stderr  # narrowed non-None local for the thread lambda
 
             stderr_lines: List[str] = []
             stderr_thread = threading.Thread(
-                target=lambda: stderr_lines.extend(self.current_process.stderr.readlines()),
+                target=lambda: stderr_lines.extend(stderr_stream.readlines()),
                 daemon=True,
             )
             stderr_thread.start()
 
             last_progress = 0
-            for line in self.current_process.stdout:
+            for line in process.stdout:
                 line = line.strip()
 
                 if line.startswith("out_time_ms="):

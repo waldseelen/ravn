@@ -2,12 +2,11 @@
 Tests for DatabaseManager migrations and schema versioning.
 """
 
+import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
-import sqlite3
-
-from ravn_app.core.database import DatabaseManager, LATEST_SCHEMA_VERSION
+from ravn_app.core.database import LATEST_SCHEMA_VERSION, DatabaseManager
 
 
 class TestDatabaseMigrations:

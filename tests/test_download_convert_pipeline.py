@@ -2,8 +2,7 @@
 Integration tests for download -> convert pipeline using mocks.
 """
 
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from ravn_app.core.converter import (
     AudioCodec,

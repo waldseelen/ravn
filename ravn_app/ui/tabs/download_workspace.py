@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tkinter import filedialog
 from typing import Any, Callable, Optional
 
 import customtkinter as ctk
-from tkinter import filedialog
 
 from ravn_app.core.i18n import t
 from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
@@ -104,6 +104,13 @@ class DownloadWorkspace(ctk.CTkFrame):
         )
         self.source_textbox.pack(fill="x", padx=Spacing.MD)
         self.source_textbox.bind("<KeyRelease>", self._on_source_text_changed)
+        # <<Paste>> also fires for paste via a right-click context menu or middle-click,
+        # which do not generate a <KeyRelease> — without it, a mouse-driven paste could
+        # leave stale (mis)detected-source state on screen until the next keystroke.
+        # Deferred via after(): our widget-level binding runs BEFORE Tk's own class-level
+        # <<Paste>> binding performs the actual insertion, so reading the text synchronously
+        # here would see the pre-paste content.
+        self.source_textbox.bind("<<Paste>>", self._on_source_pasted)
 
         source_actions = ctk.CTkFrame(source_card, fg_color="transparent")
         source_actions.pack(fill="x", padx=Spacing.MD, pady=(Spacing.XS, Spacing.SM))
@@ -129,66 +136,19 @@ class DownloadWorkspace(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         )
         self.source_browse_button.pack(side="right")
-        
-        self.source_preview_button = ctk.CTkButton(
-            source_actions,
-            text=t("download.previewAction") if t("download.previewAction") != "download.previewAction" else "Önizleme",
-            command=self._preview_source,
-            font=Fonts.SMALL,
-            height=Sizes.BTN_HEIGHT_SM,
-            fg_color=Colors.BTN_SECONDARY,
-            hover_color=Colors.BTN_SECONDARY_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-        )
-        self.source_preview_button.pack(side="right", padx=(0, Spacing.XS))
 
-        override_row = ctk.CTkFrame(self, fg_color="transparent")
-        override_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
+        # No separate "Preview" button here: it duplicated the Video/Music columns'
+        # "Fetch Data" button below (which already routes to single-video info or
+        # playlist preview) and its handler called a method that no longer exists.
 
-        ctk.CTkLabel(
-            override_row,
-            text=t("download.workspaceOverrideLabel"),
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_PRIMARY,
-        ).pack(side="left", padx=(0, Spacing.SM))
-
-        self.mode_selector = ctk.CTkSegmentedButton(
-            override_row,
-            values=self._build_override_values(),
-            fg_color=Colors.BG_SURFACE,
-            selected_color=Colors.ACCENT,
-            selected_hover_color=Colors.ACCENT_HOVER,
-            unselected_color=Colors.BG_CARD,
-            unselected_hover_color=Colors.BG_HOVER,
-            text_color=Colors.TEXT_PRIMARY,
-            text_color_disabled=Colors.TEXT_MUTED,
-            font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_MD,
-            command=self._on_override_selected,
-        )
-        self.mode_selector.pack(side="left")
+        # Source type is auto-detected from the pasted text. We keep the label->key map
+        # so programmatic select_mode() calls (Home quick actions, etc.) still work, but no
+        # redundant manual override selector is shown to the user.
+        self._build_override_values()
 
         media_output_row = ctk.CTkFrame(self, fg_color="transparent")
         media_output_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
         self.media_output_row = media_output_row
-        
-        ctk.CTkLabel(
-            media_output_row,
-            text="Önayar:" if t("download.presetLabel") == "download.presetLabel" else t("download.presetLabel"),
-            font=Fonts.LABEL,
-            text_color=Colors.TEXT_PRIMARY,
-        ).pack(side="left", padx=(0, Spacing.SM))
-        
-        self.preset_selector = ctk.CTkComboBox(
-            media_output_row,
-            values=["Özel (Custom)", "Arşiv (Archive)", "Mobil (Mobile)", "Yayın (Broadcast)"],
-            font=Fonts.LABEL,
-            height=Sizes.BTN_HEIGHT_MD,
-            fg_color=Colors.BG_INPUT,
-            border_color=Colors.BORDER,
-            command=self._on_preset_selected,
-        )
-        self.preset_selector.pack(side="left", padx=(0, Spacing.MD))
 
         ctk.CTkLabel(
             media_output_row,
@@ -347,7 +307,7 @@ class DownloadWorkspace(ctk.CTkFrame):
             (t("download.workspaceOverrideBatch"), "batch"),
             (t("download.workspaceOverrideTorrent"), "torrent"),
         ]
-        self._override_value_to_key = {label: key for label, key in labels}
+        self._override_value_to_key = dict(labels)
         return [label for label, _key in labels]
 
     def _build_media_output_values(self) -> list[str]:
@@ -355,39 +315,36 @@ class DownloadWorkspace(ctk.CTkFrame):
             (t("download.modeVideo"), "video"),
             (t("download.qualityAudioOnly"), "audio"),
         ]
-        self._media_output_value_to_key = {label: key for label, key in labels}
+        self._media_output_value_to_key = dict(labels)
         return [label for label, _key in labels]
 
     def _set_override_selector_value(self, override_key: str) -> None:
+        selector = self.__dict__.get("mode_selector")
+        if selector is None:
+            return
         label = next((value for value, key in self._override_value_to_key.items() if key == override_key), None)
-        if label and self.mode_selector.get() != label:
-            self.mode_selector.set(label)
+        if label and selector.get() != label:
+            selector.set(label)
 
     def _set_media_output_selector_value(self, output_key: str) -> None:
         label = next((value for value, key in self._media_output_value_to_key.items() if key == output_key), None)
         if label and self.media_output_selector.get() != label:
             self.media_output_selector.set(label)
 
-    def _on_override_selected(self, selected_label: str) -> None:
-        self._source_override_key = self._override_value_to_key.get(selected_label, "auto")
-        self._apply_workspace_state()
-
     def _on_media_output_selected(self, selected_label: str) -> None:
         self.set_output_surface(self._media_output_value_to_key.get(selected_label, "video"))
 
-    def _on_preset_selected(self, selected_label: str) -> None:
-        pass  # Will coordinate with DownloadTab for advanced preset logic
-        
-    def _preview_source(self) -> None:
-        source_text = self.get_source_text()
-        if not source_text:
-            return
-        if self.download_tab is not None and hasattr(self.download_tab, "set_status_text"):
-            self.download_tab.set_status_text("Önizleme yükleniyor...")
-            # Trigger analysis
-            self.download_tab._start_analysis()
+    def _on_source_pasted(self, _event=None) -> None:
+        self.after(1, self._on_source_text_changed)
 
     def _on_source_text_changed(self, _event=None) -> None:
+        # Any direct edit to the source box (typing or pasting) must re-enable live
+        # auto-detection, even if a prior deliberate action (a Home quick-action card,
+        # or Browse .torrent) had pinned the override to a specific mode. Without this,
+        # a sticky override silently ignores whatever the user just pasted while the
+        # badge — which reads raw detection, not the effective override — keeps
+        # reporting the correct type, making the workspace look broken/inconsistent.
+        self._source_override_key = "auto"
         self._apply_workspace_state()
 
     def _browse_torrent_source(self) -> None:

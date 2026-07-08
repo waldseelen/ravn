@@ -18,7 +18,6 @@ from ravn_app.core.persistence._media_library_rows import MediaLibraryRowMapper
 from ravn_app.core.persistence._media_library_stats import MediaLibraryStatsCache
 from ravn_app.utils.metadata_handler import MetadataHandler
 
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_SEARCH_HISTORY_LIMIT = 100
@@ -233,7 +232,7 @@ class MediaLibrary:
                 thumbnail or extracted.get("thumbnail") or "",
             ),
         )
-        media_id = int(cursor.lastrowid)
+        media_id = int(cursor.lastrowid or 0)
         self._replace_tags(media_id, normalized_tags)
         self.conn.commit()
         self._invalidate_stats_cache()
@@ -302,6 +301,8 @@ class MediaLibrary:
         cursor = self.conn.cursor()
         if updates:
             params.append(media_id)
+            # Safe: `updates` only ever holds fixed literal fragments ("title = ?", …) built
+            # above — never user input. All user values flow through parameterized `?` binds.
             cursor.execute(f"UPDATE media_items SET {', '.join(updates)} WHERE id = ?", params)
         if tags is not None:
             self._replace_tags(media_id, self._normalize_tags(tags))
@@ -432,7 +433,7 @@ class MediaLibrary:
         )
         self.conn.commit()
         self._invalidate_stats_cache()
-        return int(cursor.lastrowid)
+        return int(cursor.lastrowid or 0)
 
     def rename_collection(self, collection_id: int, new_name: str) -> bool:
         """Rename an existing collection."""

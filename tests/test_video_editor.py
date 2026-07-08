@@ -2,13 +2,9 @@
 VideoEditor testleri - FFmpegRunner tabanlı
 """
 
-import pytest
-import tempfile
-import os
-from unittest.mock import Mock, patch, MagicMock
-import subprocess
+from unittest.mock import Mock, patch
 
-from ravn_app.core.converter import VideoEditor, AudioCodec
+from ravn_app.core.converter import AudioCodec, VideoEditor
 from ravn_app.core.runners import RunnerResult
 
 

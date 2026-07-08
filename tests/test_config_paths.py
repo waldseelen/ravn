@@ -3,32 +3,25 @@ Tests for config_paths module
 """
 
 import os
-import sys
-import json
 import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from ravn_app.core.config_paths import (
-    get_config_directory,
-    get_data_directory,
-    get_cache_directory,
-    get_config_file_path,
-    get_database_file_path,
-    get_media_library_file_path,
+    CONFIG_SCHEMA,
     ensure_directories_exist,
     find_legacy_config_file,
     find_legacy_database_file,
-    migrate_legacy_config,
-    migrate_legacy_database,
-    migrate_all_legacy_files,
+    get_cache_directory,
+    get_config_file_path,
+    get_data_directory,
+    get_database_file_path,
     get_default_config,
-    validate_config_value,
+    get_media_library_file_path,
+    migrate_all_legacy_files,
+    migrate_legacy_config,
     validate_config,
-    CONFIG_SCHEMA,
+    validate_config_value,
 )
 
 
@@ -39,9 +32,10 @@ class TestConfigDirectoryPaths:
     @patch.dict(os.environ, {'APPDATA': 'C:\\Users\\Test\\AppData\\Roaming'})
     def test_get_config_directory_windows(self):
         """Test config directory on Windows"""
-        from ravn_app.core import config_paths
         # Reimport to pick up the patched values
         import importlib
+
+        from ravn_app.core import config_paths
         importlib.reload(config_paths)
 
         path = config_paths.get_config_directory()
@@ -51,8 +45,9 @@ class TestConfigDirectoryPaths:
     @patch.dict(os.environ, {'HOME': '/home/testuser'}, clear=False)
     def test_get_config_directory_linux(self):
         """Test config directory on Linux"""
-        from ravn_app.core import config_paths
         import importlib
+
+        from ravn_app.core import config_paths
         importlib.reload(config_paths)
 
         # Clear XDG override if present
@@ -63,8 +58,9 @@ class TestConfigDirectoryPaths:
     @patch('sys.platform', 'darwin')
     def test_get_config_directory_macos(self):
         """Test config directory on macOS"""
-        from ravn_app.core import config_paths
         import importlib
+
+        from ravn_app.core import config_paths
         importlib.reload(config_paths)
 
         path = config_paths.get_config_directory()
@@ -155,7 +151,7 @@ class TestMigration:
         """Test migration when no legacy file exists"""
         with patch('ravn_app.core.config_paths.find_legacy_config_file', return_value=None):
             result = migrate_legacy_config()
-            assert result == False
+            assert result is False
 
     def test_migrate_legacy_config_already_exists(self):
         """Test migration when target already exists"""
@@ -170,7 +166,7 @@ class TestMigration:
             with patch('ravn_app.core.config_paths.find_legacy_config_file', return_value=legacy_file):
                 with patch('ravn_app.core.config_paths.get_config_file_path', return_value=config_file):
                     result = migrate_legacy_config()
-                    assert result == False
+                    assert result is False
 
     def test_migrate_legacy_config_success(self):
         """Test successful config migration"""
@@ -186,7 +182,7 @@ class TestMigration:
                     with patch('ravn_app.core.config_paths.ensure_directories_exist'):
                         config_dir.mkdir(parents=True, exist_ok=True)
                         result = migrate_legacy_config()
-                        assert result == True
+                        assert result is True
                         assert config_file.exists()
 
     def test_migrate_all_legacy_files(self):
@@ -333,7 +329,7 @@ class TestConfigSchema:
 
     def test_schema_types_are_valid(self):
         """Test all schema types are valid Python types"""
-        for key, schema in CONFIG_SCHEMA.items():
+        for schema in CONFIG_SCHEMA.values():
             assert 'type' in schema
             assert schema['type'] in (str, int, bool, dict)
 

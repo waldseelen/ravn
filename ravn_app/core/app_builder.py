@@ -4,15 +4,13 @@ Windows, macOS ve Linux için tek kaynak koddan executable oluşturur
 """
 
 import importlib.util
-import os
-import sys
-import subprocess
 import logging
-from pathlib import Path
-from typing import Optional, Dict, List
 import platform as platform_module
+import subprocess
+import sys
 from enum import Enum
-
+from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

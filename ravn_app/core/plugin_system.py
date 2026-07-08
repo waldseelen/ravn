@@ -5,14 +5,13 @@ It remains as a future-facing extension boundary only; no stable plugin API is
 currently promised for packaged or day-to-day RAVN usage.
 """
 
-import sys
 import importlib
 import logging
-from pathlib import Path
-from typing import Dict, List, Callable, Any, Optional
+import sys
 from dataclasses import dataclass
 from enum import Enum
-
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +211,7 @@ class PluginManager:
 
     def trigger_hook(self, hook: PluginHook, *args, **kwargs) -> List[Any]:
         """Hook'u tetikle ve tüm plugin çıktılarını topla"""
-        results = []
+        results: List[Any] = []
 
         if hook not in self.hooks:
             logger.warning(f"Bilinmeyen hook: {hook}")

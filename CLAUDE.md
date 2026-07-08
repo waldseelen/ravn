@@ -46,4 +46,7 @@ Primary checks:
 - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
 - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
 
-Latest full-suite verification: `644 passed, 1 skipped` on 2026-04-07.
+Latest full-suite verification: `685 passed, 1 skipped` on 2026-07-07.
+
+Quality gates (both blocking in CI): `ruff check ravn_app tests` (clean) and
+`mypy ravn_app/core ravn_app/utils` (0 errors). UI-layer mypy is still being tightened — see `ROADMAP.md`.

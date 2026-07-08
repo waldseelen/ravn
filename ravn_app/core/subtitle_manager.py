@@ -3,13 +3,13 @@ RAVN - Subtitle Management System (Faz 3)
 Altyazı indirme, dönüştürme ve yönetim sistemi
 """
 
+import logging
 import os
 import re
-from pathlib import Path
-from typing import Any, List, Dict, Optional
-from enum import Enum
 from dataclasses import dataclass
-import logging
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from ravn_app.core.runners import FFmpegRunner, YtDlpRunner
 
@@ -471,7 +471,7 @@ class SubtitleEmbedder:
         if not os.path.exists(video_file):
             logger.error(f"Video dosyası bulunamadı: {video_file}")
             return False
-        
+
         if not os.path.exists(subtitle_file):
             logger.error(f"Altyazı dosyası bulunamadı: {subtitle_file}")
             return False
@@ -519,7 +519,7 @@ class SubtitleEmbedder:
         if not os.path.exists(video_file):
             logger.error(f"Video dosyası bulunamadı: {video_file}")
             return False
-        
+
         if not os.path.exists(subtitle_file):
             logger.error(f"Altyazı dosyası bulunamadı: {subtitle_file}")
             return False
@@ -598,5 +598,6 @@ def count_subtitle_lines(file_path: str) -> int:
         # Boş satırları say
         lines = [line for line in content.split('\n') if line.strip() and not line.strip().isdigit()]
         return len(lines)
-    except:
+    except Exception as exc:
+        logger.debug("Altyazı satırı sayılamadı (%s): %s", file_path, exc)
         return 0

@@ -1,7 +1,6 @@
 """Tests for automatic MediaLibrary registration flows."""
 
 import time
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 from ravn_app.core.persistence import MediaLibrary, MediaLibraryAutoAdder

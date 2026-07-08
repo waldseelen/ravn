@@ -1,8 +1,18 @@
 # Release Status
 
-Verified on 2026-04-07.
+Verified on 2026-07-07 (`685 passed, 1 skipped`).
 
 RAVN is an actively maintained **Windows-first desktop + CLI media product**. The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. The main remaining release work is final packaged-app validation and trust/signing polish for Windows distribution.
+
+## Recent quality pass (2026-07)
+
+- Playlist fetch reworked to progressive yt-dlp **library** extraction (results stream in one video at a
+  time instead of a ~29s all-at-once block) and now carries real **cover thumbnails** into the preview.
+- CI hardened: broken workflow files removed, `ruff` gate (blocking, clean), `mypy` core gate
+  (informational), Python 3.13 in the matrix, coverage floor, and a pip-compiled dependency lock.
+- Real fixes: a command-injection in `open_file` (now argument-list `subprocess`), 182 lines of dead code
+  carrying a latent `NameError`, a lowercase-`any` annotation bug, and swallowed queue-worker failures.
+- See [ROADMAP.md](ROADMAP.md) for the ongoing 20-category quality push.
 
 ## Product snapshot
 

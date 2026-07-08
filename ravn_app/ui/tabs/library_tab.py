@@ -16,10 +16,16 @@ from ravn_app.core.database import OperationRecord
 from ravn_app.core.i18n import t
 from ravn_app.core.persistence.media_library import MediaItemRecord, MediaLibrary, MediaSearchFilters
 from ravn_app.core.task_manager import Task, TaskQueue, TaskResult, TaskType
-from ravn_app.utils.metadata_handler import MetadataHandler
 from ravn_app.ui.components.error_panel import ErrorPanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
-from ravn_app.ui.ui_components import EmptyStateWidget, bind_focus_ring, set_button_loading_state, style_combo, style_entry
+from ravn_app.ui.ui_components import (
+    EmptyStateWidget,
+    bind_focus_ring,
+    set_button_loading_state,
+    style_combo,
+    style_entry,
+)
+from ravn_app.utils.metadata_handler import MetadataHandler
 
 
 class LibraryTab(ctk.CTkFrame):
@@ -490,8 +496,23 @@ class LibraryTab(ctk.CTkFrame):
         card = ctk.CTkFrame(self.results_frame, fg_color=Colors.BG_CARD, corner_radius=Sizes.CORNER_MD)
         card.pack(fill="x", pady=(0, Spacing.SM))
 
+        # Horizontal body: cover thumbnail on the left, text/actions column on the right.
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="x", padx=Spacing.MD, pady=Spacing.SM)
+
+        thumb_url = getattr(item, "thumbnail", "") or ""
+        if thumb_url:
+            thumb_label = ctk.CTkLabel(
+                body, text="", width=96, height=54, fg_color=Colors.BG_SURFACE, corner_radius=4
+            )
+            thumb_label.pack(side="left", padx=(0, Spacing.MD), anchor="n")
+            self._request_library_thumbnail(thumb_label, thumb_url)
+
+        content = ctk.CTkFrame(body, fg_color="transparent")
+        content.pack(side="left", fill="x", expand=True)
+
         title = item.title or Path(item.file_path).stem
-        ctk.CTkLabel(card, text=title, font=Fonts.LABEL_BOLD, text_color=Colors.TEXT_PRIMARY, anchor="w", wraplength=720).pack(fill="x", padx=Spacing.MD, pady=(Spacing.SM, Spacing.XS))
+        ctk.CTkLabel(content, text=title, font=Fonts.LABEL_BOLD, text_color=Colors.TEXT_PRIMARY, anchor="w", wraplength=640).pack(fill="x", pady=(0, Spacing.XS))
 
         details = [
             f"{item.format.upper() if item.format else t('common.unknown')}",
@@ -505,11 +526,11 @@ class LibraryTab(ctk.CTkFrame):
         if item.tags:
             details.append(", ".join(item.tags))
 
-        ctk.CTkLabel(card, text="  •  ".join(details), font=Fonts.SMALL, text_color=Colors.TEXT_MUTED, anchor="w", wraplength=760).pack(fill="x", padx=Spacing.MD)
-        ctk.CTkLabel(card, text=item.file_path, font=Fonts.SMALL, text_color=Colors.TEXT_MUTED, anchor="w", wraplength=760).pack(fill="x", padx=Spacing.MD, pady=(Spacing.XS, 0))
+        ctk.CTkLabel(content, text="  •  ".join(details), font=Fonts.SMALL, text_color=Colors.TEXT_MUTED, anchor="w", wraplength=680).pack(fill="x")
+        ctk.CTkLabel(content, text=item.file_path, font=Fonts.SMALL, text_color=Colors.TEXT_MUTED, anchor="w", wraplength=680).pack(fill="x", pady=(Spacing.XS, 0))
 
-        actions = ctk.CTkFrame(card, fg_color="transparent")
-        actions.pack(fill="x", padx=Spacing.MD, pady=(Spacing.SM, Spacing.SM))
+        actions = ctk.CTkFrame(content, fg_color="transparent")
+        actions.pack(fill="x", pady=(Spacing.SM, 0))
 
         ctk.CTkButton(
             actions,
@@ -546,6 +567,27 @@ class LibraryTab(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
             cursor=Cursors.POINTER,
         ).pack(side="right")
+
+    def _request_library_thumbnail(self, label, url: str) -> None:
+        """Load a media item's cover into its list row asynchronously (never blocks the UI)."""
+        from ravn_app.ui.components.thumbnail_loader import get_thumbnail_loader
+
+        def _apply(image):
+            try:
+                if label.winfo_exists():
+                    label.configure(image=image, text="")
+            except Exception:
+                pass
+
+        def _schedule(fn):
+            try:
+                label.after(0, fn)
+            except Exception:
+                pass
+
+        image = get_thumbnail_loader().request(url, (96, 54), on_ready=_apply, schedule_on_ui=_schedule)
+        if image is not None:
+            _apply(image)
 
     # ------------------------------------------------------------------
     # Actions

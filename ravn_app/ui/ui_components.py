@@ -3,9 +3,11 @@ RAVN - Reusable UI Components
 Toast notifications, inline error labels, and other shared UI elements.
 """
 
+from typing import Callable, List, Optional
+
 import customtkinter as ctk
-from typing import Optional, List, Callable
-from ravn_app.ui.design_tokens import Colors, Fonts, Spacing, Sizes, Motion, Icons
+
+from ravn_app.ui.design_tokens import Colors, Fonts, Icons, Sizes, Spacing
 
 
 class Toast(ctk.CTkFrame):

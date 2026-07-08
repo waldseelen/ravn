@@ -11,6 +11,7 @@ to class attributes:  font=Fonts.TITLE
 """
 
 import functools
+
 import customtkinter as ctk
 
 
@@ -24,12 +25,12 @@ class Colors:
     BG_INPUT   = ("#DDD6CE", "#2D2D2D")   # (light, dark) input field background
     BG_HOVER   = ("#D8D0C8", "#2A2A2A")   # (light, dark) hover state background
 
-    # Accent / brand (RAVN Nordic kahverengi theme)
-    # Nordic brown palette inspired by Scandinavian minimalism
-    ACCENT       = "#987a4e"   # kahverengi-500 (primary brand, WCAG AA: 4.59:1)
-    ACCENT_HOVER = "#7A5F3A"   # kahverengi-600 (darker on hover)
-    ACCENT_LIGHT = "#A68A6E"   # kahverengi-400 (lighter accent)
-    ACCENT_BEIGE = "#D4C5B9"   # beige-200 (secondary accent, contrasting)
+    # Accent / brand (RAVN brass theme — brightened evolution of the Nordic brown)
+    # Warmer, higher-energy brass keeps the brand lineage but reads livelier on dark surfaces.
+    ACCENT       = "#C99A5B"   # brass-500 (primary brand; on #141414 ≈ 6.9:1, AA)
+    ACCENT_HOVER = "#A87C42"   # brass-600 (darker on hover)
+    ACCENT_LIGHT = "#D8AC6E"   # brass-400 (lighter accent / active glow)
+    ACCENT_BEIGE = "#E0CBB3"   # sand-200 (secondary accent, contrasting)
 
     # Semantic feedback (all WCAG AA compliant on BG_PRIMARY)
     SUCCESS        = "#22c55e"   # green-500 (8.08:1)
@@ -41,8 +42,8 @@ class Colors:
     ERROR          = "#ef4444"   # red-500 (4.90:1)
     ERROR_BG       = ("#FDF0F0", "#2D1515")   # (light, dark) red bg
     ERROR_HOVER    = "#dc2626"   # red-600
-    INFO           = "#987a4e"   # kahverengi-500 brand info (4.59:1)
-    INFO_BG        = "#2a2320"   # dark kahverengi bg
+    INFO           = "#C99A5B"   # brass-500 brand info (AA on dark)
+    INFO_BG        = "#2a2320"   # dark brass bg
 
     # Destructive
     DANGER       = "#ef4444"
@@ -57,7 +58,7 @@ class Colors:
     # Borders
     BORDER        = ("#C4B5A8", "#3A3330")   # (light, dark)
     BORDER_STRONG = ("#A89080", "#5A4A40")   # (light, dark)
-    BORDER_ACCENT = "#987a4e"   # kahverengi for accent borders (WCAG AA)
+    BORDER_ACCENT = "#C99A5B"   # brass for accent borders (WCAG AA)
     BORDER_HOVER  = "#525252"
 
     # Status (for status labels / log text)
@@ -74,12 +75,12 @@ class Colors:
     BTN_SECONDARY_HOVER = ("#C4B0A0", "#4A4340")   # (light, dark)
     BTN_DISABLED        = ("#C8BFB8", "#303030")   # (light, dark) disabled button bg (MIC-07)
 
-    # Interactive states (kahverengi-aligned)
-    FOCUS_RING = "#A68A6E"   # kahverengi-400 for focus indicators
+    # Interactive states (brass-aligned)
+    FOCUS_RING = "#D8AC6E"   # brass-400 for focus indicators (high visibility)
     DRAG_OVER  = ("#EAE0D5", "#2A2218")   # (light, dark) drag-drop target
     HOVER_BEIGE = "#3b332f"  # subtle beige hover tint (POL-03)
     PROGRESS_BG = "#3a312c"  # beige-brown progress track
-    PROGRESS_FILL = "#987a4e"  # brand progress fill
+    PROGRESS_FILL = "#C99A5B"  # brass progress fill
     SUCCESS_FLASH = "#4ade80"  # brief success flash color
 
 
@@ -188,6 +189,10 @@ class Icons:
 
     For production, consider replacing with actual icon font or SVG system.
     """
+    # Primary workspace nav (top tab bar) — one clear glyph per destination
+    HOME        = "⌂"   # Home workspace
+    STUDIO      = "❖"   # Studio workspace (processing tools)
+
     # Navigation & Tabs (ICN-01 to ICN-06)
     DOWNLOAD    = "↓"   # Minimalist download (ICN-01)
     UPLOAD      = "↑"

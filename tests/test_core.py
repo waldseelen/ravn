@@ -3,18 +3,19 @@ RAVN Birim Testleri
 pytest ile çalışır: pytest tests/
 """
 
-import pytest
-import sys
 import os
+import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 # Proje dizinini path'e ekle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ravn_app.core.downloader import DownloadFormat, DownloadQuality, YouTubeDownloader
 from ravn_app.core.runners import RunnerResult
-from ravn_app.utils.file_utils import sanitize_filename, format_bytes
+from ravn_app.utils.file_utils import format_bytes, sanitize_filename
 from ravn_app.utils.system_utils import find_executable, get_platform
 
 
@@ -642,10 +643,10 @@ class TestLiveDownload:
 
     def test_extract_video_info(self):
         """Video bilgilerini çekebiliyor mu"""
+        # Gerçek video URL'si (internet) gerektiren canlı akışın smoke ucu:
+        # en azından downloader kurulabiliyor olmalı.
         downloader = YouTubeDownloader()
-        # Bu test gerçek bir video URL'si gerektirir
-        # Örnek: https://www.youtube.com/watch?v=dQw4w9WgXcQ
-        pass
+        assert downloader is not None
 
 
 if __name__ == "__main__":

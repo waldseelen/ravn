@@ -17,7 +17,6 @@ from typing import Callable, List, Optional
 from ravn_app.core.error_handler import parse_aria2c_error
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus, get_hidden_subprocess_kwargs
 
-
 logger = logging.getLogger(__name__)
 
 _PERCENT_PATTERN = re.compile(r"\((\d+)%\)")
@@ -273,7 +272,7 @@ class Aria2Runner(BaseRunner):
             process_env = os.environ.copy()
             logger.debug("aria2c command: %s", " ".join(command))
 
-            self.current_process = subprocess.Popen(
+            process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -282,19 +281,24 @@ class Aria2Runner(BaseRunner):
                 env=process_env,
                 **get_hidden_subprocess_kwargs(),
             )
+            self.current_process = process
+            # stdout=PIPE/stderr=PIPE guarantee these streams exist; bind locally so the
+            # reads below are on a known-non-None Popen rather than the Optional attribute.
+            assert process.stdout is not None and process.stderr is not None
+            stderr_stream = process.stderr  # narrowed non-None local for the thread lambda
 
             stderr_lines: List[str] = []
             import threading
 
             stderr_thread = threading.Thread(
                 target=lambda: stderr_lines.extend(
-                    self.current_process.stderr.readlines()
+                    stderr_stream.readlines()
                 ),
                 daemon=True,
             )
             stderr_thread.start()
 
-            for line in self.current_process.stdout:
+            for line in process.stdout:
                 snapshot = _handle_progress_line(line, progress_callback, parser)
                 if snapshot is not None:
                     last_progress = snapshot

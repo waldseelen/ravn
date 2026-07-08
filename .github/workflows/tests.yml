@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - name: Checkout
@@ -29,7 +29,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest pytest-cov
 
+      # Coverage floor guards against regressions. Baseline is ~50%; raise the
+      # threshold as ROADMAP workstream 3 adds tests. Much of the gap is UI code
+      # that is exercised via construction smoke tests rather than line coverage.
       - name: Run tests
-        run: pytest -q
+        run: pytest -q --cov=ravn_app --cov-report=term-missing --cov-fail-under=48
+

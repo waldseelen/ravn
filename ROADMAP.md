@@ -61,3 +61,29 @@ scored independently; keep `pytest -q` green (675 passed baseline) after every c
 - [x] Cross-platform: verified all `os.startfile` sites are Windows-guarded with `open`/`xdg-open`
       (arg-list subprocess) fallbacks; `winreg`/tray/DnD degrade gracefully. Documented the contract in
       ARCHITECTURE.md §3.6.
+
+---
+
+## Status checkpoint (2026-07-07) — pushed to `main` @ 0cad999
+
+**Where we are:** 141 → **~175/200**, verified. 646 → **755 tests** green. `ruff` + `mypy ravn_app/core
+ravn_app/utils` both **blocking** in CI at 0 errors. Fully matured: Types (9), CI/CD (9), Security (9),
+i18n (10), Performance (9). Clearly up: Visual (thumbnails in playlist+library, ClickableCard hierarchy,
+card borders), Accessibility (ClickableCard now Tab-focusable + focus ring + keyboard-activatable),
+Readability, Maintainability, Observability, Error handling.
+
+## Remaining to reach 180+ (next session — nothing rushed)
+
+1. **Test coverage push (safe, high-certainty).** Several pure-logic core modules are 0%/low and fully
+   testable — start with `download_naming.py` (277 lines, templating + path-traversal guards, currently
+   untested), then `download_metadata.py`. Was mid-writing `tests/test_download_naming.py` when we paused.
+2. **God-file splits (needs a test net first).** `download_tab.py` torrent methods → a `TorrentMixin`
+   (mirror `PlaylistMixin`/`FeedbackMixin`) — but the torrent UI methods aren't directly tested, so add a
+   thin mock-based test net BEFORE moving them. Then consider splitting `history_settings_tab.py` (1610;
+   two independent classes HistoryTab + SettingsTab) and `cli.py` (1766).
+3. **Editorial visual round 2.** Spacing/type-scale refinements on Home/Download; verify in the real app
+   (screenshots in this env are unreliable — capture from the running window or eyeball live).
+4. **Last nudges to 9:** Packaging (confirm spec bundles new modules), Architecture (final review),
+   remaining UI-layer mypy (mixins), reduce brittle UI monkeypatching in older tests.
+
+Full detail per category is in the workstreams above.

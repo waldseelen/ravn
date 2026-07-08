@@ -75,6 +75,22 @@ class ClickableCard(ctk.CTkFrame):
         self.bind("<Return>", self._on_click)
         self.bind("<space>", self._on_click)
 
+        # Make the card reachable by Tab and show a focus ring when it has focus. Focus
+        # lands on CustomTkinter's internal canvas, so bind there; guard defensively in
+        # case the private attribute changes across CTk versions.
+        focus_target = getattr(self, "_canvas", None)
+        if focus_target is not None:
+            try:
+                focus_target.configure(takefocus=1)
+                focus_target.bind("<FocusIn>", self._on_focus_in)
+                focus_target.bind("<FocusOut>", self._on_focus_out)
+                focus_target.bind("<Return>", self._on_click)
+                focus_target.bind("<space>", self._on_click)
+                for widget in (self, row, self.title_label, self.detail_label):
+                    widget.bind("<Button-1>", lambda _e: focus_target.focus_set(), add="+")
+            except Exception:
+                pass
+
     def _on_click(self, _event=None):
         if callable(self._command):
             self._command()
@@ -85,6 +101,18 @@ class ClickableCard(ctk.CTkFrame):
 
     def _on_leave(self, _event=None):
         self.configure(fg_color=self._base_color)
+
+    def _on_focus_in(self, _event=None):
+        try:
+            self.configure(border_color=Colors.FOCUS_RING)
+        except Exception:
+            pass
+
+    def _on_focus_out(self, _event=None):
+        try:
+            self.configure(border_color=Colors.BORDER)
+        except Exception:
+            pass
 
     def set_content(self, title: Optional[str] = None, detail: Optional[str] = None) -> None:
         if title is not None:

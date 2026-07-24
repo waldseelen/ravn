@@ -2,7 +2,7 @@
 
 ## Mission
 
-Maintain RAVN as a **Windows-first desktop + CLI media product**. Keep implementation, tests, and documentation synchronized with repository reality.
+Maintain RAVN as a **cross-platform desktop + CLI media product**. Keep implementation, tests, and documentation synchronized with repository reality.
 
 ## Read Order Before Substantial Changes
 
@@ -49,7 +49,7 @@ Keep `CLAUDE.md` lightweight as a compact compatibility entry point, not a dupli
 - Processing support for convert, subtitle, filters, mixer, and utility flows
 - Local media library with history, search, tags, collections, and export
 - CLI support for `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, and `utilities`
-- Windows packaged releases are the active distribution target; current release work is final clean-machine validation and signing/trust polish
+- Windows, Linux, and macOS are supported and CI-verified (`tests.yml` runs the full suite on all three); Windows packaged releases remain the only pre-built distribution target, with Linux/macOS packaging tracked as a follow-up in `TASKS.md`
 - `plugin_system.py` is experimental only and not part of the active packaged runtime
 
 ## Working Rules

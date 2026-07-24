@@ -1315,9 +1315,12 @@ class DownloadTab(FeedbackMixin, PlaylistMixin, ctk.CTkFrame):
         """Open URL or file path with the system default player."""
         import os
         import subprocess
+        import sys
         try:
             if os.name == "nt":
                 os.startfile(url)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", url])
             else:
                 subprocess.Popen(["xdg-open", url])
         except Exception:

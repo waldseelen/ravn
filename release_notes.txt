@@ -14,8 +14,6 @@ crash reporting, an in-app update check, and a first-pass Windows installer.
   leaves your machine, and you can turn it off entirely in Settings.
 * **In-app update check:** A "Check for Updates" button in Settings tells you whether a newer
   RAVN release is available, without needing to check GitHub manually.
-* **Windows MSI installer (first pass):** In addition to the portable zip, RAVN can now build an
-  MSI package with a proper Start Menu shortcut and uninstall entry via the WiX Toolset.
 * **Security scanning and SBOM:** Every push is now scanned with CodeQL and `pip-audit`, and each
   release ships a Software Bill of Materials (SBOM) alongside the checksum file.
 * **Open-source governance:** Added a security policy, contributing guide, code of conduct, and
@@ -28,9 +26,9 @@ crash reporting, an in-app update check, and a first-pass Windows installer.
 
 ## 🔧 Installation
 
-RAVN is shipped as a portable executable for Windows, with an MSI installer option.
-1. Download `RAVN-windows-x64.zip` (portable) or `RAVN-windows-x64.msi` (installer) from this release.
-2. Portable: extract the folder and launch `RAVN.exe`. Installer: run the `.msi` and follow the prompts.
+RAVN is shipped as a portable executable for Windows.
+1. Download `RAVN-windows-x64.zip` from this release.
+2. Extract the folder and launch `RAVN.exe`.
 3. Verify the download against `RAVN-windows-x64.sha256.txt` if you'd like to confirm integrity.
 *Note: Windows SmartScreen may appear on first run depending on the code-signing certificate's
 accumulated reputation. Click "More info" then "Run anyway" if the checksum matches.*

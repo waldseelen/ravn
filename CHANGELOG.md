@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security & Dependency Automation**: Added `dependabot.yml`, a `CodeQL` code-scanning workflow, and automated `pip-audit` + CycloneDX SBOM generation in `.github/workflows/security.yml`. Release builds now also attach a versioned SBOM (`RAVN-windows-x64.sbom.json`) to each GitHub Release.
 - **Opt-in local crash reporting**: Unhandled exceptions now write a timestamped, offline-only crash report (`ravn_app/core/crash_reporter.py`) next to the app logs. No network calls, no third-party SDK; can be disabled from Settings.
 - **In-app update check**: A "Check for Updates" button in Settings now uses the app's `UpdateManager` to compare against the latest GitHub Release.
-- **Windows MSI installer (first pass)**: Added a WiX v4 package (`packaging/ravn.wxs`) and a `build.ps1 -Action ci-msi` step, shipped alongside the existing zip release. Not yet end-to-end verified on a real Windows runner.
 - **Playlist Fetch Instant Estimates**: Shallow entry list immediately computes duration-based size estimates for all quality labels, ensuring rows never render blank before detail resolution completes.
 
 ### Changed

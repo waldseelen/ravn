@@ -166,6 +166,7 @@ class TestRefreshProcessEnvironmentPath:
 
     def test_merges_new_registry_paths_into_process_environment(self, monkeypatch):
         monkeypatch.setattr(tool_installer.os, "name", "nt")
+        monkeypatch.setattr(tool_installer.os, "pathsep", ";")
         monkeypatch.setenv("PATH", r"C:\Existing")
 
         fake_winreg = self._fake_winreg(
@@ -182,6 +183,7 @@ class TestRefreshProcessEnvironmentPath:
 
     def test_does_not_duplicate_existing_path_entries(self, monkeypatch):
         monkeypatch.setattr(tool_installer.os, "name", "nt")
+        monkeypatch.setattr(tool_installer.os, "pathsep", ";")
         monkeypatch.setenv("PATH", r"C:\Existing;C:\Windows\System32")
 
         fake_winreg = self._fake_winreg(

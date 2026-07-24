@@ -510,6 +510,73 @@ class TestSettingsAndHistoryLogic:
         assert SettingsTab._normalize_quality_for_storage("En Iyi") == "best"
         assert SettingsTab._normalize_quality_for_storage("En İyi") == "best"
 
+
+class _ImmediateThread:
+    """Runs the target synchronously on .start() instead of spawning a real thread,
+    so background-worker UI methods can be tested deterministically."""
+
+    def __init__(self, target=None, daemon=None):
+        self._target = target
+
+    def start(self):
+        if self._target is not None:
+            self._target()
+
+
+class TestCheckForUpdatesButton:
+    """Regression coverage for _on_check_updates_clicked: UpdateManager.check_for_updates()
+    returns a bool (never None), so `if release is not None:` on that bool was always true --
+    both the "update available" and "up to date" cases tried to read `.version` off a bool and
+    hit AttributeError, which the broad except swallowed into a misleading "check failed"
+    message every time. See history_settings_tab.py's _on_check_updates_clicked."""
+
+    @staticmethod
+    def _make_tab():
+        tab = SettingsTab.__new__(SettingsTab)
+        tab.check_updates_btn = Mock()
+        tab.update_status_label = Mock()
+        tab.after = lambda _delay, fn: fn()
+        return tab
+
+    def test_shows_update_available_with_real_version(self):
+        from ravn_app.ui.design_tokens import Colors as _Colors
+
+        tab = self._make_tab()
+        mock_mgr = Mock()
+        mock_mgr.check_for_updates.return_value = True
+        mock_mgr.get_latest_release.return_value = SimpleNamespace(version="1.2.0")
+
+        with patch("ravn_app.ui.history_settings_tab.UpdateManager", return_value=mock_mgr), patch(
+            "ravn_app.ui.history_settings_tab.threading.Thread", _ImmediateThread
+        ):
+            tab._on_check_updates_clicked()
+
+        assert tab.update_status_label.configure.call_count == 2  # "checking..." then the result
+        tab.update_status_label.configure.assert_called_with(
+            text=t("settings.updateAvailable").format(version="1.2.0"),
+            text_color=_Colors.ACCENT,
+        )
+
+    def test_shows_up_to_date_when_no_update_available(self):
+        from ravn_app import __version__ as app_version
+        from ravn_app.ui.design_tokens import Colors as _Colors
+
+        tab = self._make_tab()
+        mock_mgr = Mock()
+        mock_mgr.check_for_updates.return_value = False
+
+        with patch("ravn_app.ui.history_settings_tab.UpdateManager", return_value=mock_mgr), patch(
+            "ravn_app.ui.history_settings_tab.threading.Thread", _ImmediateThread
+        ):
+            tab._on_check_updates_clicked()
+
+        mock_mgr.get_latest_release.assert_not_called()
+        assert tab.update_status_label.configure.call_count == 2  # "checking..." then the result
+        tab.update_status_label.configure.assert_called_with(
+            text=t("settings.upToDate").format(version=app_version),
+            text_color=_Colors.TEXT_MUTED,
+        )
+
     def test_save_settings_writes_expected_keys(self):
         tab = SettingsTab.__new__(SettingsTab)
         tab.config = _FakeConfig()

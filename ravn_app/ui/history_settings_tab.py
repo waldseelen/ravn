@@ -12,10 +12,12 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from ravn_app import __version__
 from ravn_app.core import tool_installer
 from ravn_app.core.download_naming import normalize_naming_preset
 from ravn_app.core.i18n import t
 from ravn_app.core.tool_health import get_tool_health_checker
+from ravn_app.core.update_manager import UpdateManager
 from ravn_app.ui.components.collapsible_panel import CollapsiblePanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 from ravn_app.ui.ui_components import Tooltip, style_combo, style_entry
@@ -828,6 +830,38 @@ class SettingsTab(ctk.CTkFrame):
             font=Fonts.LABEL
         ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
 
+        self.crash_reporting_var = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            notification_frame,
+            text=t("settings.crashReportingEnabled"),
+            variable=self.crash_reporting_var,
+            font=Fonts.LABEL
+        ).pack(anchor="w", padx=Spacing.XS, pady=Spacing.XS)
+
+        # Manual Update Check
+        update_btn_frame = ctk.CTkFrame(notification_frame, fg_color="transparent")
+        update_btn_frame.pack(fill="x", padx=Spacing.XS, pady=Spacing.SM)
+
+        self.check_updates_btn = ctk.CTkButton(
+            update_btn_frame,
+            text=t("settings.checkUpdatesBtn"),
+            command=self._on_check_updates_clicked,
+            fg_color=Colors.BTN_SECONDARY,
+            hover_color=Colors.BTN_SECONDARY_HOVER,
+            font=Fonts.LABEL,
+            height=Sizes.BTN_HEIGHT_SM,
+            cursor=Cursors.POINTER,
+        )
+        self.check_updates_btn.pack(side="left", padx=(0, Spacing.SM))
+
+        self.update_status_label = ctk.CTkLabel(
+            update_btn_frame,
+            text="",
+            font=Fonts.LABEL,
+            text_color=Colors.TEXT_MUTED,
+        )
+        self.update_status_label.pack(side="left", padx=Spacing.XS)
+
         # Kapatma davranışı
         tray_frame = ctk.CTkFrame(parent, fg_color=Colors.BG_SURFACE)
         tray_frame.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
@@ -1300,6 +1334,8 @@ class SettingsTab(ctk.CTkFrame):
         self.language_combo.set("Türkçe" if self.config.get('language') == 'tr' else "English")
         self.notifications_var.set(self.config.get('notifications_enabled', True))
         self.auto_update_var.set(self.config.get('auto_update_check', True))
+        if hasattr(self, 'crash_reporting_var'):
+            self.crash_reporting_var.set(self.config.get('crash_reporting_enabled', True))
 
         self.download_dir_entry.insert(0, self.config.get('default_download_path', ''))
         self.default_format_combo.set(self.config.get('default_format', 'MP4'))
@@ -1419,6 +1455,8 @@ class SettingsTab(ctk.CTkFrame):
             self.config.set('language', 'tr' if language_combo.get() == "Türkçe" else 'en')
         self.config.set('notifications_enabled', self.notifications_var.get())
         self.config.set('auto_update_check', self.auto_update_var.get())
+        if hasattr(self, 'crash_reporting_var'):
+            self.config.set('crash_reporting_enabled', self.crash_reporting_var.get())
 
         self.config.set('default_download_path', self.download_dir_entry.get())
         self.config.set('default_format', self.default_format_combo.get())
@@ -1600,6 +1638,47 @@ class SettingsTab(ctk.CTkFrame):
             self.config.reset()
             self.load_settings()
             messagebox.showinfo(t("settings.saveSuccessTitle"), t("settings.resetDone"))
+
+    def _on_check_updates_clicked(self):
+        """Manual trigger for checking GitHub Releases for updates."""
+        check_btn = getattr(self, 'check_updates_btn', None)
+        status_lbl = getattr(self, 'update_status_label', None)
+        if check_btn is not None:
+            check_btn.configure(state="disabled")
+        if status_lbl is not None:
+            status_lbl.configure(
+                text=t("settings.checkingForUpdates"), text_color=Colors.TEXT_MUTED
+            )
+
+        def worker():
+            try:
+                mgr = UpdateManager(
+                    current_version=__version__,
+                    github_owner="waldseelen",
+                    github_repo="ravn",
+                )
+                is_update_available = mgr.check_for_updates()
+                if is_update_available:
+                    latest = mgr.get_latest_release()
+                    version_str = latest.version if latest is not None else "?"
+                    msg = t("settings.updateAvailable").format(version=version_str)
+                    color = Colors.ACCENT
+                else:
+                    msg = t("settings.upToDate").format(version=__version__)
+                    color = Colors.TEXT_MUTED
+            except Exception:
+                msg = t("settings.updateCheckFailed")
+                color = Colors.TEXT_MUTED
+
+            def update_ui():
+                if status_lbl is not None:
+                    status_lbl.configure(text=msg, text_color=color)
+                if check_btn is not None:
+                    check_btn.configure(state="normal")
+
+            self.after(0, update_ui)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def select_download_dir(self):
         """İndirme dizini seç"""

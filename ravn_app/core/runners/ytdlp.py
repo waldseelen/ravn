@@ -9,6 +9,8 @@ import logging
 import os
 import re
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional
 
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, get_hidden_subprocess_kwargs
@@ -343,6 +345,28 @@ class YtDlpRunner(BaseRunner):
 
         estimated_bytes = (duration_seconds * target_kbps * 1000) / 8
         return round(estimated_bytes / (1024 * 1024), 2)
+
+    @classmethod
+    def _build_instant_estimate_fields(cls, quality_label: str, duration: Any) -> Dict[str, Any]:
+        """Duration-based size estimate for every quality label, computed instantly from
+        the shallow playlist stub (no format list yet, so no `selected_format` to work from).
+        Lets playlist rows show a plausible size immediately instead of a blank cell while
+        the parallel detail pass resolves exact per-video values -- which then overwrite
+        these via `_PROGRESSIVE_DETAIL_KEYS` in the UI layer.
+
+        Resolution/format_note are intentionally left out here: unlike size, they can't be
+        estimated without real format data, so the UI leaves those chips blank until the
+        entry actually resolves.
+        """
+        quality_labels = ["En İyi", "1080p", "720p", "480p", "Sadece Ses"]
+        size_by_quality = {
+            label: cls._estimate_filesize_mb_from_quality_hint(label, duration, None)
+            for label in quality_labels
+        }
+        return {
+            "filesize_mb": size_by_quality.get(quality_label, 0.0),
+            "size_by_quality_mb": size_by_quality,
+        }
 
     @classmethod
     def compute_size_by_quality(cls, info: Dict[str, Any]) -> Dict[str, Any]:
@@ -697,18 +721,31 @@ class YtDlpRunner(BaseRunner):
         on_shallow_ready: Callable[[List[Dict[str, Any]]], None],
         on_entry_resolved: Callable[[int, Dict[str, Any]], None],
         is_cancelled: Optional[Callable[[], bool]] = None,
+        max_workers: int = 6,
     ) -> bool:
         """
         Extract playlist entries via the yt-dlp Python library instead of two blocking
         subprocess calls. Yields results progressively: the shallow (fast) list arrives
-        via on_shallow_ready almost immediately (also carries real thumbnail URLs), then
-        each entry's real size/quality/resolution is resolved one video at a time and
-        reported via on_entry_resolved as soon as it's ready -- instead of the previous
-        approach where NOTHING arrived until every video in the playlist had been fully
-        resolved (a single blocking call that could take tens of seconds to minutes).
+        via on_shallow_ready almost immediately (also carries real thumbnail URLs and an
+        instant duration-based size estimate per entry -- see _build_instant_estimate_fields
+        -- so rows never render blank), then each entry's real size/quality/resolution is
+        resolved and reported via on_entry_resolved as soon as it's ready.
 
-        Both callbacks are invoked synchronously on the calling thread; callers running
-        this from a background thread must bridge to the UI thread themselves.
+        Detail resolution runs on a bounded thread pool (max_workers, default 6): each
+        entry's info fetch is a separate network round-trip, so resolving them one at a
+        time serially (the original approach) left every row after the first waiting on
+        every prior row's network call. Threads are I/O-bound here (network extraction),
+        so the GIL is released during the wait and this parallelizes well -- though expect
+        sub-linear speedup, not a clean Nx, since YouTube's signature deciphering is CPU
+        work that still contends for the GIL. Each worker thread gets its own YoutubeDL
+        instance (thread-local, lazily created and reused across that thread's tasks) --
+        a single YoutubeDL is not safe to share across threads.
+
+        Both callbacks may now be invoked from different worker threads (out of order,
+        keyed by index) rather than always the same calling thread; callers running this
+        from a background thread must bridge every callback invocation to the UI thread
+        themselves (e.g. Tkinter's `after(0, ...)`, which is thread-safe to call from any
+        thread).
 
         Returns True if the library path was used, False if the library is unavailable
         (caller should fall back to extract_playlist_entries()).
@@ -737,24 +774,69 @@ class YtDlpRunner(BaseRunner):
                     normalized = self._normalize_shallow_entry(stub)
                     if normalized is None:
                         continue
+                    normalized.update(
+                        self._build_instant_estimate_fields(quality_label, normalized.get("duration", 0))
+                    )
                     normalized_entries.append(normalized)
                     valid_stubs.append(stub)
 
                 on_shallow_ready(normalized_entries)
 
-                for index, stub in enumerate(valid_stubs):
-                    if is_cancelled is not None and is_cancelled():
-                        break
-                    try:
-                        full_info = ydl.process_ie_result(stub, download=False)
-                    except Exception as exc:
-                        logger.warning("yt-dlp progressive resolve failed for entry %s: %s", index, exc)
-                        continue
+            if is_cancelled is not None and is_cancelled():
+                return True
+            if not valid_stubs:
+                return True
 
-                    detail_fields = self._build_detail_fields(full_info, quality_label)
-                    resolved_entry = dict(normalized_entries[index])
-                    resolved_entry.update(detail_fields)
-                    on_entry_resolved(index, resolved_entry)
+            thread_local = threading.local()
+            clients_lock = threading.Lock()
+            created_clients: List[Any] = []
+
+            def get_thread_client():
+                client = getattr(thread_local, "ydl", None)
+                if client is None:
+                    client = ytdlp_lib.YoutubeDL(ydl_opts)
+                    thread_local.ydl = client
+                    with clients_lock:
+                        created_clients.append(client)
+                return client
+
+            def resolve_entry(index: int) -> Optional[Dict[str, Any]]:
+                if is_cancelled is not None and is_cancelled():
+                    return None
+                entry_url = normalized_entries[index].get("url")
+                if not entry_url:
+                    return None
+                client = get_thread_client()
+                full_info = client.extract_info(entry_url, download=False)
+                detail_fields = self._build_detail_fields(full_info, quality_label)
+                resolved_entry = dict(normalized_entries[index])
+                resolved_entry.update(detail_fields)
+                return resolved_entry
+
+            try:
+                with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
+                    future_to_index = {}
+                    for index in range(len(valid_stubs)):
+                        if is_cancelled is not None and is_cancelled():
+                            break
+                        future_to_index[executor.submit(resolve_entry, index)] = index
+
+                    for future in as_completed(future_to_index):
+                        index = future_to_index[future]
+                        try:
+                            resolved_entry = future.result()
+                        except Exception as exc:
+                            logger.warning("yt-dlp progressive resolve failed for entry %s: %s", index, exc)
+                            continue
+                        if resolved_entry is None:
+                            continue
+                        on_entry_resolved(index, resolved_entry)
+            finally:
+                for client in created_clients:
+                    try:
+                        client.close()
+                    except Exception:  # pragma: no cover - defensive cleanup
+                        pass
 
             return True
         except Exception as exc:

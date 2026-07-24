@@ -632,32 +632,34 @@ class YouTubeDownloader:
                         except ID3NoHeaderError:
                             pass
 
-                    if metadata.get("title"):
-                        audio.tags.delall("TIT2")
-                        audio.tags.add(TIT2(encoding=3, text=metadata["title"]))
-                    if metadata.get("artist"):
-                        audio.tags.delall("TPE1")
-                        audio.tags.add(TPE1(encoding=3, text=metadata["artist"]))
-                    if metadata.get("album"):
-                        audio.tags.delall("TALB")
-                        audio.tags.add(TALB(encoding=3, text=metadata["album"]))
-                    if embed_lyrics and metadata.get("lyrics"):
-                        audio.tags.delall("USLT")
-                        audio.tags.add(USLT(encoding=3, lang="eng", text=metadata["lyrics"]))
+                    tags = audio.tags
+                    if tags is not None:
+                        if metadata.get("title"):
+                            tags.delall("TIT2")
+                            tags.add(TIT2(encoding=3, text=metadata["title"]))
+                        if metadata.get("artist"):
+                            tags.delall("TPE1")
+                            tags.add(TPE1(encoding=3, text=metadata["artist"]))
+                        if metadata.get("album"):
+                            tags.delall("TALB")
+                            tags.add(TALB(encoding=3, text=metadata["album"]))
+                        if embed_lyrics and metadata.get("lyrics"):
+                            tags.delall("USLT")
+                            tags.add(USLT(encoding=3, lang="eng", text=metadata["lyrics"]))
 
                     audio.save()
                     continue
 
-                audio = MP4(file_path)
+                mp4_audio = MP4(file_path)
                 if metadata.get("title"):
-                    audio["\u00a9nam"] = [metadata["title"]]
+                    mp4_audio["\u00a9nam"] = [metadata["title"]]
                 if metadata.get("artist"):
-                    audio["\u00a9ART"] = [metadata["artist"]]
+                    mp4_audio["\u00a9ART"] = [metadata["artist"]]
                 if metadata.get("album"):
-                    audio["\u00a9alb"] = [metadata["album"]]
+                    mp4_audio["\u00a9alb"] = [metadata["album"]]
                 if embed_lyrics and metadata.get("lyrics"):
-                    audio["\u00a9lyr"] = [metadata["lyrics"]]
-                audio.save()
+                    mp4_audio["\u00a9lyr"] = [metadata["lyrics"]]
+                mp4_audio.save()
             except Exception as err:
                 logger.warning(f"Audio metadata iyileştirme atlandı ({file_path}): {err}")
 

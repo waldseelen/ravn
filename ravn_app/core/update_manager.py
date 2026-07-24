@@ -47,7 +47,7 @@ class UpdateManager:
     def __init__(
         self,
         current_version: str,
-        github_owner: str = "ravn-project",
+        github_owner: str = "waldseelen",
         github_repo: str = "ravn",
         update_dir: Optional[str] = None,
         check_interval_hours: int = 24

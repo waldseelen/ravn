@@ -58,9 +58,13 @@ def check_tool_dependencies():
                 logger.debug("%s: %s", tool_name, tool_info.version or "version unknown")
 
 
+from ravn_app.core.crash_reporter import install_crash_handler
+
+
 def main():
     """Uygulamayı başlat"""
     setup_logging()
+    install_crash_handler()
     ensure_directories_exist()
     migrate_all_legacy_files()
     

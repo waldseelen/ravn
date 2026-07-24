@@ -31,9 +31,9 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      # Coverage floor guards against regressions. Baseline is ~50%; raise the
+      # Coverage floor guards against regressions. Baseline is ~51%; raise the
       # threshold as ROADMAP workstream 3 adds tests. Much of the gap is UI code
       # that is exercised via construction smoke tests rather than line coverage.
       - name: Run tests
-        run: pytest -q --cov=ravn_app --cov-report=term-missing --cov-fail-under=48
+        run: pytest -q --cov=ravn_app --cov-report=term-missing --cov-fail-under=49
 

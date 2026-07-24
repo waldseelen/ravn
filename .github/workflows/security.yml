@@ -1,0 +1,41 @@
+name: security
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1' # Weekly security audit on Mondays
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies & pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit cyclonedx-bom
+
+      - name: Audit python dependencies for known vulnerabilities
+        run: |
+          pip-audit -r requirements.txt
+
+      - name: Generate Software Bill of Materials (SBOM)
+        run: |
+          cyclonedx-py requirements -o sbom.json
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ravn-sbom
+          path: sbom.json

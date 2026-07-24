@@ -117,9 +117,13 @@ Responsibilities:
   packaged Windows build this binary self-updates from GitHub (`YtDlpRunner.update()`), which
   keeps site compatibility fresh without shipping a new app release.
 - **Playlist preview** uses the yt-dlp **Python library** (`extract_playlist_entries_progressive`)
-  so it can stream results progressively — the shallow (fast) entry list arrives first, then each
-  video's size/quality/resolution resolves one at a time — instead of one blocking subprocess call
-  that returns nothing until the whole playlist is resolved.
+  so it can stream results progressively — the shallow (fast) entry list arrives first (each row
+  immediately gets a duration-based size estimate so nothing renders blank), then each video's real
+  size/quality/resolution resolves on a bounded thread pool (`max_workers`, default 6) instead of
+  one video at a time — since each resolve is a separate network round-trip, this is an I/O-bound
+  workload that parallelizes well. Every worker thread owns its own `YoutubeDL` instance (a single
+  instance is not safe to share across threads); resolved entries stream back and overwrite their
+  row's estimate as soon as they land, in whatever order they finish.
 
 The library is imported lazily (first preview only) so it never taxes startup, and if it is
 unavailable the preview transparently falls back to the subprocess path. Preview numbers are

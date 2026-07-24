@@ -6,8 +6,11 @@ RAVN is an actively maintained **Windows-first desktop + CLI media product**. Th
 
 ## Recent quality pass (2026-07)
 
-- Playlist fetch reworked to progressive yt-dlp **library** extraction (results stream in one video at a
-  time instead of a ~29s all-at-once block) and now carries real **cover thumbnails** into the preview.
+- Playlist fetch reworked to progressive yt-dlp **library** extraction and now carries real **cover
+  thumbnails** into the preview. Detail resolution (size/quality/resolution per video) runs on a
+  bounded thread pool instead of one video at a time, and every row gets an instant duration-based
+  size estimate the moment the shallow list arrives, so nothing renders blank while real values
+  stream in.
 - CI hardened: broken workflow files removed, `ruff` gate (blocking, clean), `mypy` core gate
   (informational), Python 3.13 in the matrix, coverage floor, and a pip-compiled dependency lock.
 - Real fixes: a command-injection in `open_file` (now argument-list `subprocess`), 182 lines of dead code

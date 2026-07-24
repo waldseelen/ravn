@@ -3,6 +3,7 @@ Tests for FFmpegRunner and YtDlpRunner classes
 """
 
 import json
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
@@ -961,21 +962,37 @@ class TestYtDlpRunner:
             )
         assert used is False
 
+    @staticmethod
+    def _make_progressive_extract_info_side_effect(shallow_result, resolved_infos_by_url):
+        """Build an extract_info side_effect that serves both call shapes the progressive
+        path now makes through a single mocked YoutubeDL.extract_info: the one-shot shallow
+        call (`process=False`) and the per-entry detail call (`extract_info(url, download=False)`,
+        no `process` kwarg)."""
+
+        def _side_effect(url_arg, download=False, process=None, **kwargs):
+            if process is False:
+                return shallow_result
+            return resolved_infos_by_url[url_arg]
+
+        return _side_effect
+
     def test_extract_playlist_entries_progressive_streams_shallow_then_each_entry(self):
         stubs = [
             {"title": "Video 1", "url": "https://example.com/watch?v=1", "duration": 60},
             {"title": "Video 2", "url": "https://example.com/watch?v=2", "duration": 120},
         ]
-        resolved_infos = [
-            {"formats": [], "duration": 60},
-            {"formats": [], "duration": 120},
-        ]
+        shallow_result = {"entries": stubs}
+        resolved_infos_by_url = {
+            "https://example.com/watch?v=1": {"formats": [], "duration": 60},
+            "https://example.com/watch?v=2": {"formats": [], "duration": 120},
+        }
 
         fake_ydl = MagicMock()
         fake_ydl.__enter__.return_value = fake_ydl
         fake_ydl.__exit__.return_value = False
-        fake_ydl.extract_info.return_value = {"entries": stubs}
-        fake_ydl.process_ie_result.side_effect = resolved_infos
+        fake_ydl.extract_info.side_effect = self._make_progressive_extract_info_side_effect(
+            shallow_result, resolved_infos_by_url
+        )
 
         fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
 
@@ -984,11 +1001,14 @@ class TestYtDlpRunner:
 
         with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=fake_lib):
             runner = YtDlpRunner()
+            # max_workers=1 keeps entry resolution order deterministic for this test;
+            # actual concurrency is proven separately below.
             used = runner.extract_playlist_entries_progressive(
                 "https://example.com/playlist",
                 quality_label="En İyi",
                 on_shallow_ready=lambda entries: shallow_calls.append(entries),
                 on_entry_resolved=lambda index, entry: resolved_calls.append((index, entry)),
+                max_workers=1,
             )
 
         assert used is True
@@ -996,9 +1016,11 @@ class TestYtDlpRunner:
         assert [e["title"] for e in shallow_calls[0]] == ["Video 1", "Video 2"]
         assert [index for index, _entry in resolved_calls] == [0, 1]
         assert resolved_calls[0][1]["title"] == "Video 1"
-        fake_ydl.extract_info.assert_called_once_with(
-            "https://example.com/playlist", download=False, process=False
-        )
+        shallow_extract_calls = [
+            c for c in fake_ydl.extract_info.call_args_list if c.kwargs.get("process") is False
+        ]
+        assert len(shallow_extract_calls) == 1
+        assert shallow_extract_calls[0].args[0] == "https://example.com/playlist"
 
     def test_extract_playlist_entries_progressive_respects_cancellation(self):
         stubs = [
@@ -1009,7 +1031,6 @@ class TestYtDlpRunner:
         fake_ydl.__enter__.return_value = fake_ydl
         fake_ydl.__exit__.return_value = False
         fake_ydl.extract_info.return_value = {"entries": stubs}
-        fake_ydl.process_ie_result.return_value = {"formats": [], "duration": 60}
 
         fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
         resolved_calls = []
@@ -1022,24 +1043,32 @@ class TestYtDlpRunner:
                 on_shallow_ready=Mock(),
                 on_entry_resolved=lambda index, entry: resolved_calls.append(index),
                 is_cancelled=lambda: True,
+                max_workers=1,
             )
 
         assert resolved_calls == []
-        fake_ydl.process_ie_result.assert_not_called()
+        # Only the shallow (process=False) call happened -- cancellation short-circuits
+        # before the thread pool ever submits a single per-entry detail fetch.
+        assert fake_ydl.extract_info.call_count == 1
 
     def test_extract_playlist_entries_progressive_skips_failed_entry_but_continues(self):
         stubs = [
             {"title": "Broken", "url": "https://example.com/watch?v=1", "duration": 60},
             {"title": "OK", "url": "https://example.com/watch?v=2", "duration": 60},
         ]
+        shallow_result = {"entries": stubs}
+
+        def extract_info_side_effect(url_arg, download=False, process=None, **kwargs):
+            if process is False:
+                return shallow_result
+            if url_arg == "https://example.com/watch?v=1":
+                raise RuntimeError("video removed")
+            return {"formats": [], "duration": 60}
+
         fake_ydl = MagicMock()
         fake_ydl.__enter__.return_value = fake_ydl
         fake_ydl.__exit__.return_value = False
-        fake_ydl.extract_info.return_value = {"entries": stubs}
-        fake_ydl.process_ie_result.side_effect = [
-            RuntimeError("video removed"),
-            {"formats": [], "duration": 60},
-        ]
+        fake_ydl.extract_info.side_effect = extract_info_side_effect
 
         fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
         resolved_calls = []
@@ -1051,10 +1080,52 @@ class TestYtDlpRunner:
                 quality_label="En İyi",
                 on_shallow_ready=Mock(),
                 on_entry_resolved=lambda index, entry: resolved_calls.append(index),
+                max_workers=1,
             )
 
         assert used is True
         assert resolved_calls == [1]
+
+    def test_extract_playlist_entries_progressive_resolves_entries_concurrently(self):
+        """A parallelization change verified only by sequential (max_workers=1) tests
+        doesn't prove concurrency actually happens. This pins N worker threads against a
+        Barrier inside the mocked resolver: it only releases once all N calls are in
+        flight at the same time, so a regression back to serial resolution times out and
+        fails this test instead of silently passing."""
+        entry_count = 4
+        stubs = [
+            {"title": f"Video {i}", "url": f"https://example.com/watch?v={i}", "duration": 60}
+            for i in range(entry_count)
+        ]
+        shallow_result = {"entries": stubs}
+        barrier = threading.Barrier(entry_count, timeout=5)
+
+        def extract_info_side_effect(url_arg, download=False, process=None, **kwargs):
+            if process is False:
+                return shallow_result
+            barrier.wait()  # blocks until entry_count calls overlap; times out otherwise
+            return {"formats": [], "duration": 60}
+
+        fake_ydl = MagicMock()
+        fake_ydl.__enter__.return_value = fake_ydl
+        fake_ydl.__exit__.return_value = False
+        fake_ydl.extract_info.side_effect = extract_info_side_effect
+
+        fake_lib = SimpleNamespace(YoutubeDL=Mock(return_value=fake_ydl))
+        resolved_calls = []
+
+        with patch("ravn_app.core.runners.ytdlp._get_ytdlp_library", return_value=fake_lib):
+            runner = YtDlpRunner()
+            used = runner.extract_playlist_entries_progressive(
+                "https://example.com/playlist",
+                quality_label="En İyi",
+                on_shallow_ready=Mock(),
+                on_entry_resolved=lambda index, entry: resolved_calls.append(index),
+                max_workers=entry_count,
+            )
+
+        assert used is True
+        assert sorted(resolved_calls) == list(range(entry_count))
 
 
 class TestRunnerResult:

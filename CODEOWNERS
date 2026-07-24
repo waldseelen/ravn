@@ -1,0 +1,16 @@
+# RAVN Code Owners
+
+# Core maintenance
+* @waldseelen
+
+# Architecture & Core Logic
+/ravn_app/core/ @waldseelen
+/ravn_app/cli.py @waldseelen
+
+# Desktop UI
+/ravn_app/ui/ @waldseelen
+
+# GitHub Workflows & Release Pipeline
+/.github/ @waldseelen
+/ravn.spec @waldseelen
+/build.ps1 @waldseelen

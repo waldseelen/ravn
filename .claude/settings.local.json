@@ -16,7 +16,10 @@
       "Bash(dir:*)",
       "Bash(SCRIPT=\"C:/Users/bugra/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/scripts/search.py\" DATA_DIR=\"C:/Users/bugra/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/data\" python \"$SCRIPT\" \"desktop media manager download convert tool productivity dark minimal\" --design-system -p \"RAVN\" -f markdown --data-dir \"$DATA_DIR\")",
       "Bash(SCRIPT=\"C:/Users/bugra/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/scripts/search.py\")",
-      "Bash(find C:/Users/bugra/DEV/ravn -name *.svg -o -name *.ico -o -name *.png)"
+      "Bash(find C:/Users/bugra/DEV/ravn -name *.svg -o -name *.ico -o -name *.png)",
+      "Bash(git stash *)",
+      "Bash(agy --help)",
+      "PowerShell(Get-Command *)"
     ]
   }
 }

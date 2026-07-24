@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('check', 'test', 'bundle-ffmpeg', 'package', 'ci-package', 'clean')]
+    [ValidateSet('check', 'test', 'bundle-ffmpeg', 'package', 'ci-package', 'ci-msi', 'clean')]
     [string]$Action = 'package',
     [string]$PythonExe = 'python',
     [switch]$SkipTests,
@@ -202,6 +202,22 @@ function Show-EnvironmentSummary {
     Write-Host "Spec file: $(Join-Path $ProjectRoot 'ravn.spec')"
 }
 
+function Invoke-MsiBuild {
+    Write-Section 'Building MSI installer package'
+    $PackageDir = Join-Path $DistRoot 'RAVN'
+    if (-not (Test-Path $PackageDir)) {
+        throw "Package directory not found at $PackageDir. Run -Action ci-package first."
+    }
+    $WxsFile = Join-Path $ProjectRoot 'packaging\ravn.wxs'
+    $MsiOutput = Join-Path $DistRoot "$ArtifactName.msi"
+    Write-Host "Running WiX build for $WxsFile -> $MsiOutput..." -ForegroundColor Yellow
+    & wix build $WxsFile -d "SourceDir=$PackageDir" -o $MsiOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "WiX build failed with exit code $LASTEXITCODE"
+    }
+    Write-Host "MSI package created at $MsiOutput" -ForegroundColor Green
+}
+
 Push-Location $ProjectRoot
 try {
     Assert-Windows
@@ -239,6 +255,9 @@ try {
             Invoke-PackageBuild
             Invoke-SignTool
             New-ReleaseArtifacts
+        }
+        'ci-msi' {
+            Invoke-MsiBuild
         }
         'clean' {
             Clear-PreviousBuilds

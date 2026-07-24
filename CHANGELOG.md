@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-07-24
+
+### Changed
+- **RAVN is now maintained as a cross-platform product**, not Windows-first: `.github/workflows/tests.yml` now runs the full test suite on Linux, macOS, and Windows (in addition to the existing Python 3.11/3.12/3.13 matrix) on every push and pull request. Docs (`README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, `AGENTS.md`, `CLAUDE.md`) updated to match. Packaged (downloadable) releases remain Windows-only for now; Linux/macOS packaging is tracked as a follow-up in `TASKS.md`.
+
+### Fixed
+- **`yt-dlp` self-update silently produced a broken binary on Linux/macOS**: `YtDlpRunner.update()` always downloaded the Windows `yt-dlp.exe` GitHub release asset regardless of OS, "succeeding" while leaving a non-executable Windows binary in place. Now selects the correct release asset and local filename per platform (`yt-dlp.exe` / `yt-dlp_macos` / extension-less `yt-dlp`) and marks the file executable on POSIX.
+- **"Open with player" silently did nothing on macOS**: fell through to `xdg-open`, which doesn't exist there. Now uses `open` on macOS, `xdg-open` on Linux, and `os.startfile` on Windows.
+- `ravn.spec`'s hardcoded `C:\Windows\System32` CRT binaries and the Windows-only `version_info.txt` PyInstaller argument are now gated behind `sys.platform == "win32"`, so a non-Windows `pyinstaller ravn.spec` invocation no longer hard-fails on those lines (packaging itself is still Windows-only this release).
+- A pytest crash-reporting corruption bug (`NotImplementedError: cannot instantiate 'WindowsPath'`) caused by three `test_config_paths.py` tests reloading the module after patching `sys.platform`; removed the unnecessary `importlib.reload` (fixed in a prior commit this cycle, `a5c3f72`).
+- Found and fixed two more pre-existing tests that only ever passed by accident of which OS ran them, surfaced while turning on the new Linux/macOS CI matrix: `test_tool_installer.py`'s Windows-PATH-merge tests patched `os.name` to `"nt"` but not `os.pathsep` (still `:` on POSIX), so they silently misparsed `;`-separated Windows paths — and failing inside that state crashed pytest's own failure-reporting, since `os.pathsep`/`os.name` are real module attributes, not derived dynamically. `test_ffmpeg_checker.py`'s bundled-tool-resolution tests hardcoded a `win64` fixture directory without pinning `ffmpeg_checker._PLATFORM_FFMPEG_DIR` (a module-level constant frozen to the host OS at import time), so they only ever passed on an actual Windows host. Both are now OS-independent.
+
+---
+
 ## [1.2.0] - 2026-07-24
 
 ### Added

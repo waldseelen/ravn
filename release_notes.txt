@@ -1,34 +1,42 @@
-﻿# RAVN v1.2.0 - Faster Playlists, Crash Reports, and Open-Source Governance
+# RAVN v1.3.0 - Cross-Platform Verification
 
-This release focuses on a concrete performance fix users could feel, plus the groundwork for a
-more trustworthy, maintainable open-source project: governance docs, security scanning, opt-in
-crash reporting, and an in-app update check.
+This release moves RAVN from Windows-first to genuinely cross-platform: the full test suite
+now runs on Linux, macOS, and Windows in CI on every push and pull request, and two real
+platform-specific bugs found during that work are fixed. Packaged (downloadable) releases
+remain Windows-only for now; Linux/macOS packaging is a tracked follow-up (see TASKS.md).
 
-## 🚀 Key Improvements & Features
+## Key Changes
 
-* **Faster, less "laggy" playlist previews:** Detail resolution (size, quality, resolution per
-  video) now runs on a parallel worker pool instead of one video at a time, and every row shows an
-  instant size estimate the moment the list loads instead of rendering blank while it waits.
-* **Opt-in local crash reporting:** If RAVN crashes, a clear, timestamped crash report is now
-  written next to your logs so it's easy to attach to a bug report. Fully offline — no data ever
-  leaves your machine, and you can turn it off entirely in Settings.
-* **In-app update check:** A "Check for Updates" button in Settings tells you whether a newer
-  RAVN release is available, without needing to check GitHub manually.
-* **Security scanning and SBOM:** Every push is now scanned with CodeQL and `pip-audit`, and each
-  release ships a Software Bill of Materials (SBOM) alongside the checksum file.
-* **Open-source governance:** Added a security policy, contributing guide, code of conduct, and
-  issue/PR templates for anyone who wants to report a bug or contribute.
+* RAVN is now maintained as a cross-platform product. `tests.yml` runs the full pytest suite
+  on Linux, macOS, and Windows on every push/PR, and the project's docs (README, ARCHITECTURE,
+  PROGRESS, AGENTS, CLAUDE.md) have been updated to reflect that.
+* Fixed a real bug where `yt-dlp`'s self-update path always downloaded the Windows `yt-dlp.exe`
+  release asset regardless of OS, silently leaving a non-executable binary in place on
+  Linux/macOS. It now downloads the correct asset per platform and marks it executable on
+  POSIX.
+* Fixed "open with player" doing nothing on macOS (it fell through to `xdg-open`, which
+  doesn't exist there) — now uses `open` on macOS, `xdg-open` on Linux, `os.startfile` on
+  Windows.
+* `ravn.spec`'s Windows-only literals (hardcoded CRT DLL paths, the `version_info.txt`
+  PyInstaller argument) are now gated so a future non-Windows PyInstaller build doesn't
+  hard-fail on them.
 
-## 🐛 Fixes
+## Not in This Release
 
-* The update checker previously misreported every outcome as "check failed" due to an internal
-  bool/None mix-up — it now correctly reports "up to date" or "update available: vX.Y.Z".
+* Packaged Linux (AppImage/tar.gz) or macOS (.app/.dmg) builds — the app itself now runs
+  cross-platform, but pre-built downloadable artifacts are still Windows-only.
+* A native Linux/macOS backend for the one-click tool installer (currently `winget`-only;
+  degrades gracefully to a clean "not available" message on non-Windows rather than crashing).
 
-## 🔧 Installation
+## Installation
 
 RAVN is shipped as a portable executable for Windows.
 1. Download `RAVN-windows-x64.zip` from this release.
 2. Extract the folder and launch `RAVN.exe`.
 3. Verify the download against `RAVN-windows-x64.sha256.txt` if you'd like to confirm integrity.
-*Note: Windows SmartScreen may appear on first run depending on the code-signing certificate's
-accumulated reputation. Click "More info" then "Run anyway" if the checksum matches.*
+
+Note: Windows SmartScreen may appear on first run depending on the code-signing certificate's
+accumulated reputation. Click "More info" then "Run anyway" if the checksum matches.
+
+Running from source works on Linux and macOS today (see DEPENDENCIES.md); there is no
+packaged build for those platforms in this release.

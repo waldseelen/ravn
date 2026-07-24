@@ -2,7 +2,7 @@
 
 ## 1. What RAVN is
 
-RAVN is a **Windows-first desktop + CLI media application** built around one shared core.
+RAVN is a **cross-platform desktop + CLI media application** built around one shared core.
 
 It combines four product areas:
 
@@ -168,16 +168,23 @@ Responsibilities:
 
 ### 3.6 Platform contract
 
-RAVN is **Windows-first** but written to run (and at minimum not crash) on macOS/Linux:
+RAVN runs on **Windows, Linux, and macOS**, verified by a CI test matrix across all three
+(`.github/workflows/tests.yml`) on every push/PR:
 
-- OS-specific calls are branched and guarded: `os.startfile` is only reached under a
-  `platform.system() == "Windows"` / `os.name == "nt"` check, with `open` / `xdg-open`
-  (argument-list `subprocess`, never a shell) as the macOS/Linux fallback.
+- OS-specific calls are branched per-platform: `os.startfile` on Windows (`os.name == "nt"`),
+  `open` on macOS (`sys.platform == "darwin"`), `xdg-open` elsewhere on Linux (argument-list
+  `subprocess`, never a shell). The `yt-dlp` self-update path likewise selects the correct
+  release asset and binary name per OS (`.exe` on Windows, `yt-dlp_macos` on macOS, extension-less
+  `yt-dlp` on Linux) and marks the binary executable on POSIX.
 - Windows-only integrations degrade gracefully when unavailable: the system tray (`pystray`)
-  and drag-and-drop (`tkinterdnd2`) are optional imports gated behind availability flags, and
-  the registry PATH refresh (`winreg`) early-returns on non-Windows.
+  and drag-and-drop (`tkinterdnd2`) are optional imports gated behind availability flags, the
+  registry PATH refresh (`winreg`) early-returns on non-Windows, and the winget-based tool
+  installer (`core/tool_installer.py`) reports a clean "not available" result on non-Windows
+  rather than crashing (a native package-manager backend for Linux/macOS is a tracked
+  follow-up, see [TASKS.md](TASKS.md)).
 - Paths resolve per-OS through `core/config_paths.py`; hidden-subprocess flags are Windows-gated
-  in `core/runners/base.py`. Packaging/signing is the Windows distribution focus.
+  in `core/runners/base.py`. **Packaging/signing is still the Windows distribution focus** —
+  Linux/macOS packaged artifacts (AppImage/tar.gz, `.app`/`.dmg`) are not shipped yet.
 
 ---
 
@@ -287,7 +294,7 @@ Useful starting points:
 
 ## 7. Operational notes
 
-- **Windows-first packaging:** packaged releases are currently focused on Windows.
+- **Windows-only packaging (for now):** the app itself runs cross-platform (§3.6), but packaged/downloadable releases are currently Windows-only; Linux/macOS packaging is a tracked follow-up.
 - **Dependencies:** `ffmpeg`, `ffprobe`, and `yt-dlp` are core tools; `aria2c` is optional and enables torrent workflows.
 - **i18n:** user-facing UI strings should remain translation-key based in `ravn_app/translations/en.json` and `ravn_app/translations/tr.json`.
 - **Themes:** theme IDs normalize to `dark` or `light`.

@@ -834,12 +834,13 @@ class TestYtDlpRunner:
         assert "/path/to/video.mp4" in files
         assert "/path/to/final.mkv" in files
 
+    @patch('sys.platform', 'win32')
     @patch('pathlib.Path.rename')
     @patch('requests.get')
     @patch('builtins.open', new_callable=MagicMock)
     @patch('os.makedirs')
     def test_update_success(self, mock_makedirs, mock_open, mock_get, mock_rename):
-        """Test successful yt-dlp update"""
+        """Test successful yt-dlp update on Windows (downloads the .exe asset, no chmod)"""
         mock_response_api = Mock()
         mock_response_api.json.return_value = {
             "tag_name": "2024.01.01",
@@ -853,6 +854,7 @@ class TestYtDlpRunner:
             runner = YtDlpRunner()
             result = runner.update()
         assert result is True
+        assert runner.executable_path.endswith("yt-dlp.exe")
 
     @patch.object(YtDlpRunner, 'update', return_value=False)
     def test_update_failure(self, mock_update):
@@ -860,6 +862,73 @@ class TestYtDlpRunner:
         runner = YtDlpRunner()
         result = runner.update()
         assert result is False
+
+    @patch('sys.platform', 'linux')
+    @patch('pathlib.Path.mkdir')
+    @patch('pathlib.Path.chmod')
+    @patch('pathlib.Path.rename')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.makedirs')
+    def test_update_success_linux_downloads_extensionless_binary_and_chmods(
+        self, mock_makedirs, mock_open, mock_get, mock_rename, mock_chmod, mock_mkdir
+    ):
+        """On Linux, update() must fetch the extension-less 'yt-dlp' asset and mark it executable."""
+        mock_response_api = Mock()
+        mock_response_api.json.return_value = {
+            "tag_name": "2024.01.01",
+            "assets": [
+                {"name": "yt-dlp.exe", "browser_download_url": "http://example.com/yt-dlp.exe"},
+                {"name": "yt-dlp", "browser_download_url": "http://example.com/yt-dlp"},
+                {"name": "yt-dlp_macos", "browser_download_url": "http://example.com/yt-dlp_macos"},
+            ],
+        }
+        mock_response_download = Mock()
+        mock_response_download.iter_content.return_value = [b"data"]
+        mock_get.side_effect = [mock_response_api, mock_response_download]
+
+        with patch.object(YtDlpRunner, 'get_version', return_value="2023.01.01"):
+            runner = YtDlpRunner()
+            result = runner.update()
+
+        assert result is True
+        assert runner.executable_path.endswith("/yt-dlp") or runner.executable_path.endswith("\\yt-dlp")
+        assert not runner.executable_path.endswith("yt-dlp.exe")
+        assert mock_get.call_args_list[1].args[0] == "http://example.com/yt-dlp"
+        mock_chmod.assert_called_once()
+
+    @patch('sys.platform', 'darwin')
+    @patch('pathlib.Path.mkdir')
+    @patch('pathlib.Path.chmod')
+    @patch('pathlib.Path.rename')
+    @patch('requests.get')
+    @patch('builtins.open', new_callable=MagicMock)
+    @patch('os.makedirs')
+    def test_update_success_macos_downloads_macos_asset_and_chmods(
+        self, mock_makedirs, mock_open, mock_get, mock_rename, mock_chmod, mock_mkdir
+    ):
+        """On macOS, update() must fetch the 'yt-dlp_macos' asset and mark it executable."""
+        mock_response_api = Mock()
+        mock_response_api.json.return_value = {
+            "tag_name": "2024.01.01",
+            "assets": [
+                {"name": "yt-dlp.exe", "browser_download_url": "http://example.com/yt-dlp.exe"},
+                {"name": "yt-dlp", "browser_download_url": "http://example.com/yt-dlp"},
+                {"name": "yt-dlp_macos", "browser_download_url": "http://example.com/yt-dlp_macos"},
+            ],
+        }
+        mock_response_download = Mock()
+        mock_response_download.iter_content.return_value = [b"data"]
+        mock_get.side_effect = [mock_response_api, mock_response_download]
+
+        with patch.object(YtDlpRunner, 'get_version', return_value="2023.01.01"):
+            runner = YtDlpRunner()
+            result = runner.update()
+
+        assert result is True
+        assert not runner.executable_path.endswith("yt-dlp.exe")
+        assert mock_get.call_args_list[1].args[0] == "http://example.com/yt-dlp_macos"
+        mock_chmod.assert_called_once()
 
     @patch('subprocess.Popen')
     @patch('os.makedirs')

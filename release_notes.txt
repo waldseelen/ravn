@@ -2,7 +2,7 @@
 
 This release focuses on a concrete performance fix users could feel, plus the groundwork for a
 more trustworthy, maintainable open-source project: governance docs, security scanning, opt-in
-crash reporting, an in-app update check, and a first-pass Windows installer.
+crash reporting, and an in-app update check.
 
 ## 🚀 Key Improvements & Features
 

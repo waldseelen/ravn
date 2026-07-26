@@ -9,13 +9,40 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, get_hidden_subprocess_kwargs
 
 logger = logging.getLogger(__name__)
+
+# GitHub release asset name that ships a self-contained yt-dlp binary, per platform.
+_YTDLP_RELEASE_ASSET_NAMES = {
+    "win32": "yt-dlp.exe",
+    "cygwin": "yt-dlp.exe",
+    "darwin": "yt-dlp_macos",
+}
+
+
+def _ytdlp_binary_name() -> str:
+    """Local filename for the self-updated yt-dlp binary on this OS."""
+    return "yt-dlp.exe" if sys.platform in ("win32", "cygwin") else "yt-dlp"
+
+
+def _ytdlp_release_asset_name() -> str:
+    """GitHub release asset name to download for this OS."""
+    return _YTDLP_RELEASE_ASSET_NAMES.get(sys.platform, "yt-dlp")
+
+
+def _ytdlp_tools_dir() -> Path:
+    """Directory the self-updated yt-dlp binary is stored in."""
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
+    from ravn_app.core.config_paths import get_data_directory
+    return get_data_directory() / "bin"
 
 # yt-dlp is a heavy import (~0.5s) and is only needed for the progressive library-based
 # preview path -- not for downloads (which always use the self-updating binary). Import it
@@ -886,14 +913,12 @@ class YtDlpRunner(BaseRunner):
             True if update successful or already up to date
         """
         try:
-            import os
-            from pathlib import Path
-
             import requests
 
-            tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
+            binary_name = _ytdlp_binary_name()
+            tools_dir = _ytdlp_tools_dir()
             tools_dir.mkdir(parents=True, exist_ok=True)
-            target_exe = tools_dir / "yt-dlp.exe"
+            target_exe = tools_dir / binary_name
 
             logger.info("Checking latest yt-dlp release...")
             url = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
@@ -912,17 +937,18 @@ class YtDlpRunner(BaseRunner):
                     self.executable_path = str(target_exe) if target_exe.exists() else self.executable_path
                     return True
 
+            asset_name = _ytdlp_release_asset_name()
             download_url = None
             for asset in data.get("assets", []):
-                if asset.get("name") == "yt-dlp.exe":
+                if asset.get("name") == asset_name:
                     download_url = asset.get("browser_download_url")
                     break
 
             if not download_url:
-                logger.error("yt-dlp.exe asset not found in latest release")
+                logger.error("%s asset not found in latest release", asset_name)
                 return False
 
-            logger.info("Downloading yt-dlp.exe from %s", download_url)
+            logger.info("Downloading %s from %s", asset_name, download_url)
             dl_response = requests.get(download_url, stream=True, timeout=timeout)
             dl_response.raise_for_status()
 
@@ -936,9 +962,11 @@ class YtDlpRunner(BaseRunner):
                 try:
                     target_exe.unlink()
                 except Exception as e:
-                    logger.warning("Could not delete old yt-dlp.exe: %s", e)
+                    logger.warning("Could not delete old %s: %s", binary_name, e)
 
             temp_exe.rename(target_exe)
+            if sys.platform not in ("win32", "cygwin"):
+                target_exe.chmod(0o755)
             logger.info("yt-dlp updated successfully to %s", latest_version)
 
             self.executable_path = str(target_exe)
@@ -950,12 +978,9 @@ class YtDlpRunner(BaseRunner):
 
 def get_ytdlp_runner(ytdlp_path: Optional[str] = None) -> YtDlpRunner:
     """Create and return a YtDlpRunner instance."""
-    import os
-    from pathlib import Path
-
     if not ytdlp_path:
-        tools_dir = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ravn" / "bin"
-        local_exe = tools_dir / "yt-dlp.exe"
+        tools_dir = _ytdlp_tools_dir()
+        local_exe = tools_dir / _ytdlp_binary_name()
         if local_exe.exists():
             ytdlp_path = str(local_exe)
         else:

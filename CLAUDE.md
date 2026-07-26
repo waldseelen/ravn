@@ -12,12 +12,14 @@ Use this as the compact session guide. For the full workflow rules, read [AGENTS
 
 ## Current Scope
 
-RAVN is a Windows-first desktop + CLI media pipeline with:
+RAVN is a cross-platform desktop + CLI media pipeline with:
 
 - desktop workspaces for `Home`, `Download`, `Studio`, and `Library`
 - shared runner-based execution for FFmpeg, yt-dlp, and aria2 flows
 - queue/history/media-library coverage across desktop and CLI
-- Windows packaged releases as the current distribution focus
+- Windows, Linux, and macOS support verified by a CI test matrix (`tests.yml`); packaged
+  (downloadable) releases remain Windows-only for now — Linux/macOS packaging is tracked in
+  `TASKS.md`
 - an experimental `plugin_system.py` that is **not** part of the active packaged runtime
 
 ## Key Entry Points
@@ -46,7 +48,7 @@ Primary checks:
 - `pytest -q tests/test_ui_components.py tests/test_app_builder.py`
 - `pytest -q tests/test_config_paths.py tests/test_database_manager.py`
 
-Latest full-suite verification: `685 passed, 1 skipped` on 2026-07-07.
+Latest full-suite verification: `815 passed, 1 skipped` on 2026-07-24.
 
 Quality gates (both blocking in CI): `ruff check ravn_app tests` (clean) and
 `mypy ravn_app/core ravn_app/utils` (0 errors). UI-layer mypy is still being tightened — see `ROADMAP.md`.

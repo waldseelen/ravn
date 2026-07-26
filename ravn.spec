@@ -1,8 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for the Windows RAVN desktop build."""
+"""PyInstaller spec for the RAVN desktop build. Packaged releases are Windows-only
+today (see build.ps1), but the Windows-only literals below are guarded by
+sys.platform so a future Linux/macOS PyInstaller invocation doesn't hard-fail."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ, Splash
@@ -48,13 +51,17 @@ hiddenimports = sorted(
 )
 
 
+binaries = []
+if sys.platform == "win32":
+    binaries = [
+        ('C:\\Windows\\System32\\vcruntime140.dll', '.'),
+        ('C:\\Windows\\System32\\msvcp140.dll', '.')
+    ]
+
 a = Analysis(
     [str(project_root / "ravn.py")],
     pathex=[str(project_root)],
-    binaries=[
-        ('C:\\Windows\\System32\\vcruntime140.dll', '.'),
-        ('C:\\Windows\\System32\\msvcp140.dll', '.')
-    ],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -91,7 +98,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=str(assets_dir / "ravn.ico") if (assets_dir / "ravn.ico").exists() else None,
-    version='version_info.txt',
+    version='version_info.txt' if sys.platform == "win32" else None,
 )
 
 coll = COLLECT(

@@ -13,6 +13,7 @@ from ravn_app.core.config_paths import (
     find_legacy_config_file,
     find_legacy_database_file,
     get_cache_directory,
+    get_config_directory,
     get_config_file_path,
     get_data_directory,
     get_database_file_path,
@@ -32,38 +33,27 @@ class TestConfigDirectoryPaths:
     @patch.dict(os.environ, {'APPDATA': 'C:\\Users\\Test\\AppData\\Roaming'})
     def test_get_config_directory_windows(self):
         """Test config directory on Windows"""
-        # Reimport to pick up the patched values
-        import importlib
-
-        from ravn_app.core import config_paths
-        importlib.reload(config_paths)
-
-        path = config_paths.get_config_directory()
+        # get_config_directory() reads sys.platform fresh on every call, so the
+        # @patch above is sufficient on its own -- no module reload needed. (A
+        # prior importlib.reload(config_paths) here left the module reloaded
+        # under a mocked platform for the rest of the test session once the
+        # patch context exited, corrupting every later test that imports it.)
+        path = get_config_directory()
         assert 'ravn' in str(path).lower()
 
     @patch('sys.platform', 'linux')
     @patch.dict(os.environ, {'HOME': '/home/testuser'}, clear=False)
     def test_get_config_directory_linux(self):
         """Test config directory on Linux"""
-        import importlib
-
-        from ravn_app.core import config_paths
-        importlib.reload(config_paths)
-
         # Clear XDG override if present
         with patch.dict(os.environ, {'XDG_CONFIG_HOME': ''}, clear=False):
-            path = config_paths.get_config_directory()
+            path = get_config_directory()
             assert 'ravn' in str(path).lower()
 
     @patch('sys.platform', 'darwin')
     def test_get_config_directory_macos(self):
         """Test config directory on macOS"""
-        import importlib
-
-        from ravn_app.core import config_paths
-        importlib.reload(config_paths)
-
-        path = config_paths.get_config_directory()
+        path = get_config_directory()
         assert 'ravn' in str(path).lower()
 
 

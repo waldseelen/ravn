@@ -9,7 +9,7 @@
 <h1 align="center">RAVN</h1>
 
 <p align="center">
-  <strong>RAVN is a Windows-first desktop and CLI app for downloading, processing, organizing, and automating local media workflows.</strong>
+  <strong>RAVN is a cross-platform desktop and CLI app for downloading, processing, organizing, and automating local media workflows.</strong>
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white">
-  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white">
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows&logoColor=white">
   <img alt="UI" src="https://img.shields.io/badge/UI-CustomTkinter-1F6FEB">
   <img alt="CLI" src="https://img.shields.io/badge/CLI-Click-6C47FF">
 </p>
@@ -146,8 +146,8 @@ Full setup and troubleshooting guidance lives in [DEPENDENCIES.md](DEPENDENCIES.
 
 ## Platform and Release Notes
 
-- **Windows** is the primary packaged-release target.
-- Linux and macOS source checkouts may work, but packaged releases are not currently maintained for those platforms.
+- RAVN runs on **Windows, Linux, and macOS** — the test suite runs on all three in CI on every push/PR.
+- **Windows** is currently the only *packaged* (pre-built, downloadable) release target; Linux and macOS packaged artifacts are a planned follow-up (see [TASKS.md](TASKS.md)). Running from source works on all three today.
 - Packaged Windows builds automatically bundle FFmpeg/FFprobe and self-update `yt-dlp`.
 - GitHub Releases publish zip artifacts and SHA256 checksum files.
 - The `RAVN.exe` executable is signed with an Authenticode certificate. If SmartScreen appears, you can safely click "More info" and then "Run anyway". Over time, SmartScreen trust will build. Always verify the downloaded zip against the published SHA256 checksum.

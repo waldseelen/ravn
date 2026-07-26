@@ -31,15 +31,6 @@ jobs:
         run: |
           ./build.ps1 -Action ci-package -DownloadBundledFFmpeg
 
-      - name: Install WiX Toolset
-        shell: pwsh
-        run: dotnet tool install --global wix
-
-      - name: Build MSI package
-        shell: pwsh
-        run: |
-          ./build.ps1 -Action ci-msi
-
       - name: Generate SBOM
         shell: pwsh
         run: |
@@ -51,7 +42,6 @@ jobs:
         with:
           files: |
             dist/RAVN-windows-x64.zip
-            dist/RAVN-windows-x64.msi
             dist/RAVN-windows-x64.sha256.txt
             dist/RAVN-windows-x64.sbom.json
           generate_release_notes: true

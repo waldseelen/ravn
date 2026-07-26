@@ -69,12 +69,29 @@ Security Advisories + maintainer's GitHub profile).
     exact code path. Fixed by calling `get_latest_release()` for the real version string; added a
     regression test (`tests/test_ui_logic.py::TestCheckForUpdatesButton`) that fails if this
     bool/None confusion reappears.
-- **Windows MSI installer, first pass** (`packaging/ravn.wxs`, WiX v4 syntax, `build.ps1 -Action
-  ci-msi`, wired into `windows-release.yml`). Verified: well-formed XML, consistent
-  `$(var.SourceDir)` variable passing between `build.ps1` and the `.wxs`, referenced icon file
-  exists. **Not yet verified end-to-end** — no local `wix` CLI to actually build/install it; needs
-  a real Windows Actions runner (tag push or `workflow_dispatch`) before relying on it for a
-  release.
+- **Windows MSI installer, first pass — attempted, deferred, NOT shipped in v1.2.0.**
+  (`packaging/ravn.wxs`, WiX v4 syntax, `build.ps1 -Action ci-msi` — both left in the tree as
+  scaffolding for a follow-up). Structural review (well-formed XML, consistent
+  `$(var.SourceDir)` variable passing) looked fine but proved insufficient: a real Windows
+  runner build hit **three distinct, real WiX schema errors in a row**, each only surfacing after
+  fixing the previous one:
+  1. `dotnet tool install --global wix` (unpinned) grabbed WiX v7, which now requires accepting
+     an "Open Source Maintenance Fee" EULA (`WIX7015`) — pinned to `--version 4.0.4` instead of
+     accepting a EULA on the project's behalf (user's explicit call).
+  2. `<Files Include="...">` is not a valid child of `<Directory>` (`WIX0005`) — moved into a
+     `<ComponentGroup Directory="INSTALLFOLDER">` per WiX v4's actual component model, and added
+     the `<Feature>`/`<ComponentGroupRef>`/`<ComponentRef>` wiring v4 requires (no implicit
+     default feature in v4, unlike v3 and the v5 proposal).
+  3. `<Files>` is *also* not a valid child of `<ComponentGroup>` in WiX **4.0.4** specifically —
+     current WiX docs describe `Files` working under `ComponentGroup`, but that likely landed in
+     a later 4.x point release than 4.0.4. At this point (3 real failures, no local `wix` CLI to
+     iterate against directly), the MSI build was pulled out of `windows-release.yml` entirely
+     rather than keep guessing — it was blocking the three artifacts that *do* work (zip, SBOM,
+     checksum) from shipping at all.
+  **Follow-up path:** either hand-author explicit `<Component>`/`<File>` entries (no wildcard
+  harvesting) or find the correct WiX 4.x point release that actually supports `<Files>` under
+  `ComponentGroup`, then verify locally/in a scratch workflow *before* wiring it back into the
+  real release gate.
 
 ### Tier 3 — Started (test coverage), rest intentionally deferred
 - `ravn_app/utils/` package coverage: **57–80% → 99%** (`metadata_handler.py` 100%,

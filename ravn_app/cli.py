@@ -1768,8 +1768,6 @@ def tools_cmd(as_json: bool):
     checker.clear_cache()
     summary = checker.get_health_summary()
 
-    bundled_dir_list = [str(path) for path in (bundled_tools.find_tool(name) or "" for name in ("ffmpeg", "yt-dlp", "aria2c")) if path]
-
     tools_payload = {}
     for tool_name, tool_info in summary["tools"].items():
         tools_payload[tool_name] = {
@@ -1809,7 +1807,7 @@ def tools_cmd(as_json: bool):
     if install_command:
         click.echo("")
         click.echo(f"Install missing tools with:\n  {install_command}")
-    elif not bundled_dir_list and missing:
+    elif missing:
         click.echo("")
         click.echo(f"Missing: {', '.join(missing)}")
 

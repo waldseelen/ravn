@@ -1,5 +1,5 @@
 [tool.ruff]
-# RAVN is a Windows-first CustomTkinter media app. Keep the line length generous
+# RAVN is a cross-platform CustomTkinter media app. Keep the line length generous
 # (the codebase predates strict formatting) and target the versions CI runs.
 line-length = 120
 target-version = "py311"
@@ -29,12 +29,16 @@ ignore = [
 # syntax in third-party stubs (e.g. numpy's PEP 695 `type` statements) while still
 # accepting the 3.11-compatible source we ship.
 python_version = "3.12"
-# RAVN is Windows-first (see ARCHITECTURE.md); the CI lint job runs on ubuntu-latest
-# for speed, so without this mypy would otherwise infer the CI runner's own platform
-# and see an empty/stub-only typeshed winreg module (HKEY_CURRENT_USER, OpenKey, etc.
-# all "undefined") even though ravn_app/core/tool_installer.py's winreg usage is
-# already runtime-guarded behind `if os.name != "nt": return 0`. Pin the analyzed
-# platform to match the actual target OS instead of whatever CI happens to run on.
+# Pinned to win32 for the sake of typeshed's platform-conditional stubs, not because
+# RAVN is Windows-only (it is cross-platform, see ARCHITECTURE.md §3.6). The CI lint
+# job runs on ubuntu-latest for speed; without this pin mypy would infer the runner's
+# platform and see a stub-only winreg module (HKEY_CURRENT_USER, OpenKey, etc. all
+# "undefined") even though ravn_app/core/tool_installer.py's winreg usage is already
+# runtime-guarded behind `if os.name != "nt": return 0`.
+#
+# Consequence worth knowing: POSIX-only stdlib modules (pwd, grp, fcntl) are invisible
+# under this pin, so non-Windows code paths must stick to portable APIs -- which they
+# do (subprocess/shutil). Revisit if a real POSIX-only import is ever needed.
 platform = "win32"
 # Gradual typing: the codebase is ~56% return-annotated. Run in a lenient mode so the
 # gate flags real contradictions (bad attribute access, wrong argument types) without

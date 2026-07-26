@@ -21,8 +21,10 @@ executable, and install guidance for `apt`/`dnf`/`pacman`.
 * **`ravn-cli` is now part of the package.** The command-line interface previously required a
   Python environment; it now ships as its own executable next to `RAVN.exe`.
 * **Linux packaging workflow added** (manual-dispatch): builds a PyInstaller folder plus
-  `tar.gz` and SHA-256, bundles the Linux `yt-dlp` binary, and smoke-tests both the CLI and the
-  GUI (under a virtual display) before publishing artifacts.
+  `tar.gz` and SHA-256, bundles the Linux `yt-dlp` binary, and is written to smoke-test both
+  the CLI and the GUI (under a virtual display) before publishing artifacts. It has **not yet
+  been run on a real runner** — that is the gate before Linux artifacts are attached to any
+  release.
 * **Install guidance on Linux**: RAVN detects `apt`/`dnf`/`pacman` and shows the exact command
   to run, e.g. `sudo apt-get install -y ffmpeg aria2`. It intentionally does not run `sudo`
   itself — a desktop app has nowhere to prompt you for a password, so it would just hang.

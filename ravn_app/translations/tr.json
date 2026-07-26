@@ -346,6 +346,7 @@
         "toolHealthInstallTitle": "Araç Kurulumu",
         "toolHealthInstallDone": "Eksik araçlar kuruldu ve etkinleştirildi.",
         "toolHealthInstallPartial": "Bazı araçlar kurulamadı: {tools}. Detaylar için loglara bakın.",
+        "toolHealthInstallManual": "RAVN sistem paketlerini kendisi kurmaz. Eksik araçları kurmak için bu komutu bir terminalde çalıştırın:\n\n{command}",
         "toolHealthInstallNoWinget": "winget bu sistemde bulunamadı. Araçları elle kurmak için README.md dosyasına bakın.",
         "toolHealthFFmpegHelp": "FFmpeg ve FFprobe video işleme için gereklidir",
         "toolHealthYtDlpHelp": "yt-dlp medya indirme için gereklidir",

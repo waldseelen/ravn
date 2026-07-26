@@ -346,6 +346,7 @@
         "toolHealthInstallTitle": "Tool installation",
         "toolHealthInstallDone": "Missing tools installed and activated.",
         "toolHealthInstallPartial": "Some tools failed to install: {tools}. Check the logs for details.",
+        "toolHealthInstallManual": "RAVN does not install system packages itself. Run this command in a terminal to install the missing tools:\n\n{command}",
         "toolHealthInstallNoWinget": "winget was not found on this system. See README.md to install tools manually.",
         "toolHealthFFmpegHelp": "FFmpeg and FFprobe are required for video processing",
         "toolHealthYtDlpHelp": "yt-dlp is required for media downloads",

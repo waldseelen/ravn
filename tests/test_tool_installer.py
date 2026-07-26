@@ -6,6 +6,8 @@ PATH'in çalışan process içinde anında yenilenmesi.
 import subprocess
 from unittest.mock import Mock, patch
 
+import pytest
+
 from ravn_app.core import tool_installer
 
 
@@ -33,6 +35,15 @@ class TestPackageIdMapping:
 
 
 class TestInstallTool:
+    @pytest.fixture(autouse=True)
+    def _force_windows(self, monkeypatch):
+        """
+        These cover the Windows/winget branch, which install_tool now selects on
+        os.name. Pin it so the suite asserts the same thing on every host OS instead
+        of silently exercising the Linux path when CI runs on ubuntu.
+        """
+        monkeypatch.setattr(tool_installer.os, "name", "nt")
+
     def test_unmapped_tool_fails_without_calling_winget(self):
         with patch("ravn_app.core.tool_installer.subprocess.run") as run_mock:
             result = tool_installer.install_tool("not-a-real-tool")
@@ -84,6 +95,11 @@ class TestInstallTool:
 
 
 class TestInstallMissingTools:
+    @pytest.fixture(autouse=True)
+    def _force_windows(self, monkeypatch):
+        """See TestInstallTool._force_windows -- same reason, same branch."""
+        monkeypatch.setattr(tool_installer.os, "name", "nt")
+
     def test_dedupes_ffmpeg_and_ffprobe_into_a_single_winget_call(self):
         completed = Mock(returncode=0, stdout="Installed")
         with patch("ravn_app.core.tool_installer.is_winget_available", return_value=True), \
@@ -141,6 +157,158 @@ class TestInstallMissingTools:
 
         assert results["yt-dlp"].success is True
         assert results["totally-unknown-tool"].success is False
+
+
+class TestLinuxPackageManagerDetection:
+    """
+    Linux has no single package manager, so RAVN probes for one. Everything here pins
+    sys.platform/shutil.which rather than trusting the host, so the Linux behaviour is
+    asserted identically on the Windows dev box and on ubuntu CI.
+    """
+
+    @staticmethod
+    def _which_only(*available):
+        return lambda binary: f"/usr/bin/{binary}" if binary in available else None
+
+    def test_detects_apt(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+        with patch("ravn_app.core.tool_installer.shutil.which", side_effect=self._which_only("apt-get")):
+            assert tool_installer.detect_linux_package_manager() == "apt"
+
+    def test_detects_dnf(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+        with patch("ravn_app.core.tool_installer.shutil.which", side_effect=self._which_only("dnf")):
+            assert tool_installer.detect_linux_package_manager() == "dnf"
+
+    def test_detects_pacman(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+        with patch("ravn_app.core.tool_installer.shutil.which", side_effect=self._which_only("pacman")):
+            assert tool_installer.detect_linux_package_manager() == "pacman"
+
+    def test_prefers_apt_when_several_are_present(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+        with patch(
+            "ravn_app.core.tool_installer.shutil.which",
+            side_effect=self._which_only("apt-get", "dnf", "pacman"),
+        ):
+            assert tool_installer.detect_linux_package_manager() == "apt"
+
+    def test_returns_none_when_no_manager_found(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+        with patch("ravn_app.core.tool_installer.shutil.which", return_value=None):
+            assert tool_installer.detect_linux_package_manager() is None
+
+    def test_returns_none_on_windows_even_if_binaries_resolve(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.sys, "platform", "win32")
+        with patch("ravn_app.core.tool_installer.shutil.which", return_value=r"C:\apt-get.exe"):
+            assert tool_installer.detect_linux_package_manager() is None
+
+
+class TestManualInstallCommand:
+    @pytest.fixture(autouse=True)
+    def _force_linux(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "posix")
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+
+    def test_builds_apt_command_for_missing_tools(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"):
+            command = tool_installer.get_manual_install_command(["ffmpeg", "aria2c"])
+
+        assert command == "sudo apt-get install -y ffmpeg aria2"
+
+    def test_builds_pacman_command_with_its_own_flags(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="pacman"):
+            command = tool_installer.get_manual_install_command(["yt-dlp"])
+
+        assert command == "sudo pacman -S --noconfirm yt-dlp"
+
+    def test_collapses_ffmpeg_and_ffprobe_into_one_package(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"):
+            command = tool_installer.get_manual_install_command(["ffmpeg", "ffprobe"])
+
+        # ffprobe ships inside the ffmpeg package; listing it twice would be wrong.
+        assert command == "sudo apt-get install -y ffmpeg"
+
+    def test_returns_none_without_a_package_manager(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value=None):
+            assert tool_installer.get_manual_install_command(["ffmpeg"]) is None
+
+    def test_returns_none_when_no_tool_maps_to_a_package(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"):
+            assert tool_installer.get_manual_install_command(["totally-unknown-tool"]) is None
+
+
+class TestInstallOnLinuxSurfacesCommandInsteadOfRunningSudo:
+    """
+    RAVN must never shell out to sudo from the GUI: there is no TTY to prompt on, so
+    it would hang, and silently taking root is not appropriate here. The install path
+    returns the command for the user to run instead.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _force_linux(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "posix")
+        monkeypatch.setattr(tool_installer.sys, "platform", "linux")
+
+    def test_install_tool_never_spawns_a_subprocess(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"), \
+             patch("ravn_app.core.tool_installer.subprocess.run") as run_mock:
+            result = tool_installer.install_tool("ffmpeg")
+
+        run_mock.assert_not_called()
+        assert result.success is False
+        assert result.manual_command == "sudo apt-get install -y ffmpeg"
+
+    def test_install_missing_tools_never_spawns_a_subprocess(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"), \
+             patch("ravn_app.core.tool_installer.subprocess.run") as run_mock:
+            results = tool_installer.install_missing_tools(["ffmpeg", "aria2c"])
+
+        run_mock.assert_not_called()
+        assert set(results) == {"ffmpeg", "aria2c"}
+        for outcome in results.values():
+            assert outcome.success is False
+            assert outcome.manual_command == "sudo apt-get install -y ffmpeg aria2"
+
+    def test_reports_manual_stage_to_progress_callback(self):
+        stages = []
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="apt"):
+            tool_installer.install_missing_tools(
+                ["ffmpeg"],
+                progress_callback=lambda tool, stage: stages.append((tool, stage)),
+            )
+
+        # "manual" rather than "error": needing a command is guidance, not a failure.
+        assert ("ffmpeg", "manual") in stages
+
+    def test_explains_itself_when_no_package_manager_exists(self):
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value=None):
+            results = tool_installer.install_missing_tools(["ffmpeg"])
+
+        assert results["ffmpeg"].manual_command is None
+        assert "no supported package manager" in results["ffmpeg"].message.lower()
+
+
+class TestIsInstallSupported:
+    def test_true_on_windows_with_winget(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "nt")
+        with patch("ravn_app.core.tool_installer.is_winget_available", return_value=True):
+            assert tool_installer.is_install_supported() is True
+
+    def test_false_on_windows_without_winget(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "nt")
+        with patch("ravn_app.core.tool_installer.is_winget_available", return_value=False):
+            assert tool_installer.is_install_supported() is False
+
+    def test_true_on_linux_with_a_package_manager(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "posix")
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value="dnf"):
+            assert tool_installer.is_install_supported() is True
+
+    def test_false_on_linux_without_a_package_manager(self, monkeypatch):
+        monkeypatch.setattr(tool_installer.os, "name", "posix")
+        with patch("ravn_app.core.tool_installer.detect_linux_package_manager", return_value=None):
+            assert tool_installer.is_install_supported() is False
 
 
 class TestRefreshProcessEnvironmentPath:

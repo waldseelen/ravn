@@ -59,8 +59,13 @@ sorun; `ravn.spec` dosyasındaki `EXE` bloğunda Windows sürüm kaynak dosyası
 sorun; `ravn.spec` dosyasında `excludes` parametresi boş bırakılmıştır. `pytest` gibi sadece test ortamında gereken kütüphaneler ile kullanılmayan standart Python modülleri klasör modundaki (`COLLECT`) son dağıtım boyutunu gereksiz büyütmektedir.
 çözüm/agent talimatı; `ravn.spec` içerisindeki `excludes` listesine `['pytest', 'unittest', 'pdb', 'distutils']` modüllerini ekleyerek paket boyutunu optimize et.
 
-sorun; Torrent ve magnet iş akışları için `requirements.txt`'e eklenen `aria2p` kütüphanesinin dinamik alt modülleri `ravn.spec` içindeki `hiddenimports` listesinde güvenliğe alınmamıştır. Paketlenen runtime'da torrent tetiklendiğinde iç modül bulunamadı hataları oluşabilir.
-çözüm/agent talimatı; `ravn.spec` dosyasındaki `hiddenimports` kümesine `*collect_submodules("aria2p")` ifadesini ekle.
+~~sorun; Torrent ve magnet iş akışları için `aria2p` kütüphanesinin alt modülleri `ravn.spec` `hiddenimports` listesinde değil.~~
+**GEÇERSİZ (v1.4.0'da düzeltildi).** Bu madde yanlış bir varsayıma dayanıyordu: `aria2p`
+bir bağımlılık **değildir** ve `requirements.txt` içinde yer almaz — torrent desteği
+`aria2c` ikilisini `subprocess` ile çalıştırır (bkz. `ravn_app/core/runners/aria2.py` ve
+`requirements.in` içindeki açıklama). `ravn.spec` içinde bulunan
+`*collect_submodules("aria2p")` satırı, kurulu olmayan bir paketi import etmeye çalıştığı
+için temiz bir ortamdaki her build'i riske atıyordu; **kaldırıldı**. Tekrar eklemeyin.
 
 sorun; Uygulama başlangıçta veritabanı migrasyonu ve `tool_health` kontrolü gibi senkron G/Ç (I/O) işlemleri yapmaktadır. `console=False` modu aktif olduğundan, zayıf sistemlerde ana pencere yüklenene kadar uygulama kilitlenmiş veya açılmıyor algısı oluşmaktadır.
 çözüm/agent talimatı; `ravn.spec` mimarisine PyInstaller `Splash` bileşenini dahil et; `ravn.py` giriş noktasında ana arayüz yüklenene kadar ekranda geçici bir yükleme görseli (splash screen) gösterilmesini sağla.
@@ -71,15 +76,36 @@ sorun; Uygulama başlangıçta veritabanı migrasyonu ve `tool_health` kontrolü
 
 RAVN artık Linux ve macOS'ta CI test matrisiyle (`tests.yml`) doğrulanıyor ve `yt-dlp`
 self-update / medya oynatıcı açma gibi gerçek platform hataları giderildi (bkz.
-ARCHITECTURE.md §3.6). Paketlenmiş (indirilebilir) dağıtım hâlâ yalnızca Windows için var;
-aşağıdakiler bilinçli olarak bu sürüme dahil edilmedi ve takip işi olarak kalıyor —
-WiX MSI kurulumcusunun (bkz. MEMORY.md) aynı ertelenmiş-takip modeli izleniyor:
+ARCHITECTURE.md §3.6).
 
-sorun; Linux ve macOS için paketlenmiş, indirilebilir bir dağıtım (AppImage/tar.gz, `.app`/`.dmg`) yoktur; `ravn.spec`/`build.ps1`/release workflow'ları hâlâ yalnızca Windows'u hedeflemektedir.
-çözüm/agent talimatı; Windows release akışından bağımsız, `workflow_dispatch` ile tetiklenen, gate'e dahil olmayan bir Linux (PyInstaller onedir + tar.gz) ve macOS (.app/.zip) paketleme workflow'u ekle; gerçek bir runner'da doğrulanmadan tagged release'e bağlama.
+**v1.4.0'da tamamlananlar:**
 
-sorun; `ravn_app/core/tool_installer.py` yalnızca `winget` üzerinden çalışır; Linux/macOS'ta çökmeden temiz bir "kullanılamıyor" sonucu döner ama otomatik kurulum yapmaz.
-çözüm/agent talimatı; `apt`/`dnf`/`pacman` (Linux) ve `brew` (macOS) için tespit + kurulum backend'i ekleyerek `install_missing_tools()`'u tüm platformlarda gerçek bir "one-click install" haline getir.
+- ✅ Linux paketleme workflow'u eklendi (`.github/workflows/linux-package.yml`): PyInstaller
+  onedir + `tar.gz` + SHA-256, `workflow_dispatch` ile tetiklenir. Bilinçli olarak tagged
+  release'e **bağlı değildir** — gerçek bir runner'da yeşil çalıştığı görülmeden bağlanmayacak.
+  Doğrulama sadece "derlendi" değil: headless CLI smoke testi + `xvfb` altında GUI başlatma
+  kontrolü içeriyor (test suite hiçbir zaman gerçek bir `Tk()` kökü oluşturmadığı için
+  GUI'nin Linux'ta açılabildiği başka hiçbir yerde kanıtlanmıyor).
+- ✅ `tool_installer.py` artık `apt`/`dnf`/`pacman` tespiti yapıyor. **Karar:** otomatik
+  kurulum yerine çalıştırılacak komut gösteriliyor — GUI uygulamasının `sudo` parolası
+  soracak bir TTY'si yoktur, `sudo`'ya shell out etmek uygulamayı kilitlerdi.
+- ✅ Harici araçlar (ffmpeg/ffprobe, yt-dlp, aria2c) artık pakete gömülüyor ve uygulama
+  kendi dizininden otomatik buluyor (`ravn_app/utils/bundled_tools.py`). Ayarlardaki
+  "eksikleri yükle" artık **B planı**; A planı, aracın zaten zip içinde gelmesi.
+
+**Kalan takip işleri:**
+
+sorun; macOS için paketlenmiş, indirilebilir bir dağıtım (`.app`/`.dmg`) yoktur.
+çözüm/agent talimatı; Linux workflow'unu (`linux-package.yml`) şablon alarak `workflow_dispatch` ile tetiklenen bir macOS paketleme workflow'u ekle; `ravn.spec` içindeki koşulsuz `Splash()` çağrısının macOS'ta desteklenmediği durumları kontrol et; gerçek bir runner'da doğrulanmadan tagged release'e bağlama.
+
+sorun; `tool_installer.py` macOS'ta (`brew`) kurulum komutu üretmez — `TOOL_ASSET_SUBDIRS` ve Linux backend'i hazır, sadece brew eşlemesi eksik (kodda `TODO(macos-followup)` işaretli).
+çözüm/agent talimatı; `BREW_PACKAGE_IDS` ekleyip `_LINUX_PACKAGE_MANAGERS` ile aynı desende bir brew backend'i yaz; `detect_linux_package_manager()`'ı platformdan bağımsız bir `detect_package_manager()`'a genelleştir.
+
+sorun; Linux paketi `ffmpeg`/`aria2c` ikililerini gömmez (yalnızca `yt-dlp` gömülür); kullanıcı bunları dağıtım paket yöneticisinden kurmak zorundadır.
+çözüm/agent talimatı; statik bir Linux ffmpeg build'i gömmenin GPL yükümlülükleri ve ikinci bir binary-provenance hattı bakımı anlamına geldiğini göz önünde tut; yalnızca kullanıcı geri bildirimi bunun gerçek bir benimseme engeli olduğunu gösterirse ele al.
+
+sorun; Linux onedir build'i `ubuntu-latest`'in glibc sürümüne bağlıdır; daha eski dağıtımlarda çalışmayabilir.
+çözüm/agent talimatı; şimdilik release notlarında minimum desteklenen dağıtımı belgele; manylinux tarzı bir konteyner ile çözmek bu turun kapsamı dışında.
 
 
 

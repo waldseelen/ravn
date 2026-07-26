@@ -125,16 +125,21 @@ ravn library search --query tutorial --tags archive --json
 
 ## Dependencies
 
+**The Windows packaged release includes everything below — there is nothing to install.**
+Extract the zip and run it. The list matters when running from source.
+
 ### Required
-- Python 3.9+ (Not required for Windows packaged release)
-- FFmpeg (Bundled in Windows packaged release)
-- FFprobe (Bundled in Windows packaged release)
-- yt-dlp (Self-managed in Windows packaged release)
-- Python packages from `requirements.txt` (Not required for Windows packaged release)
+- Python 3.9+
+- FFmpeg and FFprobe
+- yt-dlp
+- Python packages from `requirements.txt`
 
 ### Optional
 - `aria2c` for torrent and magnet workflows
 - `tkinterdnd2` for drag-and-drop support
+
+Run `ravn-cli tools` (or `python -m ravn_app.cli tools`) to see what RAVN detected, where each
+tool resolved from, and — on Linux — the exact command to install anything missing.
 
 Install Python dependencies:
 
@@ -147,8 +152,8 @@ Full setup and troubleshooting guidance lives in [DEPENDENCIES.md](DEPENDENCIES.
 ## Platform and Release Notes
 
 - RAVN runs on **Windows, Linux, and macOS** — the test suite runs on all three in CI on every push/PR.
-- **Windows** is currently the only *packaged* (pre-built, downloadable) release target; Linux and macOS packaged artifacts are a planned follow-up (see [TASKS.md](TASKS.md)). Running from source works on all three today.
-- Packaged Windows builds automatically bundle FFmpeg/FFprobe and self-update `yt-dlp`.
+- **Windows** is currently the only *packaged* (pre-built, downloadable) release target. Linux packaging exists as a manually-triggered workflow that is intentionally not attached to releases until it has been verified on a real runner; macOS packaging is a planned follow-up (see [TASKS.md](TASKS.md)). Running from source works on all three today.
+- Packaged Windows builds bundle FFmpeg, FFprobe, yt-dlp, and aria2c, and resolve them from the application's own folder — no install step and no first-run download. `yt-dlp` can still self-update afterwards, and that newer copy takes precedence over the bundled one.
 - GitHub Releases publish zip artifacts and SHA256 checksum files.
 - The `RAVN.exe` executable is signed with an Authenticode certificate. If SmartScreen appears, you can safely click "More info" and then "Run anyway". Over time, SmartScreen trust will build. Always verify the downloaded zip against the published SHA256 checksum.
 

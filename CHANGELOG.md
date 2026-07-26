@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-07-26
+
+### Added
+- **External tools now ship inside the release, and are detected automatically.** Previously a freshly unzipped RAVN reported `yt-dlp` and `aria2c` as missing: only FFmpeg was bundled, yt-dlp downloaded itself on first run, and aria2c was never bundled at all. `build.ps1` now also fetches `aria2c.exe` and `yt-dlp.exe` into `assets/aria2/win64/` and `assets/ytdlp/win64/` (new `-Action bundle-tools`), and the packaged app resolves them from its own directory with no install step and no first-run network fetch. Settings' "install missing tools" is now the fallback it was meant to be, not the primary path.
+- **`ravn tools` CLI command** — reports each external tool's status, resolved path, version, and whether it came from the bundled tree or the system. Answers "why does it say missing?" without opening the GUI, and gives CI a headless way to assert a packaged build found its own tools.
+- **`ravn-cli` executable in the package.** `ravn.spec` now builds the Click CLI as a second console executable alongside the desktop app, sharing one onedir folder. The CLI was previously unreachable for anyone without a Python environment.
+- **Linux packaging workflow** (`.github/workflows/linux-package.yml`) — `workflow_dispatch`-only, builds a PyInstaller onedir + `tar.gz` + SHA-256, bundles the Linux `yt-dlp` binary, and smoke-tests both the headless CLI and (under `xvfb`) the GUI, which is the one path the test matrix cannot cover since the suite never constructs a real Tk root. Deliberately not wired into the tagged release until it has been run green on a real runner.
+- **Linux install guidance in `tool_installer.py`** — detects `apt`/`dnf`/`pacman` and surfaces the exact command to run (e.g. `sudo apt-get install -y ffmpeg aria2`). RAVN deliberately does *not* shell out to `sudo`: a GUI app has no TTY to prompt for a password on, so it would simply hang. The Settings action now appears on Linux and shows the command instead of being hidden.
+
+### Changed
+- Bundled-tool resolution was generalized out of `ffmpeg_checker.py` into `ravn_app/utils/bundled_tools.py` and is now shared by ffmpeg/ffprobe, yt-dlp and aria2c instead of being FFmpeg-only.
+- `tool_health` checks the bundled tree before `PATH`, so Settings reflects what the build actually ships rather than only what is installed system-wide.
+- `ravn --version` reads `ravn_app.__version__` instead of a hardcoded string that had drifted three versions behind (reported `1.0.0`).
+- `ravn_app/__init__.py` resolves its re-exports lazily (PEP 562): `from ravn_app import __version__`, which core modules such as `crash_reporter` do, no longer drags in the entire CustomTkinter/Tk GUI stack.
+
+### Fixed
+- **`pyinstaller ravn.spec` hard-failed on any machine without the VC++ redistributable at the exact hardcoded path** (`Unable to find 'C:\Windows\System32\vcruntime140.dll'`). The CRT DLLs are now collected only when present, and the path honours `%SystemRoot%`.
+- `ravn.spec` collected submodules from `aria2p`, which is deliberately not a dependency (aria2 support shells out to the `aria2c` binary) and is absent from `requirements.txt` — a latent failure for any build from a clean environment.
+- More tests that only passed by accident of the host OS: `test_tool_installer.py`'s winget tests never pinned `os.name`, so on Linux CI they would have silently exercised the new non-Windows branch instead of what they claim to test. The FFmpeg PATH-idempotency test asserted a condition that held vacuously when the platform directory didn't match.
+
+---
+
 ## [1.3.0] - 2026-07-24
 
 ### Changed

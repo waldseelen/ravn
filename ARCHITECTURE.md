@@ -177,14 +177,40 @@ RAVN runs on **Windows, Linux, and macOS**, verified by a CI test matrix across 
   release asset and binary name per OS (`.exe` on Windows, `yt-dlp_macos` on macOS, extension-less
   `yt-dlp` on Linux) and marks the binary executable on POSIX.
 - Windows-only integrations degrade gracefully when unavailable: the system tray (`pystray`)
-  and drag-and-drop (`tkinterdnd2`) are optional imports gated behind availability flags, the
-  registry PATH refresh (`winreg`) early-returns on non-Windows, and the winget-based tool
-  installer (`core/tool_installer.py`) reports a clean "not available" result on non-Windows
-  rather than crashing (a native package-manager backend for Linux/macOS is a tracked
-  follow-up, see [TASKS.md](TASKS.md)).
+  and drag-and-drop (`tkinterdnd2`) are optional imports gated behind availability flags, and
+  the registry PATH refresh (`winreg`) early-returns on non-Windows.
 - Paths resolve per-OS through `core/config_paths.py`; hidden-subprocess flags are Windows-gated
-  in `core/runners/base.py`. **Packaging/signing is still the Windows distribution focus** —
-  Linux/macOS packaged artifacts (AppImage/tar.gz, `.app`/`.dmg`) are not shipped yet.
+  in `core/runners/base.py`.
+- **Packaging:** Windows produces the signed release (`build.ps1` → `windows-release.yml`).
+  Linux packaging exists as a `workflow_dispatch`-only job (`linux-package.yml`, PyInstaller
+  onedir + `tar.gz`) that is deliberately **not** wired into the tagged release until it has
+  been run green on a real runner. macOS packaging is a tracked follow-up ([TASKS.md](TASKS.md)).
+
+#### External tool resolution
+
+The four external binaries (`ffmpeg`, `ffprobe`, `yt-dlp`, `aria2c`) resolve through
+`utils/bundled_tools.py`, which searches `assets/<tool>/<platform>/` across the PyInstaller
+extraction dir (`sys._MEIPASS`), the executable's own directory, and the project root —
+falling back to `PATH` only when nothing is bundled.
+
+**Bundling is the primary path, not an optimization.** A packaged release ships its tools, so
+a freshly unzipped build reports every tool as available with no install step and no first-run
+network fetch. Two consequences follow:
+
+- `core/tool_health.py` checks the bundled tree *before* `PATH`, otherwise Settings would report
+  bundled tools as missing (it previously consulted `shutil.which` alone).
+- Startup calls `configure_bundled_tools_path()` so the bundled directories also land on `PATH`
+  for **child** processes — yt-dlp shells out to ffmpeg for muxing and only sees `PATH`.
+
+`yt-dlp` additionally self-updates into the per-user data directory; that copy outranks the
+bundled one, since shipping a binary is what makes a fresh install work offline, not a ceiling.
+Resolution order: explicit configured path → self-updated binary → bundled copy → `PATH`.
+
+Installing missing tools (`core/tool_installer.py`) is the **fallback**. On Windows it drives
+winget directly and refreshes the process PATH so new binaries are visible without a restart.
+On Linux it detects `apt`/`dnf`/`pacman` and returns the exact command for the user to run —
+it deliberately does not shell out to `sudo`, because a GUI app has no TTY to prompt on and the
+call would hang. macOS (`brew`) is a tracked follow-up.
 
 ---
 
@@ -294,8 +320,8 @@ Useful starting points:
 
 ## 7. Operational notes
 
-- **Windows-only packaging (for now):** the app itself runs cross-platform (§3.6), but packaged/downloadable releases are currently Windows-only; Linux/macOS packaging is a tracked follow-up.
-- **Dependencies:** `ffmpeg`, `ffprobe`, and `yt-dlp` are core tools; `aria2c` is optional and enables torrent workflows.
+- **Packaging:** Windows is the signed, released artifact; Linux packaging is `workflow_dispatch`-only pending real-runner verification; macOS is a tracked follow-up (§3.6).
+- **Dependencies:** `ffmpeg`, `ffprobe`, and `yt-dlp` are core tools; `aria2c` is optional and enables torrent workflows. Packaged builds bundle them under `assets/<tool>/<platform>/` and resolve them via `utils/bundled_tools.py` before falling back to `PATH` (§3.6).
 - **i18n:** user-facing UI strings should remain translation-key based in `ravn_app/translations/en.json` and `ravn_app/translations/tr.json`.
 - **Themes:** theme IDs normalize to `dark` or `light`.
 - **Plugin surface:** `ravn_app/core/plugin_system.py` is experimental and is not part of the active packaged runtime.

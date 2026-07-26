@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="RAVN"
            Manufacturer="RAVN Team"
-           Version="1.0.0"
+           Version="1.2.0"
            UpgradeCode="A3E7216F-8D19-4C90-B8A4-1925D8F2B76D"
            Scope="perMachine">
 
@@ -10,9 +10,7 @@
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="RAVN">
-        <Files Include="$(var.SourceDir)\**" />
-      </Directory>
+      <Directory Id="INSTALLFOLDER" Name="RAVN" />
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
@@ -27,6 +25,19 @@
         <RegistryValue Root="HKCU" Key="Software\RAVN\RAVN" Name="installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </StandardDirectory>
+
+    <!-- WiX v4 requires components to belong to an explicit Feature; there is no
+         implicit default feature (that only arrived in v5). Files must live in a
+         ComponentGroup referencing their target Directory by attribute, not nested
+         directly inside a Directory element. -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Files Include="$(var.SourceDir)\**" />
+    </ComponentGroup>
+
+    <Feature Id="ProductFeature" Title="RAVN" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
 
     <Icon Id="AppIcon" SourceFile="assets/ravn.ico" />
 

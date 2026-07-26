@@ -1,8 +1,8 @@
 # Release Status
 
-Verified on 2026-07-07 (`685 passed, 1 skipped`).
+Verified on 2026-07-24 (`815 passed, 1 skipped`, across Windows/Linux/macOS via the `tests.yml` CI matrix).
 
-RAVN is an actively maintained **Windows-first desktop + CLI media product**. The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. The main remaining release work is final packaged-app validation and trust/signing polish for Windows distribution.
+RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
 
 ## Recent quality pass (2026-07)
 
@@ -44,10 +44,11 @@ RAVN is an actively maintained **Windows-first desktop + CLI media product**. Th
 - The CLI supports `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, and `utilities`.
 
 ### Platform and packaging
-- Windows packaged builds are the primary distribution target.
+- RAVN runs on Windows, Linux, and macOS — CI runs the full test suite on all three on every push/PR.
+- Windows packaged builds are the only pre-built distribution target today.
 - Packaged Windows builds support bundled FFmpeg/FFprobe lookup.
-- GitHub Actions packaging and tagged-release workflows are in place.
-- Linux and macOS source usage may work, but packaged releases are not currently maintained for those platforms.
+- GitHub Actions packaging and tagged-release workflows are in place (Windows-only).
+- Linux and macOS packaged artifacts (AppImage/tar.gz, `.app`/`.dmg`) are not shipped yet — tracked as a follow-up in [TASKS.md](TASKS.md).
 
 ## Quality snapshot
 

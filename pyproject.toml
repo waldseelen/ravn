@@ -29,6 +29,13 @@ ignore = [
 # syntax in third-party stubs (e.g. numpy's PEP 695 `type` statements) while still
 # accepting the 3.11-compatible source we ship.
 python_version = "3.12"
+# RAVN is Windows-first (see ARCHITECTURE.md); the CI lint job runs on ubuntu-latest
+# for speed, so without this mypy would otherwise infer the CI runner's own platform
+# and see an empty/stub-only typeshed winreg module (HKEY_CURRENT_USER, OpenKey, etc.
+# all "undefined") even though ravn_app/core/tool_installer.py's winreg usage is
+# already runtime-guarded behind `if os.name != "nt": return 0`. Pin the analyzed
+# platform to match the actual target OS instead of whatever CI happens to run on.
+platform = "win32"
 # Gradual typing: the codebase is ~56% return-annotated. Run in a lenient mode so the
 # gate flags real contradictions (bad attribute access, wrong argument types) without
 # demanding full annotations up front. Tighten these toggles as coverage rises.

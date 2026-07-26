@@ -864,6 +864,22 @@ class TestPhase7TabLogic:
         assert settings["advanced_profile"]["cookies_mode"] == "browser"
         assert settings["advanced_profile"]["concurrent_fragments"] == 3
 
+    @patch('subprocess.Popen')
+    @patch('os.name', 'posix')
+    @patch('sys.platform', 'darwin')
+    def test_open_with_player_uses_open_on_macos(self, mock_popen):
+        tab = DownloadTab.__new__(DownloadTab)
+        tab._open_with_player("/path/to/video.mp4")
+        mock_popen.assert_called_once_with(["open", "/path/to/video.mp4"])
+
+    @patch('subprocess.Popen')
+    @patch('os.name', 'posix')
+    @patch('sys.platform', 'linux')
+    def test_open_with_player_uses_xdg_open_on_linux(self, mock_popen):
+        tab = DownloadTab.__new__(DownloadTab)
+        tab._open_with_player("/path/to/video.mp4")
+        mock_popen.assert_called_once_with(["xdg-open", "/path/to/video.mp4"])
+
     def test_settings_advanced_cookie_mode_updates_widget_state(self):
         tab = SettingsTab.__new__(SettingsTab)
         tab.download_cookie_mode_combo = _FakeCombo(t("settings.downloadAdvancedCookiesBrowser"))

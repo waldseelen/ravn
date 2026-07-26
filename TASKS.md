@@ -65,6 +65,22 @@ sorun; Torrent ve magnet iş akışları için `requirements.txt`'e eklenen `ari
 sorun; Uygulama başlangıçta veritabanı migrasyonu ve `tool_health` kontrolü gibi senkron G/Ç (I/O) işlemleri yapmaktadır. `console=False` modu aktif olduğundan, zayıf sistemlerde ana pencere yüklenene kadar uygulama kilitlenmiş veya açılmıyor algısı oluşmaktadır.
 çözüm/agent talimatı; `ravn.spec` mimarisine PyInstaller `Splash` bileşenini dahil et; `ravn.py` giriş noktasında ana arayüz yüklenene kadar ekranda geçici bir yükleme görseli (splash screen) gösterilmesini sağla.
 
+---
+
+### Cross-platform: sıradaki adımlar
+
+RAVN artık Linux ve macOS'ta CI test matrisiyle (`tests.yml`) doğrulanıyor ve `yt-dlp`
+self-update / medya oynatıcı açma gibi gerçek platform hataları giderildi (bkz.
+ARCHITECTURE.md §3.6). Paketlenmiş (indirilebilir) dağıtım hâlâ yalnızca Windows için var;
+aşağıdakiler bilinçli olarak bu sürüme dahil edilmedi ve takip işi olarak kalıyor —
+WiX MSI kurulumcusunun (bkz. MEMORY.md) aynı ertelenmiş-takip modeli izleniyor:
+
+sorun; Linux ve macOS için paketlenmiş, indirilebilir bir dağıtım (AppImage/tar.gz, `.app`/`.dmg`) yoktur; `ravn.spec`/`build.ps1`/release workflow'ları hâlâ yalnızca Windows'u hedeflemektedir.
+çözüm/agent talimatı; Windows release akışından bağımsız, `workflow_dispatch` ile tetiklenen, gate'e dahil olmayan bir Linux (PyInstaller onedir + tar.gz) ve macOS (.app/.zip) paketleme workflow'u ekle; gerçek bir runner'da doğrulanmadan tagged release'e bağlama.
+
+sorun; `ravn_app/core/tool_installer.py` yalnızca `winget` üzerinden çalışır; Linux/macOS'ta çökmeden temiz bir "kullanılamıyor" sonucu döner ama otomatik kurulum yapmaz.
+çözüm/agent talimatı; `apt`/`dnf`/`pacman` (Linux) ve `brew` (macOS) için tespit + kurulum backend'i ekleyerek `install_missing_tools()`'u tüm platformlarda gerçek bir "one-click install" haline getir.
+
 
 
 

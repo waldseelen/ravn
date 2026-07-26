@@ -61,6 +61,13 @@ scored independently; keep `pytest -q` green (675 passed baseline) after every c
 - [x] Cross-platform: verified all `os.startfile` sites are Windows-guarded with `open`/`xdg-open`
       (arg-list subprocess) fallbacks; `winreg`/tray/DnD degrade gracefully. Documented the contract in
       ARCHITECTURE.md §3.6.
+- [x] Cross-platform (v1.3.0): fixed two real gaps found by exploration — `_open_with_player` was
+      missing a macOS `open` branch (fell through to `xdg-open`, which doesn't exist there), and
+      `YtDlpRunner.update()` unconditionally downloaded the Windows `yt-dlp.exe` release asset on
+      every OS (silently produced an unusable binary on Linux/macOS). Added a Linux/macOS/Windows
+      matrix to `tests.yml` so the full suite is now CI-verified on all three platforms, not just
+      asserted. Packaged (downloadable) distribution stays Windows-only — see TASKS.md for the
+      tracked Linux/macOS packaging follow-up.
 
 ---
 

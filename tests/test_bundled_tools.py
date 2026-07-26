@@ -1,6 +1,7 @@
 """Tests for the shared bundled-tool lookup (assets/<tool>/<platform>/ resolution)."""
 
 import os
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -172,3 +173,30 @@ class TestToolHealthSeesBundledTools:
 
         assert info.status is tool_health.ToolStatus.AVAILABLE
         assert info.path == "/usr/bin/aria2c"
+
+
+class TestToolVersionFlags:
+    """
+    yt-dlp and aria2c want GNU-style --version; ffmpeg/ffprobe want -version.
+    Getting this wrong fails silently: yt-dlp parses '-version' as short flags,
+    prints usage, and still exits 0, so a blank line got reported as the version.
+    """
+
+    @pytest.mark.parametrize(
+        "tool_name,expected_flag",
+        [
+            ("ffmpeg", "-version"),
+            ("ffprobe", "-version"),
+            ("yt-dlp", "--version"),
+            ("aria2c", "--version"),
+        ],
+    )
+    def test_each_tool_is_probed_with_the_flag_it_understands(self, tool_name, expected_flag):
+        checker = tool_health.ToolHealthChecker()
+        completed = SimpleNamespace(returncode=0, stdout="1.2.3\n")
+
+        with patch("ravn_app.core.tool_health.subprocess.run", return_value=completed) as run_mock:
+            version = checker._get_tool_version(tool_name, f"/usr/bin/{tool_name}")
+
+        assert run_mock.call_args[0][0] == [f"/usr/bin/{tool_name}", expected_flag]
+        assert version == "1.2.3"

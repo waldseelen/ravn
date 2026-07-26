@@ -135,26 +135,25 @@ class ToolHealthChecker:
         self._cache[tool_name] = info
         return info
 
+    # FFmpeg's tools use the single-dash '-version'; aria2c and yt-dlp use the GNU-style
+    # '--version'. Sending '-version' to yt-dlp does not fail loudly -- it parses as a
+    # bundle of short flags, prints its usage text, and still exits 0, so the first line
+    # of stdout was being reported as the "version" (in practice, blank).
+    _VERSION_FLAGS = {
+        'aria2c': '--version',
+        'yt-dlp': '--version',
+    }
+
     def _get_tool_version(self, tool_name: str, tool_path: str) -> Optional[str]:
         """Get version string for a tool"""
         try:
-            # Different tools use different version flags
-            if tool_name == 'aria2c':
-                result = subprocess.run(
-                    [tool_path, '--version'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    **get_hidden_subprocess_kwargs(),
-                )
-            else:
-                result = subprocess.run(
-                    [tool_path, '-version'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    **get_hidden_subprocess_kwargs(),
-                )
+            result = subprocess.run(
+                [tool_path, self._VERSION_FLAGS.get(tool_name, '-version')],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                **get_hidden_subprocess_kwargs(),
+            )
 
             if result.returncode == 0:
                 # Extract first line which usually contains version

@@ -187,9 +187,29 @@ function Ensure-BundledYtDlp {
         return
     }
 
-    Write-Host "Downloading yt-dlp from $YtDlpBinaryUrl" -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $YtDlpBinaryUrl -OutFile $ytDlpExe
-    Write-Host "Bundled yt-dlp downloaded to $YtDlpAssetsRoot" -ForegroundColor Green
+    # Download to a temp file and only move it into place once complete. Writing
+    # straight to the final path would leave a truncated yt-dlp.exe behind on a failed
+    # or interrupted download, which the Test-Path check above would then accept as
+    # "already bundled" on the next run -- shipping a poisoned binary.
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ravn-ytdlp-" + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    try {
+        $downloadPath = Join-Path $tempRoot 'yt-dlp.exe'
+        Write-Host "Downloading yt-dlp from $YtDlpBinaryUrl" -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $YtDlpBinaryUrl -OutFile $downloadPath
+
+        if ((Get-Item $downloadPath).Length -eq 0) {
+            throw "Downloaded yt-dlp binary is empty: $YtDlpBinaryUrl"
+        }
+
+        Move-Item $downloadPath $ytDlpExe -Force
+        Write-Host "Bundled yt-dlp downloaded to $YtDlpAssetsRoot" -ForegroundColor Green
+    }
+    finally {
+        if (Test-Path $tempRoot) {
+            Remove-Item $tempRoot -Recurse -Force
+        }
+    }
 }
 
 function Ensure-BundledTools {

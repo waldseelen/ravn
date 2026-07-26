@@ -35,7 +35,7 @@ jobs:
           cyclonedx-py requirements -o sbom.json
 
       - name: Upload SBOM Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ravn-sbom
           path: sbom.json

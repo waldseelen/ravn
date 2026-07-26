@@ -28,13 +28,13 @@ jobs:
           ./build.ps1 -Action ci-package -DownloadBundledFFmpeg
 
       - name: Upload packaged folder
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: RAVN-windows-folder
           path: dist/RAVN
 
       - name: Upload distributable archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: RAVN-windows-x64
           path: |

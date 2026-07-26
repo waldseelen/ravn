@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from ravn_app.core.runners.base import get_hidden_subprocess_kwargs
+from ravn_app.utils import bundled_tools
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +103,11 @@ class ToolHealthChecker:
         required = requirements.get('required', False)
         affected_features = requirements.get('affected_features', [])
 
-        # Check if tool is in PATH
-        tool_path = shutil.which(tool_name)
+        # Prefer a copy bundled inside the packaged build over whatever is installed
+        # on the machine: a released RAVN ships its tools, so an unzipped build must
+        # report them as available without the user installing anything. Falling back
+        # to PATH covers running from source and user-installed tools.
+        tool_path = bundled_tools.find_tool(tool_name) or shutil.which(tool_name)
 
         if not tool_path:
             info = ToolInfo(

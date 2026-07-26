@@ -8,6 +8,7 @@ import logging
 from ravn_app.core.config_paths import ensure_directories_exist, migrate_all_legacy_files
 from ravn_app.core.logging_config import setup_logging
 from ravn_app.core.tool_health import get_tool_health_checker
+from ravn_app.utils.bundled_tools import configure_bundled_tools_path
 from ravn_app.utils.ffmpeg_checker import configure_ffmpeg_runtime
 
 
@@ -68,7 +69,10 @@ def main():
     ensure_directories_exist()
     migrate_all_legacy_files()
     
-    # Make bundled FFmpeg/FFprobe visible before any runtime/tool checks.
+    # Make every bundled tool (ffmpeg/ffprobe, yt-dlp, aria2c) visible before any
+    # runtime/tool checks, so a freshly unzipped build finds what it shipped with
+    # and child processes (yt-dlp muxing via ffmpeg) resolve them too.
+    configure_bundled_tools_path()
     configure_ffmpeg_runtime()
 
     # Check tool dependencies at startup

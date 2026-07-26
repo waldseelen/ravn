@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, get_hidden_subprocess_kwargs
+from ravn_app.utils import bundled_tools
 
 logger = logging.getLogger(__name__)
 
@@ -977,13 +978,19 @@ class YtDlpRunner(BaseRunner):
 
 
 def get_ytdlp_runner(ytdlp_path: Optional[str] = None) -> YtDlpRunner:
-    """Create and return a YtDlpRunner instance."""
+    """
+    Create a YtDlpRunner, resolving which yt-dlp binary to drive.
+
+    Order: an explicitly configured path, then a self-updated binary, then the copy
+    bundled in the packaged build, then PATH. Self-update deliberately outranks the
+    bundled copy -- shipping a binary is what makes a freshly unzipped build work
+    offline, but once update() has fetched a newer one that should win.
+    """
     if not ytdlp_path:
-        tools_dir = _ytdlp_tools_dir()
-        local_exe = tools_dir / _ytdlp_binary_name()
+        local_exe = _ytdlp_tools_dir() / _ytdlp_binary_name()
         if local_exe.exists():
             ytdlp_path = str(local_exe)
         else:
-            ytdlp_path = "yt-dlp"
+            ytdlp_path = bundled_tools.find_tool("yt-dlp") or "yt-dlp"
 
     return YtDlpRunner(ytdlp_path)

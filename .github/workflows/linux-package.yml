@@ -1,0 +1,121 @@
+name: linux-package
+
+# Manual-dispatch only, on purpose. Linux packaging is new and has never been proven
+# on a real runner, so it must not gate PRs and must not be wired into the tagged
+# release flow (windows-release.yml) until it has been run green here at least once.
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      # python3-tk: CustomTkinter needs system Tcl/Tk -- PyInstaller bundles the Python
+      #   bindings but not the Tk libraries themselves.
+      # xdg-utils: provides xdg-open, used to open files/folders in the desktop UI.
+      # xvfb: virtual display for the GUI smoke test below.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xdg-utils xvfb
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest
+
+      - name: Run test suite
+        run: pytest -q
+
+      # yt-dlp ships a self-contained Linux binary and is Unlicense-licensed, so it can
+      # be bundled with no redistribution complications. ffmpeg and aria2c deliberately
+      # are NOT bundled here: a static ffmpeg build carries GPL obligations and a second
+      # binary-provenance pipeline to maintain, and both are one apt/dnf/pacman install
+      # away. Settings surfaces the exact command (see core/tool_installer.py).
+      - name: Bundle yt-dlp binary
+        run: |
+          mkdir -p assets/ytdlp/linux
+          curl -fsSL -o assets/ytdlp/linux/yt-dlp \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+          chmod +x assets/ytdlp/linux/yt-dlp
+          ./assets/ytdlp/linux/yt-dlp --version
+
+      - name: Build PyInstaller package
+        run: pyinstaller --clean --noconfirm ravn.spec
+
+      - name: Verify both executables were produced
+        run: |
+          test -x dist/RAVN/RAVN || (echo "GUI executable missing" && exit 1)
+          test -x dist/RAVN/ravn-cli || (echo "CLI executable missing" && exit 1)
+
+      # Headless: exercises the real packaged binary with no display at all. Catches
+      # missing hidden imports and broken _MEIPASS asset paths, which a source-tree
+      # pytest run cannot catch.
+      - name: Smoke test packaged CLI
+        run: |
+          ./dist/RAVN/ravn-cli --version
+          ./dist/RAVN/ravn-cli --help
+          # Exercises a real command end to end: creates the config/data directories
+          # and opens the SQLite database, so it covers more than argument parsing.
+          ./dist/RAVN/ravn-cli history --json
+          ./dist/RAVN/ravn-cli tools --json
+
+      # Proves the packaged build resolves the yt-dlp it shipped with, rather than
+      # something that happens to be on the runner's PATH. This is the whole point of
+      # bundling, so assert it instead of eyeballing the log.
+      - name: Verify packaged build resolves its bundled yt-dlp
+        run: |
+          ./dist/RAVN/ravn-cli tools --json > tools.json
+          cat tools.json
+          python - <<'PY'
+          import json, sys
+          data = json.load(open("tools.json"))
+          ytdlp = data["tools"]["yt-dlp"]
+          if not ytdlp["bundled"]:
+              sys.exit("yt-dlp was not resolved from the bundled assets tree")
+          if "dist/RAVN" not in (ytdlp["path"] or ""):
+              sys.exit(f"yt-dlp resolved outside the package: {ytdlp['path']}")
+          print("bundled yt-dlp resolved from", ytdlp["path"])
+          PY
+
+      # The one genuinely novel risk on Linux: constructing a real Tk root. The pytest
+      # suite never instantiates CTk(), so "the tests pass on Linux" does not prove the
+      # GUI can start. This also exercises the unconditional Splash() in ravn.spec.
+      - name: Smoke test packaged GUI under Xvfb
+        run: |
+          xvfb-run -a --server-args="-screen 0 1280x800x24" ./dist/RAVN/RAVN &
+          APP_PID=$!
+          sleep 20
+          if ! kill -0 "$APP_PID" 2>/dev/null; then
+            echo "GUI process exited during startup"
+            wait "$APP_PID" || true
+            exit 1
+          fi
+          echo "GUI still running after startup"
+          kill "$APP_PID" 2>/dev/null || true
+
+      - name: Create tar.gz and checksum
+        run: |
+          tar -C dist -czf dist/RAVN-linux-x64.tar.gz RAVN
+          cd dist && sha256sum RAVN-linux-x64.tar.gz > RAVN-linux-x64.sha256.txt
+          cat RAVN-linux-x64.sha256.txt
+
+      - name: Upload distributable archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: RAVN-linux-x64
+          path: |
+            dist/RAVN-linux-x64.tar.gz
+            dist/RAVN-linux-x64.sha256.txt

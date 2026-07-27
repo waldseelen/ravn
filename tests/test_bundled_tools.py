@@ -97,7 +97,10 @@ class TestConfigureBundledToolsPath:
         ffmpeg_binary = _write_binary(bundled_root, "ffmpeg", "ffmpeg")
         aria2_binary = _write_binary(bundled_root, "aria2", "aria2c")
 
-        with patch.dict(os.environ, {"PATH": "C:/existing"}, clear=True):
+        # Use a path component that doesn't contain separators so split is stable across OSes
+        # (Windows uses ;, Linux/macOS use :). Absolute paths on both work fine.
+        initial_existing_path = "/existing" if os.name != "nt" else "C:\\existing"
+        with patch.dict(os.environ, {"PATH": initial_existing_path}, clear=True):
             configured = bundled_tools.configure_bundled_tools_path()
             path_parts = os.environ["PATH"].split(os.pathsep)
 
@@ -105,19 +108,21 @@ class TestConfigureBundledToolsPath:
         assert str(aria2_binary.parent) in configured
         assert str(ffmpeg_binary.parent) in path_parts
         assert str(aria2_binary.parent) in path_parts
-        assert "C:/existing" in path_parts
+        assert initial_existing_path in path_parts
 
     def test_reports_nothing_when_no_tools_are_bundled(self, bundled_root):
-        with patch.dict(os.environ, {"PATH": "C:/existing"}, clear=True):
+        initial_existing_path = "/existing" if os.name != "nt" else "C:\\existing"
+        with patch.dict(os.environ, {"PATH": initial_existing_path}, clear=True):
             configured = bundled_tools.configure_bundled_tools_path()
 
             assert configured == []
-            assert os.environ["PATH"] == "C:/existing"
+            assert os.environ["PATH"] == initial_existing_path
 
     def test_is_idempotent_across_repeated_calls(self, bundled_root):
         _write_binary(bundled_root, "ffmpeg", "ffmpeg")
 
-        with patch.dict(os.environ, {"PATH": "C:/existing"}, clear=True):
+        initial_existing_path = "/existing" if os.name != "nt" else "C:\\existing"
+        with patch.dict(os.environ, {"PATH": initial_existing_path}, clear=True):
             bundled_tools.configure_bundled_tools_path()
             first = os.environ["PATH"]
             bundled_tools.configure_bundled_tools_path()
@@ -130,7 +135,8 @@ class TestConfigureBundledToolsPath:
         _write_binary(bundled_root, "ffmpeg", "ffmpeg")
         _write_binary(bundled_root, "ffmpeg", "ffprobe")
 
-        with patch.dict(os.environ, {"PATH": "C:/existing"}, clear=True):
+        initial_existing_path = "/existing" if os.name != "nt" else "C:\\existing"
+        with patch.dict(os.environ, {"PATH": initial_existing_path}, clear=True):
             configured = bundled_tools.configure_bundled_tools_path()
 
         assert len(configured) == len(set(configured))

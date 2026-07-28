@@ -1,7 +1,7 @@
 import sys
 from unittest.mock import patch
 
-from ravn_app.utils import ffmpeg_checker
+from ravn_app.utils import bundled_tools
 from ravn_app.utils.ffmpeg_checker import (
     FFmpegCodecChecker,
     _binary_name,
@@ -13,6 +13,9 @@ from ravn_app.utils.ffmpeg_checker import (
     resolve_tool_path,
 )
 
+# ffmpeg_checker delegates its binary lookup to bundled_tools (shared with aria2c and
+# yt-dlp), so the roots/platform-dir seams these tests drive live in that module.
+
 
 def test_find_bundled_tool_prefers_assets_layout(tmp_path):
     bundled_dir = tmp_path / "assets" / "ffmpeg" / "win64"
@@ -20,8 +23,8 @@ def test_find_bundled_tool_prefers_assets_layout(tmp_path):
     ffmpeg_binary = bundled_dir / ("ffmpeg.exe" if __import__("os").name == "nt" else "ffmpeg")
     ffmpeg_binary.write_text("demo")
 
-    with patch("ravn_app.utils.ffmpeg_checker._candidate_runtime_roots", return_value=[tmp_path]), patch(
-        "ravn_app.utils.ffmpeg_checker._PLATFORM_FFMPEG_DIR", "win64"
+    with patch("ravn_app.utils.bundled_tools.candidate_runtime_roots", return_value=[tmp_path]), patch(
+        "ravn_app.utils.bundled_tools.PLATFORM_DIR", "win64"
     ):
         resolved = find_bundled_tool("ffmpeg")
 
@@ -43,9 +46,9 @@ def test_resolve_tool_path_uses_bundled_before_path(tmp_path):
     ffprobe_binary = bundled_dir / ("ffprobe.exe" if __import__("os").name == "nt" else "ffprobe")
     ffprobe_binary.write_text("demo")
 
-    with patch("ravn_app.utils.ffmpeg_checker._candidate_runtime_roots", return_value=[tmp_path]), patch(
-        "ravn_app.utils.ffmpeg_checker.shutil.which", return_value="/usr/bin/ffprobe"
-    ), patch("ravn_app.utils.ffmpeg_checker._PLATFORM_FFMPEG_DIR", "win64"):
+    with patch("ravn_app.utils.bundled_tools.candidate_runtime_roots", return_value=[tmp_path]), patch(
+        "ravn_app.utils.bundled_tools.shutil.which", return_value="/usr/bin/ffprobe"
+    ), patch("ravn_app.utils.bundled_tools.PLATFORM_DIR", "win64"):
         resolved = resolve_tool_path("ffprobe", "ffprobe")
 
     assert resolved == str(ffprobe_binary)
@@ -60,8 +63,8 @@ def test_configure_ffmpeg_runtime_prepends_bundled_dir(tmp_path):
     ffprobe_binary.write_text("demo")
 
     with patch.dict("os.environ", {"PATH": "C:/existing"}, clear=True), patch(
-        "ravn_app.utils.ffmpeg_checker._candidate_runtime_roots", return_value=[tmp_path]
-    ), patch("ravn_app.utils.ffmpeg_checker._PLATFORM_FFMPEG_DIR", "win64"):
+        "ravn_app.utils.bundled_tools.candidate_runtime_roots", return_value=[tmp_path]
+    ), patch("ravn_app.utils.bundled_tools.PLATFORM_DIR", "win64"):
         resolved_ffmpeg, resolved_ffprobe = configure_ffmpeg_runtime()
 
     assert resolved_ffmpeg == str(ffmpeg_binary)
@@ -75,11 +78,14 @@ def test_prepend_bundled_ffmpeg_to_path_is_idempotent(tmp_path):
     ffmpeg_binary.write_text("demo")
 
     with patch.dict("os.environ", {"PATH": str(bundled_dir)}, clear=True), patch(
-        "ravn_app.utils.ffmpeg_checker._candidate_runtime_roots", return_value=[tmp_path]
-    ):
-        prepend_bundled_ffmpeg_to_path()
+        "ravn_app.utils.bundled_tools.candidate_runtime_roots", return_value=[tmp_path]
+    ), patch("ravn_app.utils.bundled_tools.PLATFORM_DIR", "win64"):
+        returned_dir = prepend_bundled_ffmpeg_to_path()
         path_value = __import__("os").environ["PATH"]
 
+    # Assert the binary was actually located, otherwise "PATH unchanged" would pass
+    # vacuously on any platform whose PLATFORM_DIR is not win64.
+    assert returned_dir == str(bundled_dir)
     assert path_value == str(bundled_dir)
 
 
@@ -96,7 +102,7 @@ def test_resolve_tool_path_returns_normalized_when_explicit_path_missing(tmp_pat
 
 
 def test_resolve_tool_path_uses_shutil_which_for_custom_name():
-    with patch("ravn_app.utils.ffmpeg_checker.shutil.which", return_value="/usr/bin/ffmpeg4"):
+    with patch("ravn_app.utils.bundled_tools.shutil.which", return_value="/usr/bin/ffmpeg4"):
         resolved = resolve_tool_path("ffmpeg4", "ffmpeg")
 
     assert resolved == "/usr/bin/ffmpeg4"
@@ -110,14 +116,14 @@ def test_candidate_runtime_roots_includes_meipass_when_frozen(tmp_path):
 
 
 def test_candidate_runtime_roots_swallows_executable_resolve_failure():
-    original_path = ffmpeg_checker.Path
+    original_path = bundled_tools.Path
 
     def fake_path(arg):
         if arg == sys.executable:
             raise OSError("cannot resolve executable path")
         return original_path(arg)
 
-    with patch.object(ffmpeg_checker, "Path", fake_path):
+    with patch.object(bundled_tools, "Path", fake_path):
         roots = _candidate_runtime_roots()
 
     # Falls through to the project-root fallback instead of raising.
@@ -126,7 +132,7 @@ def test_candidate_runtime_roots_swallows_executable_resolve_failure():
 
 def test_candidate_runtime_roots_deduplicates_equal_roots(tmp_path):
     with patch.object(sys, "_MEIPASS", str(tmp_path), create=True), patch(
-        "ravn_app.utils.ffmpeg_checker._project_root", return_value=tmp_path
+        "ravn_app.utils.bundled_tools.project_root", return_value=tmp_path
     ):
         roots = _candidate_runtime_roots()
 
@@ -135,7 +141,7 @@ def test_candidate_runtime_roots_deduplicates_equal_roots(tmp_path):
 
 def test_iter_bundled_ffmpeg_dirs_deduplicates_repeated_roots(tmp_path):
     with patch(
-        "ravn_app.utils.ffmpeg_checker._candidate_runtime_roots",
+        "ravn_app.utils.bundled_tools.candidate_runtime_roots",
         return_value=[tmp_path, tmp_path],
     ):
         dirs = list(iter_bundled_ffmpeg_dirs())

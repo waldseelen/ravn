@@ -16,6 +16,7 @@ from typing import Callable, List, Optional
 
 from ravn_app.core.error_handler import parse_aria2c_error
 from ravn_app.core.runners.base import BaseRunner, RunnerResult, RunnerStatus, get_hidden_subprocess_kwargs
+from ravn_app.utils import bundled_tools
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,10 @@ class Aria2Runner(BaseRunner):
     """
 
     def __init__(self, aria2c_path: str = "aria2c") -> None:
-        super().__init__(aria2c_path)
+        # Use the aria2c a packaged build shipped with, when there is one. An explicit
+        # user-configured path wins; with nothing bundled the name passes through
+        # unchanged so BaseRunner still resolves it from PATH at execution time.
+        super().__init__(bundled_tools.prefer_bundled(aria2c_path, "aria2c"))
 
     # ------------------------------------------------------------------
     # BaseRunner abstract method implementations

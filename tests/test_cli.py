@@ -2,6 +2,7 @@
 CLI tests using click.testing.CliRunner.
 """
 
+import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -760,3 +761,33 @@ class TestCliCommands:
         assert result.exit_code == 0
         assert "REST API server not yet implemented" in result.output
 
+
+    def test_tools_reports_bundled_binary_as_such(self):
+        """A packaged build ships its tools; `ravn tools` must show where each resolved."""
+        with patch("ravn_app.cli.bundled_tools.find_tool", side_effect=lambda name: "/pkg/assets/aria2/linux/aria2c" if name == "aria2c" else None):
+            result = self.runner.invoke(cli, ["tools", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["tools"]["aria2c"]["bundled"] is True
+        assert payload["tools"]["ffmpeg"]["bundled"] is False
+
+    def test_tools_surfaces_the_linux_install_command_for_missing_tools(self):
+        """On Linux the fallback is guidance, not an install; the command must be shown."""
+        with patch("ravn_app.cli.bundled_tools.find_tool", return_value=None), patch(
+            "ravn_app.cli.tool_installer.get_manual_install_command",
+            return_value="sudo apt-get install -y ffmpeg aria2",
+        ), patch("ravn_app.core.tool_health.shutil.which", return_value=None):
+            result = self.runner.invoke(cli, ["tools", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["install_command"] == "sudo apt-get install -y ffmpeg aria2"
+        assert "ffmpeg" in payload["missing"]
+
+    def test_tools_human_output_lists_every_known_tool(self):
+        result = self.runner.invoke(cli, ["tools"])
+
+        assert result.exit_code == 0
+        for tool_name in ("ffmpeg", "ffprobe", "yt-dlp", "aria2c"):
+            assert tool_name in result.output

@@ -616,7 +616,7 @@ class SettingsTab(ctk.CTkFrame):
         install_button = self.__dict__.get("install_missing_tools_button")
         if install_button is not None:
             install_button.configure(state="normal", text=t("settings.toolHealthInstallMissing"))
-            if missing_tools and tool_installer.is_winget_available():
+            if missing_tools and tool_installer.is_install_supported():
                 if not install_button.winfo_manager():
                     install_button.pack(side="right", padx=(0, Spacing.XS))
             else:
@@ -740,7 +740,7 @@ class SettingsTab(ctk.CTkFrame):
         if not missing_tools:
             return
 
-        if not tool_installer.is_winget_available():
+        if not tool_installer.is_install_supported():
             messagebox.showerror(
                 t("settings.toolHealthInstallTitle"),
                 t("settings.toolHealthInstallNoWinget"),
@@ -768,6 +768,20 @@ class SettingsTab(ctk.CTkFrame):
         # Tool status refreshes immediately (in-process PATH was already merged
         # by install_missing_tools), no application restart required.
         self._refresh_tool_health()
+
+        # On Linux the installer intentionally does not run a privileged command; it
+        # returns the one to run. That is guidance, not a failure, so show the command
+        # instead of a "some tools failed" warning.
+        manual_command = next(
+            (outcome.manual_command for outcome in results.values() if outcome.manual_command),
+            None,
+        )
+        if manual_command:
+            messagebox.showinfo(
+                t("settings.toolHealthInstallTitle"),
+                t("settings.toolHealthInstallManual", command=manual_command),
+            )
+            return
 
         if failed_tools:
             messagebox.showwarning(

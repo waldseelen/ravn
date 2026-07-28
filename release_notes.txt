@@ -1,32 +1,53 @@
-# RAVN v1.3.0 - Cross-Platform Verification
+# RAVN v1.4.0 - Tools Included, Linux Packaging Prep
 
-This release moves RAVN from Windows-first to genuinely cross-platform: the full test suite
-now runs on Linux, macOS, and Windows in CI on every push and pull request, and two real
-platform-specific bugs found during that work are fixed. Packaged (downloadable) releases
-remain Windows-only for now; Linux/macOS packaging is a tracked follow-up (see TASKS.md).
+The headline fix: **RAVN now ships its external tools inside the download.** Previously you
+could unzip a release, launch it, and be told `yt-dlp` and `aria2c` were missing — only FFmpeg
+was actually bundled. The Settings "install missing tools" button was doing work that the
+package should have done for you. Now the tools come in the zip, the app finds them in its own
+folder on launch, and that button is the fallback it was always meant to be.
+
+This release also lays the groundwork for Linux: a real packaging workflow, a headless CLI
+executable, and install guidance for `apt`/`dnf`/`pacman`.
 
 ## Key Changes
 
-* RAVN is now maintained as a cross-platform product. `tests.yml` runs the full pytest suite
-  on Linux, macOS, and Windows on every push/PR, and the project's docs (README, ARCHITECTURE,
-  PROGRESS, AGENTS, CLAUDE.md) have been updated to reflect that.
-* Fixed a real bug where `yt-dlp`'s self-update path always downloaded the Windows `yt-dlp.exe`
-  release asset regardless of OS, silently leaving a non-executable binary in place on
-  Linux/macOS. It now downloads the correct asset per platform and marks it executable on
-  POSIX.
-* Fixed "open with player" doing nothing on macOS (it fell through to `xdg-open`, which
-  doesn't exist there) — now uses `open` on macOS, `xdg-open` on Linux, `os.startfile` on
-  Windows.
-* `ravn.spec`'s Windows-only literals (hardcoded CRT DLL paths, the `version_info.txt`
-  PyInstaller argument) are now gated so a future non-Windows PyInstaller build doesn't
-  hard-fail on them.
+* **External tools ship with the release and are detected automatically.** `build.ps1` now
+  fetches `aria2c.exe` and `yt-dlp.exe` alongside FFmpeg into `assets/`, and the packaged app
+  resolves them from its own directory — no install step, no first-run download. If you delete
+  them or run from source, RAVN falls back to your system copies exactly as before.
+* **New `ravn tools` command** shows each tool's status, where it resolved from, its version,
+  and whether it came from the bundle or your system. Use it to answer "why does it say
+  missing?" without opening the app.
+* **`ravn-cli` is now part of the package.** The command-line interface previously required a
+  Python environment; it now ships as its own executable next to `RAVN.exe`.
+* **Linux packaging workflow added** (manual-dispatch): builds a PyInstaller folder plus
+  `tar.gz` and SHA-256, bundles the Linux `yt-dlp` binary, and is written to smoke-test both
+  the CLI and the GUI (under a virtual display) before publishing artifacts. It has **not yet
+  been run on a real runner** — that is the gate before Linux artifacts are attached to any
+  release.
+* **Install guidance on Linux**: RAVN detects `apt`/`dnf`/`pacman` and shows the exact command
+  to run, e.g. `sudo apt-get install -y ffmpeg aria2`. It intentionally does not run `sudo`
+  itself — a desktop app has nowhere to prompt you for a password, so it would just hang.
+
+## Fixes
+
+* `pyinstaller ravn.spec` failed outright on any machine without the Visual C++ redistributable
+  at one hardcoded path. Those DLLs are now included only when present.
+* Removed a `ravn.spec` reference to `aria2p`, a library RAVN deliberately does not depend on
+  (torrent support runs the `aria2c` binary directly) — it could break builds from a clean
+  environment.
+* Fixed more tests that only passed depending on which OS ran them.
 
 ## Not in This Release
 
-* Packaged Linux (AppImage/tar.gz) or macOS (.app/.dmg) builds — the app itself now runs
-  cross-platform, but pre-built downloadable artifacts are still Windows-only.
-* A native Linux/macOS backend for the one-click tool installer (currently `winget`-only;
-  degrades gracefully to a clean "not available" message on non-Windows rather than crashing).
+* **A downloadable Linux or macOS build.** The Linux packaging workflow exists but is
+  deliberately manual-only and not attached to this release: it has not yet been proven on a
+  real runner, and shipping an unverified binary would be worse than shipping none. macOS
+  packaging has not started.
+* **Bundled `ffmpeg`/`aria2c` on Linux** — only `yt-dlp` is bundled there. A static FFmpeg
+  build carries GPL obligations and a second binary pipeline to maintain, and both tools are a
+  single package-manager command away.
+* **`brew` support** in the tool installer (macOS), which remains a tracked follow-up.
 
 ## Installation
 
@@ -35,8 +56,11 @@ RAVN is shipped as a portable executable for Windows.
 2. Extract the folder and launch `RAVN.exe`.
 3. Verify the download against `RAVN-windows-x64.sha256.txt` if you'd like to confirm integrity.
 
+FFmpeg, FFprobe, yt-dlp, and aria2c are included in the zip — nothing else to install. Run
+`ravn-cli.exe tools` from the extracted folder to confirm what was detected.
+
 Note: Windows SmartScreen may appear on first run depending on the code-signing certificate's
 accumulated reputation. Click "More info" then "Run anyway" if the checksum matches.
 
-Running from source works on Linux and macOS today (see DEPENDENCIES.md); there is no
-packaged build for those platforms in this release.
+Running from source works on Linux and macOS today (see DEPENDENCIES.md); there is no packaged
+build for those platforms in this release.

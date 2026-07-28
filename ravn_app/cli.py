@@ -14,6 +14,8 @@ from typing import Optional
 import click
 from click.core import ParameterSource
 
+from ravn_app import __version__
+from ravn_app.core import tool_installer
 from ravn_app.core.converter import (
     AudioCodec,
     CodecManager,
@@ -41,6 +43,8 @@ from ravn_app.core.runners import AudioMixerRunner, AudioTrack, FFmpegRunner, Vi
 from ravn_app.core.subtitle_manager import SubtitleEmbedder
 from ravn_app.core.tool_health import check_tool_availability, get_tool_health_checker
 from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
+from ravn_app.utils import bundled_tools
+from ravn_app.utils.bundled_tools import configure_bundled_tools_path
 from ravn_app.utils.ffmpeg_checker import configure_ffmpeg_runtime
 
 # ---------------------------------------------------------------------------
@@ -371,9 +375,12 @@ def _resolve_download_cli_settings(
 # ---------------------------------------------------------------------------
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="ravn")
+@click.version_option(version=__version__, prog_name="ravn")
 def cli():
     """RAVN — Media download and conversion tool."""
+    # Same bundled-tool resolution the desktop app does, so the packaged CLI works
+    # from a freshly unzipped build without anything installed system-wide.
+    configure_bundled_tools_path()
     configure_ffmpeg_runtime()
 
 
@@ -1745,6 +1752,65 @@ def utilities_cmd(
 # ---------------------------------------------------------------------------
 # ravn serve  (placeholder)
 # ---------------------------------------------------------------------------
+
+@cli.command("tools")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")
+def tools_cmd(as_json: bool):
+    """
+    Report external tool availability (ffmpeg, ffprobe, yt-dlp, aria2c).
+
+    Answers "why does RAVN say a tool is missing?" without opening the GUI: it shows
+    where each tool resolved from, so a bundled copy can be told apart from a
+    system-installed one. On Linux it also prints the command to install what is
+    missing. Doubles as the headless check that a packaged build found its own tools.
+    """
+    checker = get_tool_health_checker()
+    checker.clear_cache()
+    summary = checker.get_health_summary()
+
+    tools_payload = {}
+    for tool_name, tool_info in summary["tools"].items():
+        tools_payload[tool_name] = {
+            "status": tool_info.status.value,
+            "path": tool_info.path,
+            "version": tool_info.version,
+            "required": tool_info.required,
+            "bundled": bool(bundled_tools.find_tool(tool_name)),
+        }
+
+    missing = summary["missing_required"] + summary["missing_optional"]
+    install_command = tool_installer.get_manual_install_command(missing) if missing else None
+
+    if as_json:
+        _output(
+            {
+                "overall_status": summary["overall_status"],
+                "available": summary["available_tools"],
+                "total": summary["total_tools"],
+                "tools": tools_payload,
+                "missing": missing,
+                "install_command": install_command,
+            },
+            as_json=True,
+        )
+        return
+
+    for tool_name, info in tools_payload.items():
+        marker = "OK " if info["status"] == "available" else "-- "
+        origin = " (bundled)" if info["bundled"] else ""
+        click.echo(f"{marker}{tool_name}: {info['status']}{origin}")
+        if info["path"]:
+            click.echo(f"     path: {info['path']}")
+        if info["version"]:
+            click.echo(f"     version: {info['version']}")
+
+    if install_command:
+        click.echo("")
+        click.echo(f"Install missing tools with:\n  {install_command}")
+    elif missing:
+        click.echo("")
+        click.echo(f"Missing: {', '.join(missing)}")
+
 
 @cli.command("serve")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON.")

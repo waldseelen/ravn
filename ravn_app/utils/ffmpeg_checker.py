@@ -3,122 +3,40 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from ravn_app.core.runners.ffmpeg import FFmpegRunner
+from ravn_app.utils import bundled_tools
 
-_PLATFORM_FFMPEG_DIR = {
-    "win32": "win64",
-    "cygwin": "win64",
-    "darwin": "macos",
-}.get(sys.platform, "linux")
+# Re-exported under their historical private names: these were defined here before the
+# lookup was generalized in bundled_tools, and other modules/tests still import them.
+from ravn_app.utils.bundled_tools import binary_name as _binary_name  # noqa: F401
+from ravn_app.utils.bundled_tools import candidate_runtime_roots as _candidate_runtime_roots  # noqa: F401
+from ravn_app.utils.bundled_tools import project_root as _project_root  # noqa: F401
 
-
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _candidate_runtime_roots() -> List[Path]:
-    roots: list[Path] = []
-
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass:
-        roots.append(Path(meipass))
-
-    executable = getattr(sys, "executable", None)
-    if executable:
-        try:
-            roots.append(Path(executable).resolve().parent)
-        except Exception:
-            pass
-
-    roots.append(_project_root())
-
-    unique_roots: list[Path] = []
-    seen: set[str] = set()
-    for root in roots:
-        key = str(root)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_roots.append(root)
-    return unique_roots
-
-
-def _binary_name(tool_name: str) -> str:
-    normalized = str(tool_name or "").strip()
-    if os.name == "nt" and normalized and not normalized.lower().endswith(".exe"):
-        return f"{normalized}.exe"
-    return normalized
+# FFmpeg's bundled binaries live under assets/ffmpeg/<platform>/.
+_FFMPEG_ASSET_SUBDIR = "ffmpeg"
 
 
 def iter_bundled_ffmpeg_dirs() -> Iterable[Path]:
     """Yield candidate bundled-runtime directories in lookup order."""
-    seen: set[str] = set()
-    relative_dirs = (
-        Path("assets") / "ffmpeg" / _PLATFORM_FFMPEG_DIR,
-        Path("ffmpeg") / _PLATFORM_FFMPEG_DIR,
-        Path("assets") / "ffmpeg",
-        Path("ffmpeg"),
-    )
-    for root in _candidate_runtime_roots():
-        for relative_dir in relative_dirs:
-            candidate = root / relative_dir
-            key = str(candidate)
-            if key in seen:
-                continue
-            seen.add(key)
-            yield candidate
+    return bundled_tools.iter_bundled_dirs(_FFMPEG_ASSET_SUBDIR)
 
 
 def find_bundled_tool(tool_name: str) -> Optional[str]:
     """Return bundled executable path if present."""
-    binary_name = _binary_name(tool_name)
-    for directory in iter_bundled_ffmpeg_dirs():
-        candidate = directory / binary_name
-        if candidate.exists() and candidate.is_file():
-            return str(candidate)
-    return None
+    return bundled_tools.find_bundled_binary(tool_name, _FFMPEG_ASSET_SUBDIR)
 
 
 def resolve_tool_path(requested_path: str, tool_name: str) -> str:
     """Resolve a configured tool path, preferring explicit paths, then bundled runtime, then PATH."""
-    normalized = str(requested_path or tool_name).strip() or tool_name
-
-    if any(sep in normalized for sep in (os.sep, "/", "\\")):
-        expanded = Path(normalized).expanduser()
-        if expanded.exists():
-            return str(expanded)
-        return normalized
-
-    if normalized not in {tool_name, _binary_name(tool_name)}:
-        discovered = shutil.which(normalized)
-        return discovered or normalized
-
-    bundled = find_bundled_tool(tool_name)
-    if bundled:
-        return bundled
-
-    discovered = shutil.which(normalized)
-    return discovered or normalized
+    return bundled_tools.resolve_binary_path(requested_path, tool_name, _FFMPEG_ASSET_SUBDIR)
 
 
 def prepend_bundled_ffmpeg_to_path() -> Optional[str]:
     """Ensure bundled FFmpeg directory is visible via PATH for default executable names."""
-    bundled_ffmpeg = find_bundled_tool("ffmpeg")
-    if not bundled_ffmpeg:
-        return None
-
-    bundled_dir = str(Path(bundled_ffmpeg).parent)
-    current_path = os.environ.get("PATH", "")
-    path_parts = current_path.split(os.pathsep) if current_path else []
-    if bundled_dir not in path_parts:
-        os.environ["PATH"] = bundled_dir if not current_path else bundled_dir + os.pathsep + current_path
-    return bundled_dir
+    return bundled_tools.prepend_bundled_dir_to_path("ffmpeg", _FFMPEG_ASSET_SUBDIR)
 
 
 def configure_ffmpeg_runtime(

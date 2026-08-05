@@ -51,7 +51,8 @@ async def lifespan(app: FastAPI):
     from ravn_app.api.deps import _task_queue  # type: ignore[import]
 
     tq = _task_queue()
-    logger.info("RAVN API server starting up (port=%s)", app.state.port)
+    port = getattr(app.state, "port", DEFAULT_PORT)
+    logger.info("RAVN API server starting up (port=%s)", port)
 
     yield  # Application runs here
 

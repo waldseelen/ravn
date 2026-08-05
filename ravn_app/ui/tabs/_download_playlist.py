@@ -1,0 +1,574 @@
+"""Playlist-related behavior for the download tab."""
+
+from __future__ import annotations
+
+import threading
+from pathlib import Path
+from time import perf_counter
+from typing import Any, Dict, List, Optional
+
+import customtkinter as ctk
+
+from ravn_app.core.downloader import DownloadFormat, DownloadQuality
+from ravn_app.core.i18n import t
+from ravn_app.ui.components.playlist_item import PlaylistItemRow
+from ravn_app.ui.components.playlist_sort_dialog import PlaylistSortDialog
+from ravn_app.ui.design_tokens import Colors, Icons
+
+
+class PlaylistMixin:
+    def _get_playlist_entry_quality_metrics(self, entry: Dict[str, Any], quality_label: str) -> Dict[str, Any]:
+        size_by_quality = entry.get("size_by_quality_mb") or {}
+        resolution_by_quality = entry.get("resolution_by_quality") or {}
+        format_note_by_quality = entry.get("format_note_by_quality") or {}
+
+        size_mb = size_by_quality.get(quality_label)
+        resolution = resolution_by_quality.get(quality_label)
+        format_note = format_note_by_quality.get(quality_label)
+
+        best_aliases = (
+            t("download.qualityBest"),
+            "Best",
+            "En Iyi",
+            "En İyi",
+        )
+
+        if size_mb is None or float(size_mb or 0) <= 0:
+            for alias in best_aliases:
+                fallback_size = size_by_quality.get(alias)
+                if alias in size_by_quality and float(fallback_size or 0) > 0:
+                    size_mb = fallback_size
+                    break
+            if size_mb is None or float(size_mb or 0) <= 0:
+                size_mb = entry.get("filesize_mb", 0) or 0
+
+        if resolution is None:
+            for alias in best_aliases:
+                if alias in resolution_by_quality:
+                    resolution = resolution_by_quality.get(alias)
+                    break
+            if resolution is None:
+                resolution = entry.get("resolution", t("common.unknown")) or t("common.unknown")
+
+        if format_note is None:
+            for alias in best_aliases:
+                if alias in format_note_by_quality:
+                    format_note = format_note_by_quality.get(alias)
+                    break
+            if format_note is None:
+                format_note = entry.get("format_note", "") or ""
+
+        return {
+            "size_mb": float(size_mb or 0),
+            "resolution": str(resolution),
+            "format_note": str(format_note),
+        }
+
+    def _build_playlist_detail_text(self, entry: Dict[str, Any], quality_label: str) -> str:
+        duration = self._format_duration(entry.get("duration"))
+        metrics = self._get_playlist_entry_quality_metrics(entry, quality_label)
+        size_mb = metrics["size_mb"]
+        resolution = metrics["resolution"]
+        format_note = metrics["format_note"]
+
+        parts: List[str] = []
+        if duration:
+            parts.append(f"{Icons.HISTORY} {duration}")
+        if resolution and resolution != t("common.unknown"):
+            parts.append(f"{Icons.QUALITY_SELECT} {resolution}")
+        if size_mb > 0:
+            parts.append(f"{Icons.INFO} {self._format_size_from_mb(size_mb)}")
+        if format_note:
+            parts.append(f"{Icons.FORMAT_SELECT} {format_note}")
+        return " • ".join(parts)
+
+    def _clear_playlist_selection(self):
+        self._playlist_detail_fetch_token = int(getattr(self, "_playlist_detail_fetch_token", 0)) + 1
+        self._playlist_detail_fetch_inflight = False
+        self.playlist_entries = []
+        self.playlist_selection_vars = []
+        self.playlist_detail_rows = []
+        self.playlist_source_url = ""
+        self.is_playlist_fetching = False
+        self.is_info_fetching = False
+        self._last_video_info = None
+        self._update_size_estimate()
+
+        for child in self.playlist_list_frame.winfo_children():
+            child.destroy()
+
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            dialog.destroy()
+        self._playlist_sort_dialog_window = None
+
+        self.playlist_frame.pack_forget()
+        restore_text = getattr(self, "_active_btn_restore_text", f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_btn.configure(text=restore_text, state="normal")
+
+    def _update_playlist_summary(self):
+        if not self.playlist_entries or not self.playlist_selection_vars:
+            return
+
+        selected_count = sum(1 for var in self.playlist_selection_vars if var.get())
+        total_count = len(self.playlist_entries)
+        quality_label = self._get_selected_quality_label()
+
+        total_size_mb = 0.0
+        for index, variable in enumerate(self.playlist_selection_vars):
+            if variable.get() and index < len(self.playlist_entries):
+                metrics = self._get_playlist_entry_quality_metrics(
+                    self.playlist_entries[index],
+                    quality_label,
+                )
+                total_size_mb += metrics["size_mb"]
+
+        summary = f"{Icons.QUEUED_STATUS} {t('download.playlistSelectedSummary', selected=selected_count, total=total_count)}"
+        if total_size_mb > 0:
+            summary += f" • {Icons.INFO} ~{self._format_size_from_mb(total_size_mb)} ({quality_label})"
+
+        self.playlist_summary_label.configure(text=summary)
+
+    def _select_all_playlist_items(self):
+        for variable in self.playlist_selection_vars:
+            variable.set(True)
+        self._update_playlist_summary()
+
+    def _clear_all_playlist_items(self):
+        for variable in self.playlist_selection_vars:
+            variable.set(False)
+        self._update_playlist_summary()
+
+    def _get_selected_playlist_entries(self) -> List[Dict[str, Any]]:
+        selected: List[Dict[str, Any]] = []
+        for entry, variable in zip(self.playlist_entries, self.playlist_selection_vars):
+            if variable.get():
+                selected.append(entry)
+        return selected
+
+    def _refresh_playlist_detail_surfaces(self, quality_label: Optional[str] = None) -> None:
+        resolved_quality = quality_label or self._get_selected_quality_label()
+        for item_widget, entry in self.playlist_detail_rows:
+            if hasattr(item_widget, "set_detail_text"):
+                item_widget.set_detail_text(self._build_playlist_detail_text(entry, resolved_quality))
+        self._update_playlist_summary()
+        self._update_size_estimate()
+
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            if hasattr(dialog, "refresh_entries"):
+                dialog.refresh_entries(self.playlist_entries, quality_label=resolved_quality)
+        elif dialog is not None:
+            self._playlist_sort_dialog_window = None
+
+    def _start_playlist_fetch(self, url: str):
+        if self.is_playlist_fetching or self.is_info_fetching:
+            return
+
+        # Playlists always use the video side (format menus, quality menus, etc.)
+        if hasattr(self, "_activate_video_side"):
+            self._activate_video_side()
+
+        self.is_playlist_fetching = True
+        self.error_panel.hide_error()
+        self.download_progress.set(0)
+        self._download_progress_value = 0.0
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        selected_quality = self._get_selected_quality_label()
+        self._start_processing_feedback(t("download.playlistInfoLoading", quality=selected_quality))
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.fetchData')}...")
+            self._set_button_loading_state(fetch_data_btn, is_loading=True)
+        self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.playlistInfoLoading', quality=selected_quality)}")
+        self._set_button_loading_state(self.download_btn, is_loading=True)
+        self._playlist_detail_fetch_token = int(getattr(self, "_playlist_detail_fetch_token", 0)) + 1
+        active_detail_token = self._playlist_detail_fetch_token
+        self._playlist_detail_fetch_inflight = False
+
+        def run_playlist_fetch():
+            progressive_started = perf_counter()
+
+            def on_shallow_ready(entries):
+                self.after(0, self._on_playlist_fetch_complete, url, entries)
+
+            def on_entry_resolved(index, entry):
+                self.after(0, self._on_playlist_entry_resolved, url, index, entry, active_detail_token)
+
+            def is_cancelled():
+                return active_detail_token != getattr(self, "_playlist_detail_fetch_token", 0)
+
+            used_progressive = self.downloader.extract_playlist_entries_progressive(
+                url,
+                quality_label=selected_quality,
+                on_shallow_ready=on_shallow_ready,
+                on_entry_resolved=on_entry_resolved,
+                is_cancelled=is_cancelled,
+            )
+            if used_progressive:
+                self.after(
+                    0,
+                    self._on_playlist_details_all_resolved,
+                    url,
+                    active_detail_token,
+                    perf_counter() - progressive_started,
+                )
+                return
+
+            # Fallback: yt-dlp Python library unavailable -- two blocking subprocess
+            # calls (fast list, then one all-at-once detail pass) as before.
+            entries = self.downloader.extract_playlist_entries(
+                url,
+                quality_label=selected_quality,
+                with_details=False,
+            )
+            self.after(0, self._on_playlist_fetch_complete, url, entries)
+
+            if not entries:
+                return
+
+            detail_started = perf_counter()
+            detailed_entries = self.downloader.extract_playlist_entries(
+                url,
+                quality_label=selected_quality,
+                with_details=True,
+            )
+            self.after(
+                0,
+                self._on_playlist_detail_fetch_complete,
+                url,
+                detailed_entries,
+                active_detail_token,
+                perf_counter() - detail_started,
+            )
+
+        threading.Thread(target=run_playlist_fetch, daemon=True).start()
+
+    def _on_playlist_fetch_complete(self, url: str, entries: List[Dict[str, Any]]):
+        self.is_playlist_fetching = False
+        self._stop_processing_feedback()
+        self._hide_progress()
+        fetch_data_btn = self.__dict__.get("fetch_data_btn")
+        if fetch_data_btn is not None:
+            self._set_button_loading_state(fetch_data_btn, is_loading=False)
+
+        if not entries:
+            self._playlist_detail_fetch_inflight = False
+            self._set_button_loading_state(self.download_btn, is_loading=False)
+            self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+            self.download_status_label.configure(text="")
+            if fetch_data_btn is not None:
+                fetch_data_btn.configure(text=f"{Icons.SEARCH} {t('download.fetchPlaylistData')}")
+            self._show_download_error(
+                t("download.playlistInfoFailed"),
+                "Playlist entries not found",
+            )
+            return
+
+        self.playlist_entries = entries
+        self.playlist_source_url = url
+        self.playlist_selection_vars = [ctk.BooleanVar(value=True) for _ in entries]
+        self.playlist_detail_rows = []
+        self._playlist_detail_fetch_inflight = True
+        quality_label = self._get_selected_quality_label()
+
+        self._set_button_loading_state(self.download_btn, is_loading=False)
+        self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadButton')}")
+        self.download_status_label.configure(text=t("download.playlistSelectionPrompt"))
+        self._set_url_validation_state(Icons.SUCCESS_INDICATOR, Colors.SUCCESS)
+        if fetch_data_btn is not None:
+            fetch_data_btn.configure(text=f"{Icons.REFRESH} {t('download.refreshPlaylistData')}")
+
+        if getattr(self, "_playlist_sort_dialog_enabled", False):
+            self.playlist_frame.pack_forget()
+            self._open_playlist_sort_dialog(entries, quality_label)
+            return
+
+        self._render_inline_playlist_entries(entries, quality_label)
+
+    def _on_playlist_detail_fetch_complete(
+        self,
+        url: str,
+        detailed_entries: List[Dict[str, Any]],
+        detail_token: int,
+        duration_seconds: float,
+    ) -> None:
+        if detail_token != getattr(self, "_playlist_detail_fetch_token", 0):
+            return
+
+        self._playlist_detail_fetch_inflight = False
+        if not detailed_entries or url != self.playlist_source_url or not self.playlist_entries:
+            return
+
+        merged_count = self.downloader.merge_playlist_entry_detail_fields(self.playlist_entries, detailed_entries)
+        if merged_count <= 0:
+            return
+
+        quality_label = self._get_selected_quality_label()
+        self._refresh_playlist_detail_surfaces(quality_label)
+        if hasattr(self, "_record_perf_metric"):
+            self._record_perf_metric(
+                "playlist_detail_enrichment",
+                item_count=len(detailed_entries),
+                duration_seconds=duration_seconds,
+                chunked=False,
+                merged_count=merged_count,
+            )
+
+    _PROGRESSIVE_DETAIL_KEYS = (
+        "filesize_mb",
+        "resolution",
+        "format_note",
+        "size_by_quality_mb",
+        "resolution_by_quality",
+        "format_note_by_quality",
+    )
+
+    def _on_playlist_entry_resolved(self, url: str, index: int, entry: Dict[str, Any], detail_token: int) -> None:
+        """One playlist video's real size/quality just resolved (yt-dlp library
+        progressive path) -- update just that row instead of waiting for every
+        video in the playlist to finish before showing any real numbers."""
+        if detail_token != getattr(self, "_playlist_detail_fetch_token", 0):
+            return
+        if url != self.playlist_source_url or index >= len(self.playlist_entries):
+            return
+
+        self._playlist_detail_fetch_inflight = True
+        for key in self._PROGRESSIVE_DETAIL_KEYS:
+            if key in entry:
+                self.playlist_entries[index][key] = entry[key]
+
+        quality_label = self._get_selected_quality_label()
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            if hasattr(dialog, "update_entry_at_index"):
+                dialog.update_entry_at_index(index, self.playlist_entries[index], quality_label=quality_label)
+            return
+
+        # Inline (non-dialog) render mode: refresh just the one matching row widget.
+        for item_widget, row_entry in self.playlist_detail_rows:
+            if row_entry is self.playlist_entries[index] and hasattr(item_widget, "set_detail_text"):
+                item_widget.set_detail_text(self._build_playlist_detail_text(row_entry, quality_label))
+                break
+        self._update_playlist_summary()
+        self._update_size_estimate()
+
+    def _on_playlist_details_all_resolved(self, url: str, detail_token: int, duration_seconds: float) -> None:
+        """All playlist entries have finished resolving via the progressive path."""
+        if detail_token != getattr(self, "_playlist_detail_fetch_token", 0):
+            return
+
+        self._playlist_detail_fetch_inflight = False
+        dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if dialog is not None and hasattr(dialog, "winfo_exists") and dialog.winfo_exists():
+            if hasattr(dialog, "mark_details_complete"):
+                dialog.mark_details_complete()
+
+        if url != self.playlist_source_url:
+            return
+
+        self._update_playlist_summary()
+        self._update_size_estimate()
+        if hasattr(self, "_record_perf_metric"):
+            self._record_perf_metric(
+                "playlist_detail_enrichment",
+                item_count=len(self.playlist_entries),
+                duration_seconds=duration_seconds,
+                chunked=False,
+                merged_count=len(self.playlist_entries),
+                progressive=True,
+            )
+
+    def _render_inline_playlist_entries(self, entries: List[Dict[str, Any]], quality_label: str):
+        from ravn_app.ui.tabs import download_tab as download_tab_module
+
+        render_started = perf_counter()
+        playlist_item_cls = getattr(download_tab_module, "PlaylistItemRow", PlaylistItemRow)
+
+        existing_after = getattr(self, "_playlist_render_after_id", None)
+        if existing_after and hasattr(self, "after_cancel"):
+            try:
+                self.after_cancel(existing_after)
+            except Exception:
+                pass
+            self._playlist_render_after_id = None
+
+        for child in self.playlist_list_frame.winfo_children():
+            child.destroy()
+
+        self.playlist_detail_rows = []
+        chunk_enabled = bool(getattr(self, "_playlist_inline_chunk_rendering_enabled", False))
+        render_in_chunks = chunk_enabled and len(entries) > 120 and callable(getattr(self, "after", None))
+        batch_size = 40
+        render_batches = 0
+
+        def render_row(index: int, entry: Dict[str, Any]) -> None:
+            variable = self.playlist_selection_vars[index - 1]
+            item_widget = playlist_item_cls(
+                self.playlist_list_frame,
+                index=index,
+                entry=entry,
+                variable=variable,
+                detail_text=self._build_playlist_detail_text(entry, quality_label),
+                on_toggle=self._update_playlist_summary,
+            )
+            item_widget.pack(fill="x", padx=2, pady=1)
+            self.playlist_detail_rows.append((item_widget, entry))
+
+        def finalize_render(chunked: bool, batches: int) -> None:
+            self._update_playlist_summary()
+            columns_frame = getattr(self, "_columns_frame", None)
+            pack_kwargs = {"fill": "x", "padx": 15, "pady": (0, 10)}
+            if columns_frame is not None:
+                pack_kwargs["before"] = columns_frame
+            self.playlist_frame.pack(**pack_kwargs)
+            self.download_btn.configure(text=f"{Icons.DOWNLOAD_BTN} {t('download.downloadSelected')}")
+            if hasattr(self, "_record_perf_metric"):
+                self._record_perf_metric(
+                    "playlist_inline_render",
+                    item_count=len(entries),
+                    duration_seconds=perf_counter() - render_started,
+                    chunked=chunked,
+                    batches=batches,
+                )
+
+        if not render_in_chunks:
+            for index, entry in enumerate(entries, start=1):
+                render_row(index, entry)
+            finalize_render(False, 1 if entries else 0)
+            return
+
+        self._playlist_render_token = int(getattr(self, "_playlist_render_token", 0)) + 1
+        active_token = self._playlist_render_token
+
+        def render_batch(start_index: int = 0) -> None:
+            nonlocal render_batches
+            if active_token != getattr(self, "_playlist_render_token", active_token):
+                return
+
+            render_batches += 1
+            end_index = min(start_index + batch_size, len(entries))
+            for list_index in range(start_index, end_index):
+                render_row(list_index + 1, entries[list_index])
+
+            if end_index < len(entries):
+                self._playlist_render_after_id = self.after(1, lambda: render_batch(end_index))
+                return
+
+            self._playlist_render_after_id = None
+            finalize_render(True, render_batches)
+
+        render_batch(0)
+
+    def _open_playlist_sort_dialog(self, entries: List[Dict[str, Any]], quality_label: str):
+        def on_download(selected_entries: List[Dict[str, Any]]):
+            if not selected_entries:
+                self._show_download_error(t("download.playlistSelectAtLeastOne"), "")
+                return
+            self._start_playlist_download_from_popup(selected_entries)
+
+        existing_dialog = getattr(self, "_playlist_sort_dialog_window", None)
+        if existing_dialog is not None and hasattr(existing_dialog, "winfo_exists") and existing_dialog.winfo_exists():
+            existing_dialog.destroy()
+
+        dialog = PlaylistSortDialog(
+            self,
+            entries=entries,
+            quality_label=quality_label,
+            metrics_getter=self._get_playlist_entry_quality_metrics,
+            duration_formatter=self._format_duration,
+            size_formatter=self._format_size_from_mb,
+            on_download=on_download,
+        )
+        dialog.bind("<Destroy>", lambda _event: setattr(self, "_playlist_sort_dialog_window", None), add="+")
+        self._playlist_sort_dialog_window = dialog
+
+    def _start_playlist_download_from_popup(self, selected_entries: List[Dict[str, Any]]):
+        if hasattr(self, "queue_paused_getter") and callable(self.queue_paused_getter):
+            if self.queue_paused_getter():
+                self._show_download_error(t("download.queuePaused"), "")
+                return
+
+        from ravn_app.ui.tabs import download_tab as download_tab_module
+
+        if hasattr(self, "_resolve_effective_download_selection"):
+            format_type, quality, _audio_bitrate = self._resolve_effective_download_selection(prefer_music=False)
+        else:
+            quality_map = getattr(download_tab_module, "_QUALITY_MAP", {})
+            format_map = getattr(download_tab_module, "_FORMAT_MAP", {})
+            quality = quality_map.get(self.quality_menu.get(), DownloadQuality.BEST)
+            format_type = format_map.get(self.format_menu.get(), DownloadFormat.MP4)
+
+        if hasattr(self, "_resolve_download_output_dir"):
+            output_dir = self._resolve_download_output_dir()
+        else:
+            default_path = self.config_manager.get(
+                "default_download_path",
+                str(Path.home() / "Downloads" / "RAVN"),
+            )
+            output_dir = str(Path(default_path))
+
+        self._start_playlist_download(selected_entries, output_dir, format_type, quality)
+
+    def _start_playlist_download(
+        self,
+        selected_entries: List[Dict[str, Any]],
+        output_dir: str,
+        format_type: DownloadFormat,
+        quality: DownloadQuality,
+    ):
+        total = len(selected_entries)
+        self.error_panel.hide_error()
+        self.download_progress.set(0)
+        self._download_progress_value = 0.0
+        self.download_progress.pack(padx=15, pady=(5, 0), fill="x")
+        self._start_processing_feedback(t("download.downloadLoading"))
+        self.download_btn.configure(text=f"{Icons.RUNNING_STATUS} {t('download.downloadLoading')}...")
+        self._set_button_loading_state(self.download_btn, is_loading=True)
+
+        download_settings = self._get_download_behavior_settings()
+
+        def run_playlist_download():
+            all_files: List[str] = []
+            for index, entry in enumerate(selected_entries, start=1):
+                entry_url = entry.get("url", "")
+                entry_title = entry.get("title", t("download.itemLabel", index=index))
+                if not entry_url:
+                    continue
+
+                def item_progress(percent: int, message: str, current=index, title=entry_title):
+                    overall = int(((current - 1) + max(0, min(100, percent)) / 100.0) / total * 100)
+                    prefix = f"{current}/{total} • {title}"
+                    if message:
+                        self._on_download_progress(overall, f"{prefix} • {message}")
+                    else:
+                        self._on_download_progress(overall, prefix)
+
+                from ravn_app.core.downloader import DownloadRequest
+                req = DownloadRequest(
+                    url=entry_url,
+                    output_dir=output_dir,
+                    format=format_type,
+                    quality=quality,
+                    progress_callback=item_progress,
+                    **download_settings,
+                )
+                result = self.downloader.download(req)
+
+                if not result.success:
+                    self.after(
+                        0,
+                        self._on_download_failure,
+                        t("download.playlistDownloadFailed", index=index, total=total, message=result.error_message),
+                    )
+                    return
+
+                all_files.extend(result.output_files or [])
+
+            class _PlaylistResult:
+                def __init__(self, files: List[str]):
+                    self.output_files = files
+
+            self.after(0, self._on_download_success, _PlaylistResult(all_files))
+
+        threading.Thread(target=run_playlist_download, daemon=True).start()

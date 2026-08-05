@@ -25,7 +25,7 @@ def list_download_history(
     offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
     """Return recent download records, newest first."""
-    records = db.get_download_history(limit=limit, offset=offset)
+    records = db.get_downloads(limit=limit)
     return [
         {
             "id": r.id,
@@ -51,7 +51,7 @@ def list_conversion_history(
     offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
     """Return recent conversion records, newest first."""
-    records = db.get_conversion_history(limit=limit, offset=offset)
+    records = db.get_conversions(limit=limit)
     return [
         {
             "id": r.id,
@@ -69,13 +69,16 @@ def list_conversion_history(
 
 @router.delete("/downloads/{record_id}", summary="Delete a download history record")
 def delete_download_record(record_id: int, db: DbDep) -> Dict[str, Any]:
-    ok = db.delete_download_record(record_id)
-    if not ok:
+    conn = db._require_conn()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM downloads WHERE id = ?", (record_id,))
+    conn.commit()
+    if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail=f"Record {record_id} not found")
     return {"deleted": True, "id": record_id}
 
 
 @router.delete("/downloads", summary="Clear all download history")
 def clear_download_history(db: DbDep) -> Dict[str, Any]:
-    db.clear_download_history()
+    db.clear_history("downloads")
     return {"cleared": True}

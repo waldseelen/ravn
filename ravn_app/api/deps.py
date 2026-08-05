@@ -75,7 +75,7 @@ def get_downloader() -> YouTubeDownloader:
 
 
 def get_db() -> DatabaseManager:
-    return _db_manager()
+    return DatabaseManager()
 
 
 def get_config() -> ConfigManager:

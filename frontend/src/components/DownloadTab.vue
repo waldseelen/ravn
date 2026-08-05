@@ -1,25 +1,25 @@
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="max-w-6xl mx-auto space-y-6">
     <!-- Header / Mode Switcher -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 backdrop-blur p-4 rounded-2xl border border-slate-800 shadow-xl">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#1E1E1E] p-4 rounded-2xl border border-[#3A3330] shadow-xl">
       <div class="flex items-center gap-3">
-        <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
-          <span class="text-2xl">⚡</span>
+        <div class="p-3 bg-[#C99A5B]/10 text-[#C99A5B] rounded-xl border border-[#C99A5B]/20">
+          <span class="text-xl">↓</span>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-100">Media Acquisition & Download</h1>
-          <p class="text-xs text-slate-400">Single URL, Playlists, Batch Links, Magnets & Torrent files</p>
+          <h1 class="text-lg font-bold text-[#E8E0D8]">Media Acquisition</h1>
+          <p class="text-xs text-[#A09080]">Single URL, Playlist Review, Batch Links & Torrent/Magnet</p>
         </div>
       </div>
 
-      <!-- Tabs Mode -->
-      <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <!-- Mode Selector (Orijinal CustomTkinter Modes) -->
+      <div class="flex bg-[#141414] p-1 rounded-xl border border-[#3A3330]">
         <button
           v-for="mode in modes"
           :key="mode.id"
           @click="activeMode = mode.id"
           class="px-4 py-2 text-xs font-semibold rounded-lg transition-all"
-          :class="activeMode === mode.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-slate-200'"
+          :class="activeMode === mode.id ? 'bg-[#C99A5B] text-[#141414] shadow-md' : 'text-[#B8A99A] hover:text-[#E8E0D8]'"
         >
           {{ mode.label }}
         </button>
@@ -28,36 +28,36 @@
 
     <!-- Mode 1: Single URL & Playlist -->
     <div v-if="activeMode === 'single'" class="space-y-6">
-      <div class="bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800 space-y-4">
-        <label class="block text-sm font-semibold text-slate-200">Target Media URL or Playlist Link</label>
+      <div class="bg-[#1E1E1E] p-6 rounded-2xl border border-[#3A3330] space-y-4">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-[#A09080]">Target Media URL or Playlist Link</label>
         <div class="flex gap-3">
           <input
             v-model="singleUrl"
             type="text"
             placeholder="https://www.youtube.com/watch?v=... or playlist link"
-            class="flex-1 px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition"
+            class="flex-1 px-4 py-3 bg-[#141414] border border-[#3A3330] rounded-xl text-[#E8E0D8] placeholder-[#7A6B60] text-xs focus:outline-none focus:border-[#C99A5B]"
           />
           <button
             @click="fetchInfo"
             :disabled="!singleUrl || loadingInfo"
-            class="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-xl border border-slate-700 transition disabled:opacity-50"
+            class="px-5 py-3 bg-[#252525] hover:bg-[#2A2A2A] text-[#E8E0D8] text-xs font-semibold rounded-xl border border-[#3A3330] transition disabled:opacity-50"
           >
             {{ loadingInfo ? 'Analyzing...' : 'Fetch Info' }}
           </button>
           <button
             @click="startSingleDownload"
             :disabled="!singleUrl || downloading"
-            class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+            class="px-8 py-3 bg-[#C99A5B] hover:bg-[#A87C42] text-[#141414] text-xs font-bold rounded-xl shadow-lg shadow-[#C99A5B]/20 transition disabled:opacity-50"
           >
             {{ downloading ? 'Starting...' : 'Download Now' }}
           </button>
         </div>
 
         <!-- Single Options Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-[#3A3330]/50">
           <div>
-            <span class="block text-xs font-medium text-slate-400 mb-1">Format</span>
-            <select v-model="selectedFormat" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200">
+            <span class="block text-[11px] font-semibold text-[#A09080] mb-1">Format</span>
+            <select v-model="selectedFormat" class="w-full bg-[#141414] border border-[#3A3330] rounded-lg px-3 py-2 text-xs text-[#E8E0D8]">
               <option value="mp4">MP4 (Video)</option>
               <option value="mkv">MKV (Video)</option>
               <option value="webm">WebM (Video)</option>
@@ -67,8 +67,8 @@
             </select>
           </div>
           <div>
-            <span class="block text-xs font-medium text-slate-400 mb-1">Quality Preset</span>
-            <select v-model="selectedQuality" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200">
+            <span class="block text-[11px] font-semibold text-[#A09080] mb-1">Quality Preset</span>
+            <select v-model="selectedQuality" class="w-full bg-[#141414] border border-[#3A3330] rounded-lg px-3 py-2 text-xs text-[#E8E0D8]">
               <option value="best">Best Available (Highest)</option>
               <option value="2160p">4K Ultra HD (2160p)</option>
               <option value="1080p">Full HD (1080p)</option>
@@ -77,8 +77,8 @@
             </select>
           </div>
           <div>
-            <span class="block text-xs font-medium text-slate-400 mb-1">Naming Template</span>
-            <select v-model="namingTemplate" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200">
+            <span class="block text-[11px] font-semibold text-[#A09080] mb-1">Naming Template</span>
+            <select v-model="namingTemplate" class="w-full bg-[#141414] border border-[#3A3330] rounded-lg px-3 py-2 text-xs text-[#E8E0D8]">
               <option value="default">{title} [{id}]</option>
               <option value="clean">{title}</option>
               <option value="numbered">{playlist_index} - {title}</option>
@@ -86,12 +86,12 @@
             </select>
           </div>
           <div class="flex flex-col justify-end space-y-2">
-            <label class="flex items-center gap-2 text-xs text-slate-300">
-              <input v-model="embedMetadata" type="checkbox" class="rounded bg-slate-950 border-slate-800 text-indigo-600" />
+            <label class="flex items-center gap-2 text-xs text-[#B8A99A]">
+              <input v-model="embedMetadata" type="checkbox" class="rounded bg-[#141414] border-[#3A3330] text-[#C99A5B]" />
               Embed Metadata & Cover
             </label>
-            <label class="flex items-center gap-2 text-xs text-slate-300">
-              <input v-model="embedSubtitles" type="checkbox" class="rounded bg-slate-950 border-slate-800 text-indigo-600" />
+            <label class="flex items-center gap-2 text-xs text-[#B8A99A]">
+              <input v-model="embedSubtitles" type="checkbox" class="rounded bg-[#141414] border-[#3A3330] text-[#C99A5B]" />
               Download Subtitles (.srt)
             </label>
           </div>
@@ -99,18 +99,18 @@
       </div>
 
       <!-- Playlist Preview / Extracted Info Panel -->
-      <div v-if="mediaInfo" class="bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800 space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 class="text-sm font-semibold text-slate-200">Media Preview & Metadata</h3>
-          <span class="text-xs text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 font-mono">
+      <div v-if="mediaInfo" class="bg-[#1E1E1E] p-6 rounded-2xl border border-[#3A3330] space-y-4">
+        <div class="flex items-center justify-between border-b border-[#3A3330] pb-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-[#E8E0D8]">Media Preview & Metadata</h3>
+          <span class="text-[10px] text-[#C99A5B] bg-[#C99A5B]/10 px-2.5 py-1 rounded-full border border-[#C99A5B]/20 font-mono">
             {{ mediaInfo.extractor || 'yt-dlp' }}
           </span>
         </div>
         <div class="flex gap-4">
-          <img v-if="mediaInfo.thumbnail" :src="mediaInfo.thumbnail" class="w-40 h-24 object-cover rounded-xl border border-slate-800" />
+          <img v-if="mediaInfo.thumbnail" :src="mediaInfo.thumbnail" class="w-40 h-24 object-cover rounded-xl border border-[#3A3330]" />
           <div class="space-y-1">
-            <h4 class="text-base font-semibold text-slate-100">{{ mediaInfo.title }}</h4>
-            <p class="text-xs text-slate-400">Uploader: {{ mediaInfo.uploader || 'N/A' }} | Duration: {{ mediaInfo.duration || 'N/A' }}s</p>
+            <h4 class="text-sm font-bold text-[#E8E0D8]">{{ mediaInfo.title }}</h4>
+            <p class="text-xs text-[#A09080]">Uploader: {{ mediaInfo.uploader || 'N/A' }} | Duration: {{ mediaInfo.duration || 'N/A' }}s</p>
           </div>
         </div>
       </div>
@@ -118,23 +118,23 @@
 
     <!-- Mode 2: Torrent & Magnet -->
     <div v-if="activeMode === 'torrent'" class="space-y-6">
-      <div class="bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800 space-y-4">
-        <h3 class="text-sm font-semibold text-slate-200">Magnet URI or Torrent File</h3>
+      <div class="bg-[#1E1E1E] p-6 rounded-2xl border border-[#3A3330] space-y-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-[#E8E0D8]">Magnet URI or Torrent File</h3>
         <div class="flex gap-3">
           <input
             v-model="torrentUri"
             type="text"
             placeholder="magnet:?xt=urn:btih:... or path to .torrent file"
-            class="flex-1 px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+            class="flex-1 px-4 py-3 bg-[#141414] border border-[#3A3330] rounded-xl text-[#E8E0D8] text-xs focus:outline-none focus:border-[#C99A5B]"
           />
-          <button @click="startTorrentDownload" class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition">
+          <button @click="startTorrentDownload" class="px-8 py-3 bg-[#22c55e] hover:bg-[#16a34a] text-[#141414] font-bold text-xs rounded-xl shadow-lg transition">
             Start Torrent
           </button>
         </div>
-        <div class="flex gap-6 text-xs text-slate-400 pt-2">
+        <div class="flex gap-6 text-xs text-[#B8A99A] pt-2">
           <label class="flex items-center gap-2">
-            Mode:
-            <select v-model="torrentMode" class="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200">
+            Download Mode:
+            <select v-model="torrentMode" class="bg-[#141414] border border-[#3A3330] rounded px-2 py-1 text-xs text-[#E8E0D8]">
               <option value="FULL">FULL (Complete Download)</option>
               <option value="SEQUENTIAL">SEQUENTIAL (Ordered for Playback)</option>
               <option value="STREAM">STREAM (Local HTTP Stream)</option>
@@ -145,16 +145,16 @@
     </div>
 
     <!-- Mode 3: Batch Links -->
-    <div v-if="activeMode === 'batch'" class="space-y-4 bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800">
-      <h3 class="text-sm font-semibold text-slate-200">Batch Links (One URL per line)</h3>
+    <div v-if="activeMode === 'batch'" class="space-y-4 bg-[#1E1E1E] p-6 rounded-2xl border border-[#3A3330]">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-[#E8E0D8]">Batch Links (One URL per line)</h3>
       <textarea
         v-model="batchUrls"
         rows="6"
         placeholder="https://www.youtube.com/watch?v=1&#10;https://www.youtube.com/watch?v=2"
-        class="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500"
+        class="w-full p-4 bg-[#141414] border border-[#3A3330] rounded-xl text-[#E8E0D8] text-xs font-mono focus:outline-none focus:border-[#C99A5B]"
       ></textarea>
       <div class="flex justify-end">
-        <button @click="startBatchDownload" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl">
+        <button @click="startBatchDownload" class="px-8 py-3 bg-[#C99A5B] hover:bg-[#A87C42] text-[#141414] font-bold text-xs rounded-xl shadow-lg">
           Process Batch Queue
         </button>
       </div>

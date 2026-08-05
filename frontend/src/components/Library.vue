@@ -1,29 +1,35 @@
 <template>
-  <div class="p-6 max-w-6xl mx-auto space-y-6">
-    <div class="flex justify-between items-center border-b border-slate-700 pb-4">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-100">Media Library</h1>
-        <p class="text-sm text-slate-400">Browse and manage your downloaded and converted media files.</p>
+  <div class="max-w-6xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-[#1E1E1E] p-4 rounded-2xl border border-[#3A3330] shadow-xl">
+      <div class="flex items-center gap-3">
+        <div class="p-3 bg-[#C99A5B]/10 text-[#C99A5B] rounded-xl border border-[#C99A5B]/20">
+          <span class="text-xl">▦</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-[#E8E0D8]">Media Library</h1>
+          <p class="text-xs text-[#A09080]">Browse, search, and manage your local media history</p>
+        </div>
       </div>
-      <button @click="fetchHistory" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm font-medium">
-        Refresh
+      <button @click="fetchHistory" class="px-4 py-2 bg-[#252525] hover:bg-[#2A2A2A] border border-[#3A3330] rounded-xl text-xs font-semibold text-[#E8E0D8]">
+        Refresh Library
       </button>
     </div>
 
-    <!-- Search & Filter -->
+    <!-- Search & Filter Bar -->
     <div class="flex gap-4">
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search title, format, or path..."
-        class="flex-1 px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500"
+        placeholder="Search by title, format, or file path..."
+        class="flex-1 px-4 py-3 bg-[#141414] border border-[#3A3330] rounded-xl text-[#E8E0D8] text-xs focus:outline-none focus:border-[#C99A5B]"
       />
     </div>
 
     <!-- Media Table -->
-    <div class="bg-slate-800/60 rounded-xl border border-slate-700 overflow-hidden">
-      <table class="w-full text-left text-sm text-slate-300">
-        <thead class="bg-slate-800 text-slate-400 font-semibold border-b border-slate-700">
+    <div class="bg-[#1E1E1E] rounded-2xl border border-[#3A3330] overflow-hidden shadow-xl">
+      <table class="w-full text-left text-xs text-[#B8A99A]">
+        <thead class="bg-[#141414] text-[#A09080] font-bold uppercase tracking-wider border-b border-[#3A3330]">
           <tr>
             <th class="p-4">Title / Source</th>
             <th class="p-4">Format</th>
@@ -32,24 +38,24 @@
             <th class="p-4 text-right">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-700/50">
+        <tbody class="divide-y divide-[#3A3330]/50">
           <tr v-if="filteredRecords.length === 0">
-            <td colspan="5" class="p-8 text-center text-slate-500">
-              No media records found.
+            <td colspan="5" class="p-8 text-center text-[#A09080]">
+              No media records found in local library.
             </td>
           </tr>
-          <tr v-for="item in filteredRecords" :key="item.id" class="hover:bg-slate-800/40">
-            <td class="p-4 font-medium text-slate-200">
+          <tr v-for="item in filteredRecords" :key="item.id" class="hover:bg-[#252525]">
+            <td class="p-4 font-semibold text-[#E8E0D8]">
               <div class="truncate max-w-md">{{ item.title || item.url }}</div>
-              <div class="text-xs text-slate-500 truncate max-w-md">{{ item.file_path }}</div>
+              <div class="text-[10px] text-[#A09080] font-mono truncate max-w-md">{{ item.file_path }}</div>
             </td>
-            <td class="p-4 font-mono text-xs uppercase">{{ item.format || 'N/A' }}</td>
+            <td class="p-4 font-mono text-xs uppercase text-[#C99A5B]">{{ item.format || 'N/A' }}</td>
             <td class="p-4 font-mono text-xs">{{ item.quality || 'N/A' }}</td>
-            <td class="p-4 text-xs text-slate-400">{{ item.download_date || 'N/A' }}</td>
+            <td class="p-4 text-xs text-[#A09080]">{{ item.download_date || 'N/A' }}</td>
             <td class="p-4 text-right">
               <button
                 @click="deleteRecord(item.id)"
-                class="px-3 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded text-xs"
+                class="px-3 py-1 bg-[#ef4444]/10 text-[#ef4444] hover:bg-[#ef4444]/20 rounded text-[11px] font-semibold border border-[#ef4444]/20"
               >
                 Delete
               </button>

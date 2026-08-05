@@ -1,7 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  /* RAVN Nordic Brass Design System Tokens */
+  --bg-primary: #141414;
+  --bg-surface: #1E1E1E;
+  --bg-card: #252525;
+  --bg-input: #2D2D2D;
+  --bg-hover: #2A2A2A;
+
+  --accent-brass: #C99A5B;
+  --accent-brass-hover: #A87C42;
+  --accent-brass-light: #D8AC6E;
+  --accent-beige: #E0CBB3;
+
+  --text-primary: #E8E0D8;
+  --text-secondary: #B8A99A;
+  --text-muted: #A09080;
+
+  --border-subtle: #3A3330;
+  --border-strong: #5A4A40;
+  --border-brass: #C99A5B;
+
+  --status-success: #22c55e;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-purple: #a855f7;
+  --status-blue: #3b82f6;
+
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -12,6 +38,22 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Custom Scrollbars matching CTk style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: #3A3330;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-brass);
 }

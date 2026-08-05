@@ -43,6 +43,49 @@ RAVN is a cross-platform desktop + CLI media pipeline with:
 - Update `README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and `TASKS.md` together when repo reality changes.
 - Keep settings compact, themes limited to `dark` / `light`, and torrent mode semantics stable.
 
+## Tauri Frontend Migration — Critical Guardrails
+
+> These rules exist because previous agents repeatedly violated them. **Non-negotiable.**
+
+### ⛔ RENK PALETİ — TEK KAYNAK: `style.css` CSS DEĞİŞKENLERİ
+- **YASAK:** Tailwind renk sınıfları (`bg-slate-*`, `text-purple-*`, `bg-rose-*`, `bg-cyan-*`, `bg-teal-*`, `bg-indigo-*`, `bg-amber-*`) Vue bileşenlerinde kullanmak.
+- **DOĞRU:** `var(--bg-primary)`, `var(--accent-brass)`, `var(--bg-card)` vb. CSS custom properties kullanmak.
+- **DOĞRULAMA:** `grep -r "bg-slate\|bg-purple\|bg-rose\|bg-cyan\|bg-teal\|bg-indigo\|bg-amber" frontend/src/components/` → 0 sonuç.
+- **NEDEN:** 6 bileşen (ConverterTab, SubtitleTab, FiltersTab, MixerTab, UtilitiesTab, QueuePanel) Tailwind renkleriyle yazıldı ve tema tutarsızlığı yarattı.
+
+### ⛔ STUB / PLACEHOLDER / ALERT YASAĞI
+- **YASAK:** `alert()`, `console.log("TODO")`, `setTimeout` mock, "Coming soon" placeholder.
+- **DOĞRU:** Her buton ya gerçek API çağrısı yapar, ya da `disabled` + tooltip gösterir.
+- **DOĞRULAMA:** `grep -r "alert(" frontend/src/components/` → 0 sonuç.
+- **NEDEN:** 5 Studio bileşeni tamamen `alert()` stub'larıyla teslim edildi, kullanıcıya fonksiyonel gösterildi.
+
+### ⛔ MOCK DATA YASAĞI
+- **YASAK:** Statik dosya yolları (`C:/Downloads/sample_video.mkv`), sahte istatistikler, hardcoded durum rozetleri.
+- **DOĞRU:** Backend API'den gerçek veri çek. API yoksa önce endpoint yaz.
+- **NEDEN:** ConverterTab mock path kullanıyordu, Settings araç durumları hardcoded idi.
+
+### ⛔ GIT İŞLEM YASAĞI
+- **YASAK:** `git commit`, `git push`, `git tag` — kullanıcı açıkça istemeden YAPMA.
+- **NEDEN:** Daha önce test edilmeden commit atıldı.
+
+### ⛔ CUSTOMTKINTER REFERANS ZORUNLULUĞU
+- Bir Vue bileşeni yazarken veya düzenlerken, orijinal CustomTkinter Python dosyasını **MUTLAKA** oku.
+- Ezberden veya varsayımla yazma. Orijinal dosya yolları `TASKS.md` → KURAL-8'de listelenmiştir.
+- **NEDEN:** Önceki portta features atlandı çünkü orijinal kod okunmadan yazıldı.
+
+### Referans Dosya Yolları (Tauri Frontend)
+- Frontend bileşenleri: `frontend/src/components/*.vue`
+- Stil tanımları: `frontend/src/style.css`
+- API istemcisi: `frontend/src/services/apiClient.ts`
+- Pinia store: `frontend/src/stores/downloadStore.ts`
+- Backend API routers: `ravn_app/api/routers/`
+- Orijinal CustomTkinter UI: `ravn_app/ui/tabs/`, `ravn_app/ui/components/`
+- Design tokens: `ravn_app/ui/design_tokens.py`
+
+### Görev Takibi
+Tauri Frontend Migration görev listesi `TASKS.md` → "TAURI FRONTEND MİGRASYON" bölümündedir.
+9 Phase (P0–P8), ~100+ subtask. Phase sırası ve bağımlılıklar orada belgelidir.
+
 ## Verification
 
 Primary checks:

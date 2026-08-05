@@ -28,24 +28,23 @@ class SettingsPatchRequest(BaseModel):
 
 @router.get("/", summary="Return all current application settings")
 def get_settings(config: ConfigDep) -> Dict[str, Any]:
-    return config.get_config()
+    return config.config
 
 
 @router.patch("/", summary="Update one or more settings keys")
 def patch_settings(body: SettingsPatchRequest, config: ConfigDep) -> Dict[str, Any]:
     """
-    Merge the provided keys into the existing config.  Unknown keys are
-    accepted (the config schema is open-ended on the backend side).
+    Merge the provided keys into the existing config.
     Returns the full updated config.
     """
-    current = config.get_config()
-    current.update(body.data)
-    config.save_config(current)
+    for key, value in body.data.items():
+        config.config[key] = value
+    config.save_config()
     logger.info("Settings updated: keys=%s", list(body.data.keys()))
-    return current
+    return config.config
 
 
 @router.post("/reset", summary="Reset all settings to application defaults")
 def reset_settings(config: ConfigDep) -> Dict[str, Any]:
-    config.reset_to_defaults()
-    return config.get_config()
+    config.reset()
+    return config.config

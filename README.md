@@ -21,7 +21,7 @@
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white">
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows&logoColor=white">
-  <img alt="UI" src="https://img.shields.io/badge/UI-CustomTkinter-1F6FEB">
+  <img alt="UI" src="https://img.shields.io/badge/UI-Tauri%20v2%20%7C%20Vue%203-4FC08D?logo=vuedotjs&logoColor=white">
   <img alt="CLI" src="https://img.shields.io/badge/CLI-Click-6C47FF">
 </p>
 

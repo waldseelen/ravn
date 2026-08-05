@@ -10,7 +10,7 @@ from typing import Callable, Optional
 
 import customtkinter as ctk
 
-from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.converter import (
     AudioBitrate,
     CodecManager,

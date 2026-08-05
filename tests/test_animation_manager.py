@@ -8,7 +8,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from ravn_app.core.animation_manager import AnimationManager, EasingFunction, detect_reduced_motion
+from ravn_app.ui.animation_manager import AnimationManager, EasingFunction, detect_reduced_motion
 
 
 class TestEasingFunction(unittest.TestCase):
@@ -134,19 +134,19 @@ class TestAnimationManager(unittest.TestCase):
         r2, g2, b2 = self.manager._hex_to_rgb("ffffff")
         self.assertEqual((r1, g1, b1), (r2, g2, b2))
 
-    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Light")
+    @patch("ravn_app.ui.animation_manager.ctk.get_appearance_mode", return_value="Light")
     def test_hex_to_rgb_resolves_tuple_light_mode(self, _appearance_mode):
         """Tuple color tokens should resolve to light-mode entry."""
         rgb = self.manager._hex_to_rgb(("#112233", "#445566"))
         self.assertEqual(rgb, (17, 34, 51))
 
-    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    @patch("ravn_app.ui.animation_manager.ctk.get_appearance_mode", return_value="Dark")
     def test_hex_to_rgb_resolves_tuple_dark_mode(self, _appearance_mode):
         """Tuple color tokens should resolve to dark-mode entry."""
         rgb = self.manager._hex_to_rgb(("#112233", "#445566"))
         self.assertEqual(rgb, (68, 85, 102))
 
-    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    @patch("ravn_app.ui.animation_manager.ctk.get_appearance_mode", return_value="Dark")
     def test_hex_to_rgb_resolves_list_dark_mode(self, _appearance_mode):
         """List color tokens should resolve to dark-mode entry."""
         rgb = self.manager._hex_to_rgb(["#001122", "#334455"])
@@ -157,13 +157,13 @@ class TestAnimationManager(unittest.TestCase):
         rgb = self.manager._hex_to_rgb("not-a-color")
         self.assertEqual(rgb, (255, 255, 255))
 
-    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    @patch("ravn_app.ui.animation_manager.ctk.get_appearance_mode", return_value="Dark")
     def test_interpolate_hex_with_tuple_tokens(self, _appearance_mode):
         """Color interpolation should resolve tuple tokens deterministically."""
         color = self.manager._interpolate_hex(("#000000", "#101010"), ("#ffffff", "#f0f0f0"), 0.5)
         self.assertEqual(color.lower(), "#808080")
 
-    @patch("ravn_app.core.animation_manager.ctk.get_appearance_mode", return_value="Dark")
+    @patch("ravn_app.ui.animation_manager.ctk.get_appearance_mode", return_value="Dark")
     def test_animate_color_transition_reduced_motion_resolves_tuple_end_color(self, _appearance_mode):
         """Reduced-motion path should resolve tuple end colors before configure."""
         self.manager.set_reduced_motion(True)

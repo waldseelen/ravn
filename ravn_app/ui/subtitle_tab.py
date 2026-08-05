@@ -12,7 +12,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.i18n import t
 from ravn_app.ui.components.error_panel import ErrorPanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing

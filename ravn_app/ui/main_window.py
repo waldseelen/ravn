@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import customtkinter as ctk
 
-from ravn_app.core.animation_manager import get_animation_manager
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.database import ConfigManager, DatabaseManager
 from ravn_app.core.downloader import YouTubeDownloader
 from ravn_app.core.i18n import get_i18n, t

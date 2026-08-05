@@ -46,9 +46,11 @@ class AppBuilder:
 
     def check_requirements(self) -> bool:
         """PyInstaller ve gerekli bağımlılıkları kontrol et"""
+        # NOTE(tauri-migration): customtkinter removed — the Tkinter UI is being replaced
+        # by the Tauri frontend.  Only the Python backend (PyInstaller) and core media
+        # libraries are required here.
         required_packages = {
             'PyInstaller': 'PyInstaller',
-            'customtkinter': 'customtkinter',
             'yt-dlp': 'yt_dlp',
             'pillow': 'PIL',
         }
@@ -154,8 +156,9 @@ class AppBuilder:
                 cmd.append(f'--icon={icon_path}')
 
             # Gizli içe aktarmalar
+            # NOTE(tauri-migration): customtkinter removed — Tkinter UI is being
+            # replaced by the Tauri frontend.  Add Tauri sidecar hidden imports here.
             hidden_imports = [
-                'customtkinter',
                 'PIL',
                 'yt_dlp',
             ]

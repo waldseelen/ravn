@@ -1,0 +1,357 @@
+# Handoff: Migrate RAVN GUI from Tkinter to Tauri
+
+## Project Goal
+
+The goal is **not** to rewrite the application.
+
+The goal is to replace the current **Tkinter desktop UI** with a modern **Tauri-based frontend**, while preserving the existing Python backend and business logic.
+
+The Python codebase should remain the single source of truth.
+
+---
+
+# High-Level Architecture
+
+Current:
+
+```text
+Tkinter
+    │
+Python Application
+    │
+Download / Metadata / Library / FFmpeg / yt-dlp
+```
+
+Target:
+
+```text
+Tauri (Frontend)
+        │
+ IPC / Local API
+        │
+Python Backend
+        │
+Core Business Logic
+        │
+yt-dlp / FFmpeg / Database / Filesystem
+```
+
+The backend should not know whether requests come from:
+
+* CLI
+* Tauri Desktop
+* future Web UI
+* automated scripts
+
+Everything should use the same Python core.
+
+---
+
+# Migration Principles
+
+## DO NOT rewrite business logic.
+
+Keep:
+
+* download engine
+* metadata processing
+* queue management
+* library management
+* filesystem operations
+* configuration
+* ffmpeg integration
+* yt-dlp integration
+
+Only replace the presentation layer.
+
+---
+
+## Separate responsibilities
+
+Python should become:
+
+```
+backend/
+    core/
+    services/
+    models/
+    api/
+```
+
+Frontend should become:
+
+```
+frontend/
+    src/
+        components/
+        pages/
+        stores/
+        services/
+```
+
+---
+
+# Desired Desktop Experience
+
+The new UI should feel like a modern native application.
+
+Desired features:
+
+* Sidebar navigation
+* Responsive layout
+* Dark/light themes
+* Smooth animations
+* Search everywhere
+* Keyboard shortcuts
+* Toast notifications
+* Progress indicators
+* Multi-download queue
+* Rich tables
+* Better settings UI
+
+---
+
+# Major Screens
+
+## Dashboard
+
+Show:
+
+* active downloads
+* completed downloads
+* failed downloads
+* queue length
+* storage usage
+* recent activity
+
+---
+
+## Download Queue
+
+Must support:
+
+* pause
+* resume
+* cancel
+* reorder
+* retry
+* progress
+* ETA
+* speed
+* status
+
+---
+
+## Library
+
+Modern searchable table.
+
+Features:
+
+* filtering
+* sorting
+* multiple selection
+* context menu
+* metadata preview
+
+---
+
+## Metadata Editor
+
+Should support editing metadata without opening external tools.
+
+---
+
+## Settings
+
+Organized into categories.
+
+Avoid long scrolling pages.
+
+---
+
+## Logs
+
+Real-time log viewer.
+
+Support:
+
+* filtering
+* searching
+* copying
+
+---
+
+# Backend Requirements
+
+The backend should expose a clean interface.
+
+Avoid GUI-specific code.
+
+Instead of:
+
+```
+Tkinter Button
+        ↓
+Business Logic
+```
+
+Use:
+
+```
+Frontend Event
+        ↓
+Backend API
+        ↓
+Business Logic
+```
+
+The business layer should never depend on UI code.
+
+---
+
+# Communication
+
+The frontend should communicate with Python through a clean abstraction.
+
+Possible implementations:
+
+* subprocess
+* local HTTP API
+* IPC
+
+Choose whichever best fits the existing architecture.
+
+The communication layer should be isolated.
+
+---
+
+# CLI Compatibility
+
+The CLI is a first-class citizen.
+
+The same backend must power both:
+
+```
+ravn download ...
+```
+
+and
+
+Desktop UI.
+
+No duplicated logic.
+
+---
+
+# Suggested Folder Structure
+
+```
+project/
+
+backend/
+    core/
+    services/
+    models/
+    api/
+
+frontend/
+    src/
+        components/
+        pages/
+        stores/
+        services/
+
+src-tauri/
+
+docs/
+```
+
+---
+
+# Technology Preferences
+
+Desktop:
+
+* Tauri v2
+
+Frontend:
+
+* Vue 3
+* Vite
+* TypeScript
+* Tailwind CSS
+
+Recommended libraries:
+
+* Pinia
+* Vue Router
+* TanStack Table
+* VueUse
+
+Python:
+
+* Existing codebase
+* No framework rewrite unless necessary
+
+---
+
+# UX Goals
+
+The application should feel similar to modern desktop software rather than a traditional Tkinter application.
+
+Priorities:
+
+* fast startup
+* low memory usage
+* smooth interaction
+* native menus
+* drag & drop
+* keyboard-first workflow
+
+---
+
+# Migration Strategy
+
+Do not perform a big-bang rewrite.
+
+Instead:
+
+Phase 1
+
+* isolate backend
+* remove GUI dependencies
+
+Phase 2
+
+* create Tauri shell
+
+Phase 3
+
+* connect backend
+
+Phase 4
+
+* migrate pages one by one
+
+Phase 5
+
+* remove Tkinter
+
+This minimizes regressions.
+
+---
+
+# Expectations for the AI Agent
+
+Before writing code:
+
+1. Understand the current architecture.
+2. Identify business logic mixed with Tkinter.
+3. Propose extraction/refactoring where necessary.
+4. Preserve behavior.
+5. Avoid unnecessary rewrites.
+6. Keep commits small and reviewable.
+7. Prefer incremental migration over replacing large parts of the codebase.
+
+The objective is to modernize the desktop application while keeping the existing Python engine stable, reusable, and maintainable.

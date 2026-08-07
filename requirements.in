@@ -15,7 +15,7 @@ mutagen>=1.47.0          # audio metadata tagging
 
 # --- API transport (Tauri frontend IPC) ---
 fastapi>=0.100.0          # HTTP/WebSocket transport layer for the Tauri frontend
-uvicorn[standard]>=0.23.0 # ASGI server (sidecar mode for packaged builds)
+uvicorn[standard]>=0.52.1 # ASGI server (sidecar mode for packaged builds)
 
 # --- Desktop extras (Windows-first, legacy Tkinter UI) ---
 # NOTE(tauri-migration): tkinterdnd2 and pystray are removed once the Tauri UI lands.

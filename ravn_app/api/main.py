@@ -149,6 +149,9 @@ def create_app() -> FastAPI:
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str):
+            from fastapi import HTTPException
+            if full_path.startswith("api/") or full_path.startswith("ws/"):
+                raise HTTPException(status_code=404, detail=f"API route '{full_path}' not found")
             # If requesting an existing static file in dist root (e.g. favicon.ico)
             target_file = dist_dir / full_path
             if full_path and target_file.is_file():

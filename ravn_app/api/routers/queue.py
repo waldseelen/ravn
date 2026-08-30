@@ -49,6 +49,7 @@ def _task_to_dict(task: Task) -> Dict[str, Any]:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@router.get("", summary="List all tasks in the queue")
 @router.get("/", summary="List all tasks in the queue")
 def list_tasks(queue: QueueDep) -> List[Dict[str, Any]]:
     """Return all tasks (active, pending, and recently completed)."""

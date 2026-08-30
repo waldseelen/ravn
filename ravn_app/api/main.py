@@ -30,7 +30,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ravn_app.api.routers import downloads, history, queue, settings, studio
+from ravn_app.api.routers import downloads, history, library, queue, settings, studio
 from ravn_app.api.ws import event_bus
 from ravn_app.api.ws import router as ws_router
 from ravn_app.core.logging_config import setup_logging
@@ -61,11 +61,11 @@ async def lifespan(app: FastAPI):
 
 
 # ---------------------------------------------------------------------------
-# App factory
+# Application factory
 # ---------------------------------------------------------------------------
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
+    """Instantiate and configure the FastAPI application."""
     app = FastAPI(
         title="RAVN API",
         description=(
@@ -95,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(downloads.router, prefix="/api/v1")
     app.include_router(queue.router,     prefix="/api/v1")
     app.include_router(history.router,   prefix="/api/v1")
+    app.include_router(library.router,   prefix="/api/v1")
     app.include_router(settings.router,  prefix="/api/v1")
     app.include_router(studio.router,    prefix="/api/v1")
 

@@ -1,6 +1,6 @@
 # Release Status
 
-Verified on 2026-08-30 (`874 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
+Verified on 2026-08-30 (`875 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
 
 RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
 
@@ -59,9 +59,39 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 - Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors**.
 - Test suite updated: **874 passed, 1 skipped** (16 API tests passing).
 
-### Phase 5: Library Workspace Matching — NEXT
-- Split `LibraryTab.vue` and `HistoryTab.vue` workflows.
-- Media library collections, tag filtering, search, and batch actions.
+### Phase 5: Library Workspace Matching ✅ COMPLETE
+- Rebuilt `Library.vue` into a unified tabbed workspace matching `LibraryWorkspace` in CustomTkinter (`Media Library` | `History` segmented tabs) with collapsible quick usage guide.
+- Implemented `frontend/src/components/LibraryTab.vue`:
+  - DND File Import Card with `@tauri-apps/plugin-dialog` file picker, Title & Tag inputs, Add to Library action.
+  - Search & Filter bar: Query, comma-separated tags, format combobox (`All`, `mp4`, `mp3`, `mkv`, `webm`, `wav`, `flac`, `aac`, `mov`), Search & Reset triggers.
+  - Export actions: JSON and CSV catalog export.
+  - Results card: item thumbnail/format badge, Title, Duration, Size, Resolution/Sample Rate, Tags, File Path, `Open File`, `Open Folder`, `Add to Collection`, and `Delete` actions.
+  - Sidebar: Live Stats card (Items, Total size, Collections count, Duplicates count), Collections manager (New collection creator, target collection selector, collection items filter & delete), Recent Searches clickable history.
+  - `ErrorPanel.vue` integration.
+- Implemented `frontend/src/components/HistoryTab.vue`:
+  - Header actions: Detailed statistics dialog modal, Clear history confirmation dialog modal, Refresh.
+  - Live search input & dual filtering (Format: `All`/`MP4`/`MP3`/`MKV`/`AVI`; Status: `All`/`completed`/`failed`/`cancelled`).
+  - Scrollable history cards: Format, Quality, Size, Date, colored status badge (`completed`=green, `failed`=red, `cancelled`=amber), `Open File`, and individual delete actions.
+  - `ErrorPanel.vue` integration.
+- Added FastAPI Library router (`ravn_app/api/routers/library.py`):
+  - `GET /api/v1/library/` (search & filter)
+  - `POST /api/v1/library/add` (import media)
+  - `DELETE /api/v1/library/{media_id}`
+  - `GET /api/v1/library/stats`
+  - `POST /api/v1/library/export` (JSON / CSV export)
+  - `GET /api/v1/library/collections` & `POST /api/v1/library/collections` & `DELETE /api/v1/library/collections/{id}`
+  - `GET /api/v1/library/collections/{id}/items` & `POST /api/v1/library/collections/{id}/items`
+  - `GET /api/v1/library/recent-searches`
+  - `POST /api/v1/library/open-file` & `POST /api/v1/library/open-folder`
+- Zero `alert()` calls, zero forbidden color classes, full Nordic Brass design tokens.
+- Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors**.
+- Full test suite: **875 passed, 1 skipped** (17 API tests passing).
+
+
+### Phase 6: Settings Workspace Matching — NEXT
+- Tool Health status & auto-fix / re-check.
+- Video, audio, subtitle, torrent, and network engine configurations.
+- Theme policy, backup/restore database, cache purger, crash logs.
 
 ---
 

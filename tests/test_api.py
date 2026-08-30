@@ -169,5 +169,61 @@ def test_studio_utilities_endpoint():
     assert "task_id" in data
 
 
+def test_library_endpoints(tmp_path):
+    # 1. Stats
+    res_stats = client.get("/api/v1/library/stats")
+    assert res_stats.status_code == 200
+    assert "total_items" in res_stats.json()
+
+    # 2. Collections
+    res_col = client.post("/api/v1/library/collections", json={"name": "Test Col", "description": "Desc"})
+    assert res_col.status_code == 201
+    col_data = res_col.json()
+    col_id = col_data["id"]
+
+    res_list_col = client.get("/api/v1/library/collections")
+    assert res_list_col.status_code == 200
+    assert any(c["id"] == col_id for c in res_list_col.json())
+
+    # 3. Add Media File
+    test_media = tmp_path / "sample_video.mp4"
+    test_media.write_text("dummy video content")
+
+    res_add = client.post(
+        "/api/v1/library/add",
+        json={"file_path": str(test_media), "title": "Sample Clip", "tags": ["test", "clip"]},
+    )
+    assert res_add.status_code == 201
+    media_id = res_add.json()["media_id"]
+
+    # 4. Search
+    res_search = client.get("/api/v1/library/?q=Sample&tags=test")
+    assert res_search.status_code == 200
+    results = res_search.json()
+    assert any(item["id"] == media_id for item in results)
+
+    # 5. Add to Collection
+    res_add_col = client.post(f"/api/v1/library/collections/{col_id}/items", json={"media_id": media_id})
+    assert res_add_col.status_code == 200
+
+    res_col_items = client.get(f"/api/v1/library/collections/{col_id}/items")
+    assert res_col_items.status_code == 200
+    assert len(res_col_items.json()) >= 1
+
+    # 6. Export
+    export_file = tmp_path / "export.json"
+    res_export = client.post("/api/v1/library/export", json={"format": "json", "output_file": str(export_file)})
+    assert res_export.status_code == 200
+    assert export_file.exists()
+
+    # 7. Delete Item and Collection
+    res_del_media = client.delete(f"/api/v1/library/{media_id}")
+    assert res_del_media.status_code == 200
+
+    res_del_col = client.delete(f"/api/v1/library/collections/{col_id}")
+    assert res_del_col.status_code == 200
+
+
+
 
 

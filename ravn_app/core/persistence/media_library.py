@@ -92,7 +92,7 @@ class MediaLibrary:
         self.search_history_limit = max(int(search_history_limit or 0), 0)
         self.export_batch_size = max(int(export_batch_size or 1), 1)
 
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._create_tables()

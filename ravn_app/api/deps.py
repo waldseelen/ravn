@@ -15,8 +15,10 @@ from fastapi import Depends
 
 from ravn_app.core.database import ConfigManager, DatabaseManager
 from ravn_app.core.downloader import YouTubeDownloader
+from ravn_app.core.persistence.media_library import MediaLibrary
 from ravn_app.core.task_manager import TaskQueue, get_task_queue
 from ravn_app.utils.bundled_tools import find_tool
+from ravn_app.utils.metadata_handler import MetadataHandler
 
 # ---------------------------------------------------------------------------
 # Tool-path resolution (reuses the same lookup chain as the desktop runtime)
@@ -85,8 +87,15 @@ def get_queue() -> TaskQueue:
     return _task_queue()
 
 
+def get_library() -> MediaLibrary:
+    metadata_handler = MetadataHandler(ffmpeg_path=_ffmpeg_path())
+    return MediaLibrary(metadata_handler=metadata_handler)
+
+
 # Typed shortcuts for cleaner router signatures
 DownloaderDep = Annotated[YouTubeDownloader, Depends(get_downloader)]
 DbDep = Annotated[DatabaseManager, Depends(get_db)]
 ConfigDep = Annotated[ConfigManager, Depends(get_config)]
 QueueDep = Annotated[TaskQueue, Depends(get_queue)]
+LibraryDep = Annotated[MediaLibrary, Depends(get_library)]
+

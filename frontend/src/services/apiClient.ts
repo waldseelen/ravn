@@ -215,8 +215,139 @@ export const apiClient = {
     })
     if (!res.ok) throw new Error(await res.text())
     return res.json()
+  },
+
+  // Media Library Workspace APIs
+  async searchLibrary(params?: { q?: string; tags?: string; format?: string; limit?: number; offset?: number }) {
+    const url = new URL(`${API_BASE}/library/`)
+    if (params?.q) url.searchParams.set('q', params.q)
+    if (params?.tags) url.searchParams.set('tags', params.tags)
+    if (params?.format && params.format.toLowerCase() !== 'all') url.searchParams.set('format', params.format)
+    if (params?.limit) url.searchParams.set('limit', String(params.limit))
+    if (params?.offset) url.searchParams.set('offset', String(params.offset))
+
+    const res = await fetch(url.toString())
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async addMediaToLibrary(payload: { file_path: string; title?: string; tags?: string[] }) {
+    const res = await fetch(`${API_BASE}/library/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async deleteMediaFromLibrary(id: number) {
+    const res = await fetch(`${API_BASE}/library/${id}`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async getLibraryStats() {
+    const res = await fetch(`${API_BASE}/library/stats`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async exportLibrary(payload: { format: string; output_file?: string }) {
+    const res = await fetch(`${API_BASE}/library/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async getCollections() {
+    const res = await fetch(`${API_BASE}/library/collections`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async createCollection(payload: { name: string; description?: string }) {
+    const res = await fetch(`${API_BASE}/library/collections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async deleteCollection(id: number) {
+    const res = await fetch(`${API_BASE}/library/collections/${id}`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async getCollectionItems(id: number) {
+    const res = await fetch(`${API_BASE}/library/collections/${id}/items`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async addItemToCollection(collectionId: number, mediaId: number, position?: number) {
+    const res = await fetch(`${API_BASE}/library/collections/${collectionId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ media_id: mediaId, position })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async getRecentLibrarySearches(limit = 10) {
+    const res = await fetch(`${API_BASE}/library/recent-searches?limit=${limit}`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async openFile(path: string) {
+    const res = await fetch(`${API_BASE}/library/open-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async openFolder(path: string) {
+    const res = await fetch(`${API_BASE}/library/open-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async deleteDownloadHistory(recordId: number) {
+    const res = await fetch(`${API_BASE}/history/downloads/${recordId}`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async clearDownloadHistory() {
+    const res = await fetch(`${API_BASE}/history/downloads`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
   }
 }
+
 
 
 export function connectWebSocket(onEvent: (event: string, data: any) => void) {

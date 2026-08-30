@@ -534,32 +534,32 @@ Kaynak: `ravn_app/ui/tabs/utilities_tab.py` — OKU.
 
 ### P5-T1: Library/History Tab Yapısı
 Mevcut `Library.vue`'yu ikiye böl:
-- [ ] `LibraryTab.vue` — Medya kütüphanesi (import, arama, koleksiyonlar).
-- [ ] `HistoryTab.vue` — İndirme geçmişi (filtreleme, temizleme, istatistikler).
-- [ ] Library workspace'de tab navigasyonu: `Media Library` | `History`.
+- [x] `LibraryTab.vue` — Medya kütüphanesi (import, arama, koleksiyonlar).
+- [x] `HistoryTab.vue` — İndirme geçmişi (filtreleme, temizleme, istatistikler).
+- [x] Library workspace'de tab navigasyonu: `Media Library` | `History`.
 
 ### P5-T2: Media Library Tab — Tam İmplementasyon
-- [ ] **İçe Aktarma Bölümü**: File Path (Browse), Title girişi, Tags girişi (virgülle ayrılmış), Add to Library butonu.
-- [ ] **Arama & Filtre Bölümü**: Search query, Search tags, Format combobox (All/mp4/mp3/mkv/webm/wav/flac/aac/mov), Search + Reset butonları.
-- [ ] **Dışa Aktarma**: Export JSON + Export CSV butonları.
-- [ ] **Sonuç Listesi**: Her satırda → kapak görseli, Başlık, Format rozeti, Süre, Dosya Boyutu, Çözünürlük/Sample Rate, Tags, Dosya Yolu, Open File + Open Folder + Add to Collection butonları.
-- [ ] **Sidebar Panelleri**:
+- [x] **İçe Aktarma Bölümü**: File Path (Browse), Title girişi, Tags girişi (virgülle ayrılmış), Add to Library butonu.
+- [x] **Arama & Filtre Bölümü**: Search query, Search tags, Format combobox (All/mp4/mp3/mkv/webm/wav/flac/aac/mov), Search + Reset butonları.
+- [x] **Dışa Aktarma**: Export JSON + Export CSV butonları.
+- [x] **Sonuç Listesi**: Her satırda → kapak görseli, Başlık, Format rozeti, Süre, Dosya Boyutu, Çözünürlük/Sample Rate, Tags, Dosya Yolu, Open File + Open Folder + Add to Collection butonları.
+- [x] **Sidebar Panelleri**:
   - Stats Card: Toplam öğe, Toplam boyut (MB/GB), Koleksiyon sayısı, Yinelenen grup sayısı.
   - Collections Card: Collection Name girişi + Create butonu, Target collection dropdown, Koleksiyon listesi.
   - Recent Searches Card: Önceki aramaların tıklanabilir listesi.
-- [ ] Backend: `GET/POST /api/v1/library/`, `GET /api/v1/library/stats`, `POST /api/v1/library/export`.
+- [x] Backend: `GET/POST /api/v1/library/`, `GET /api/v1/library/stats`, `POST /api/v1/library/export`.
 
 ### P5-T3: History Tab — Tam İmplementasyon
-- [ ] Header: Başlık, Statistics butonu (popup dialog), Clear History butonu (onay dialog'u ile).
-- [ ] Arama & Filtre: Search girişi (canlı), Format combobox (All/MP4/MP3/MKV/AVI), Status combobox (All/completed/failed/cancelled).
-- [ ] Kaydırılabilir geçmiş listesi: Başlık, Format, Kalite, Boyut, Tarih, Status rozeti (completed=yeşil, failed=kırmızı, cancelled=amber), Open File butonu.
-- [ ] Backend: `GET /api/v1/history/downloads`, `DELETE /api/v1/history/clear`, `GET /api/v1/history/stats`.
+- [x] Header: Başlık, Statistics butonu (popup dialog), Clear History butonu (onay dialog'u ile).
+- [x] Arama & Filtre: Search girişi (canlı), Format combobox (All/MP4/MP3/MKV/AVI), Status combobox (All/completed/failed/cancelled).
+- [x] Kaydırılabilir geçmiş listesi: Başlık, Format, Kalite, Boyut, Tarih, Status rozeti (completed=yeşil, failed=kırmızı, cancelled=amber), Open File butonu.
+- [x] Backend: `GET /api/v1/history/downloads`, `DELETE /api/v1/history/clear`, `GET /api/v1/history/stats`.
 
 **P5 Doğrulama Kapısı:**
-- [ ] Library'de dosya import edilebiliyor.
-- [ ] Tags ile arama çalışıyor.
-- [ ] Export JSON butonu dosya indiriyor.
-- [ ] History'de status filtresi çalışıyor.
+- [x] Library'de dosya import edilebiliyor.
+- [x] Tags ile arama çalışıyor.
+- [x] Export JSON butonu dosya indiriyor.
+- [x] History'de status filtresi çalışıyor.
 
 ---
 

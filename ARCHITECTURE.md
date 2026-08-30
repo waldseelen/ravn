@@ -59,20 +59,20 @@ The CLI reuses shared services and shared runners instead of duplicating media l
 
 Primary files:
 
-- `frontend/src/App.vue`
-- `frontend/src/components/HeaderNav.vue`
-- `frontend/src/components/QueuePanel.vue`
-- `frontend/src/components/CommandPalette.vue`
-- `frontend/src/components/ToastManager.vue`
-- `frontend/src/components/ErrorPanel.vue`
-- `frontend/src/components/PlaylistSortDialog.vue`
-- `frontend/src/components/Home.vue`
-- `frontend/src/components/DownloadTab.vue`
-- `frontend/src/components/StudioWorkspace.vue` (ConverterTab, SubtitleTab, FiltersTab, MixerTab, UtilitiesTab)
-- `frontend/src/components/Library.vue` (Tabbed workspace: LibraryTab, HistoryTab)
-- `frontend/src/components/LibraryTab.vue`
-- `frontend/src/components/HistoryTab.vue`
-- `frontend/src/components/Settings.vue`
+- `frontend/src/App.vue` (Desktop Shell, Nav Header, 380px Slide-out Task Queue Drawer)
+- `frontend/src/components/HeaderNav.vue` (Top Header Navigation, Theme Toggle, TR/EN, Command Palette Trigger)
+- `frontend/src/components/QueuePanel.vue` (Full Task Queue View: Status Accent Bars, Animated Spinners/Crosses/Checks, Progress Bars, Cancel/Open Folder Actions)
+- `frontend/src/components/CommandPalette.vue` (`Ctrl+K` Fuzzy Search, Keyboard Nav, Categorized Actions)
+- `frontend/src/components/ToastManager.vue` (Global notifications: success, error, warning, info)
+- `frontend/src/components/ErrorPanel.vue` (Expandable technical error accordion with retry triggers)
+- `frontend/src/components/PlaylistSortDialog.vue` (7-column sortable table, title/duration/popularity filters)
+- `frontend/src/components/Home.vue` (ToolHealth Banner, 6 Quick Actions, 4 Live Metric Cards, Recent Operations)
+- `frontend/src/components/DownloadTab.vue` (Source Auto-Classifier, Platform Presets, 2-Column Audio/Video, Batch, Torrents)
+- `frontend/src/components/StudioWorkspace.vue` (5-Card Launcher + ConverterTab, SubtitleTab, FiltersTab, MixerTab, UtilitiesTab)
+- `frontend/src/components/Library.vue` (Segmented Tab Shell: Media Library & History tabs, Quick Guide)
+- `frontend/src/components/LibraryTab.vue` (DND File Import, Catalog Search/Filter, Tagging, JSON/CSV Export, Collections)
+- `frontend/src/components/HistoryTab.vue` (Live Search, Format/Status Filters, Detailed Stats Modal, Clear Confirmation)
+- `frontend/src/components/Settings.vue` (Tool Health Cards & Auto-Install, General & Live Themes, Output Paths, Subtitles, ID3/Metadata, Post-Process, Robustness Limits, Collapsible Cookies/Network Tuning, Engines, Reset Modal, JSON Export/Import)
 
 Responsibilities:
 
@@ -87,13 +87,13 @@ Responsibilities:
 Primary files:
 
 - `ravn_app/api/main.py`
-- `ravn_app/api/routers/downloads.py`
-- `ravn_app/api/routers/history.py`
-- `ravn_app/api/routers/library.py`
-- `ravn_app/api/routers/queue.py`
-- `ravn_app/api/routers/settings.py`
-- `ravn_app/api/routers/studio.py`
-- `ravn_app/api/ws.py`
+- `ravn_app/api/routers/downloads.py` (Single, Playlist, Batch, Torrent endpoints)
+- `ravn_app/api/routers/history.py` (Recent items, Stats, Operations, Clear)
+- `ravn_app/api/routers/library.py` (CRUD, Search/Filter, Collections, JSON/CSV Export, Open File/Folder)
+- `ravn_app/api/routers/queue.py` (Queue snapshots, Pause, Resume, Cancel, Clear Completed)
+- `ravn_app/api/routers/settings.py` (Get, Patch, Reset, GitHub Update Check, Missing Tools Auto-Install, JSON Export/Import)
+- `ravn_app/api/routers/studio.py` (Convert, Subtitles, Filters, Mixer, Utilities)
+- `ravn_app/api/ws.py` (WebSocket events broadcaster)
 
 Responsibilities:
 

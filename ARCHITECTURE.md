@@ -87,13 +87,13 @@ Responsibilities:
 Primary files:
 
 - `ravn_app/api/main.py`
-- `ravn_app/api/routers/downloads.py` (Single, Playlist, Batch, Torrent endpoints)
-- `ravn_app/api/routers/history.py` (Recent items, Stats, Operations, Clear)
-- `ravn_app/api/routers/library.py` (CRUD, Search/Filter, Collections, JSON/CSV Export, Open File/Folder)
-- `ravn_app/api/routers/queue.py` (Queue snapshots, Pause, Resume, Cancel, Clear Completed)
-- `ravn_app/api/routers/settings.py` (Get, Patch, Reset, GitHub Update Check, Missing Tools Auto-Install, JSON Export/Import)
-- `ravn_app/api/routers/studio.py` (Convert, Subtitles, Filters, Mixer, Utilities)
-- `ravn_app/api/ws.py` (WebSocket events broadcaster)
+- `ravn_app/api/routers/downloads.py` (`/downloads/start`, `/downloads/info`, `/downloads/playlist/info`, `/downloads/batch/start`, `/downloads/torrent/start`, `/downloads/torrent/cancel`)
+- `ravn_app/api/routers/history.py` (`/history/downloads`, `/history/conversions`, `/history/stats`, `/history/recent`, `/history/operations`, `/history/clear`, `/history/downloads/{id}`)
+- `ravn_app/api/routers/library.py` (`/library/` search/filter/add, `/library/add`, `/library/{id}`, `/library/stats`, `/library/export`, `/library/collections`, `/library/collections/{id}`, `/library/collections/{id}/items`, `/library/recent-searches`, `/library/open-file`, `/library/open-folder`)
+- `ravn_app/api/routers/queue.py` (`/queue/`, `/queue/{id}/cancel`, `/queue/completed`, `/queue/pause`, `/queue/resume`)
+- `ravn_app/api/routers/settings.py` (`/settings/`, `/settings/reset`, `/settings/updates/check`, `/settings/tools/install`, `/settings/export`, `/settings/import`)
+- `ravn_app/api/routers/studio.py` (`/convert/start`, `/convert/cancel`, `/subtitle/download`, `/subtitle/process`, `/filters/apply`, `/mixer/run`, `/utilities/run`)
+- `ravn_app/api/ws.py` (WebSocket real-time events broadcaster at `/ws/events`)
 
 Responsibilities:
 

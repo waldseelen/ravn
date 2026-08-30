@@ -568,82 +568,82 @@ Mevcut `Library.vue`'yu ikiye böl:
 > Kaynak: `ravn_app/ui/tabs/settings_tab.py` — TAMAMINI OKU (uzun dosya).
 
 ### P6-T1: Araç Sağlık Bölümü — Dinamik
-- [ ] `GET /api/v1/health` çağrısı ile gerçek sürüm, yol, durum bilgisi al.
-- [ ] Her araç için ayrı kart: ffmpeg, ffprobe, yt-dlp, aria2c.
-- [ ] Kart içeriği: Sürüm numarası, Yol, Etkilenen özellikler listesi.
-- [ ] Refresh butonu.
-- [ ] Install Missing Tools butonu (platform-aware komut gösterimi).
-- [ ] Statik "Available"/"Optional" rozetlerini SİL.
+- [x] `GET /api/v1/health` çağrısı ile gerçek sürüm, yol, durum bilgisi al.
+- [x] Her araç için ayrı kart: ffmpeg, ffprobe, yt-dlp, aria2c.
+- [x] Kart içeriği: Sürüm numarası, Yol, Etkilenen özellikler listesi.
+- [x] Refresh butonu.
+- [x] Install Missing Tools butonu (platform-aware komut gösterimi).
+- [x] Statik "Available"/"Optional" rozetlerini SİL.
 
 ### P6-T2: Genel Ayarlar
-- [ ] Tema Seçici: `Nordic Dark` / `Nordic Light` dropdown → `data-theme` değiştirir.
-- [ ] Dil Seçici: `Türkçe` / `English` dropdown.
-- [ ] Checkboxlar: Notifications Enabled, Auto Check for Updates, Crash Reporting.
-- [ ] Güncelleme Kontrol Butonu + Status label (GitHub Releases `waldseelen/ravn` kontrol).
-- [ ] Kapatma Davranışı: `Close to System Tray` / `Close Application Fully` dropdown.
+- [x] Tema Seçici: `Nordic Dark` / `Nordic Light` dropdown → `data-theme` değiştirir.
+- [x] Dil Seçici: `Türkçe` / `English` dropdown.
+- [x] Checkboxlar: Notifications Enabled, Auto Check for Updates, Crash Reporting.
+- [x] Güncelleme Kontrol Butonu + Status label (GitHub Releases `waldseelen/ravn` kontrol).
+- [x] Kapatma Davranışı: `Close to System Tray` / `Close Application Fully` dropdown.
 
 ### P6-T3: İndirme Ayarları
-- [ ] Download Directory (mevcut) + Browse butonu (Tauri `dialog.open`).
-- [ ] Default Format: MP4 / MP3 / MKV dropdown.
-- [ ] Default Quality: Best / 1080p / 720p / 480p dropdown.
-- [ ] Concurrent Downloads: Slider (1–5).
-- [ ] History Limit: Sayı girişi.
+- [x] Download Directory (mevcut) + Browse butonu (Tauri `dialog.open`).
+- [x] Default Format: MP4 / MP3 / MKV dropdown.
+- [x] Default Quality: Best / 1080p / 720p / 480p dropdown.
+- [x] Concurrent Downloads: Slider (1–5).
+- [x] History Limit: Sayı girişi.
 
 ### P6-T4: Altyazı Ayarları
-- [ ] Auto Subtitles checkbox.
-- [ ] Preferred Subtitle Language dropdown (tr/en/de/fr/es).
-- [ ] Subtitle Fallback Language dropdown.
-- [ ] Include Auto-generated checkbox.
-- [ ] Auto Embed Subtitles checkbox.
+- [x] Auto Subtitles checkbox.
+- [x] Preferred Subtitle Language dropdown (tr/en/de/fr/es).
+- [x] Subtitle Fallback Language dropdown.
+- [x] Include Auto-generated checkbox.
+- [x] Auto Embed Subtitles checkbox.
 
 ### P6-T5: Metadata & Sıralama Ayarları
-- [ ] Embed Metadata checkbox (mevcut).
-- [ ] Auto Sort Downloads checkbox.
-- [ ] Download Naming Preset: Standard / Clean / Playlist dropdown.
-- [ ] Filename Template girişi (düzenlenebilir).
+- [x] Embed Metadata checkbox (mevcut).
+- [x] Auto Sort Downloads checkbox.
+- [x] Download Naming Preset: Standard / Clean / Playlist dropdown.
+- [x] Filename Template girişi (düzenlenebilir).
 
 ### P6-T6: Post-Process Ayarları
-- [ ] Extract Audio checkbox.
-- [ ] Audio Format dropdown.
-- [ ] Audio Bitrate dropdown.
-- [ ] Convert Video checkbox.
-- [ ] Convert Format dropdown.
-- [ ] Embed Subtitles checkbox.
+- [x] Extract Audio checkbox.
+- [x] Audio Format dropdown.
+- [x] Audio Bitrate dropdown.
+- [x] Convert Video checkbox.
+- [x] Convert Format dropdown.
+- [x] Embed Subtitles checkbox.
 
 ### P6-T7: Güvenilirlik Ayarları
-- [ ] Enable Download Archive checkbox.
-- [ ] Detect Duplicates checkbox.
-- [ ] Continue Partial Downloads checkbox.
-- [ ] Format Fallback checkbox.
-- [ ] Download Rate Limit girişi (KB/s).
+- [x] Enable Download Archive checkbox.
+- [x] Detect Duplicates checkbox.
+- [x] Continue Partial Downloads checkbox.
+- [x] Format Fallback checkbox.
+- [x] Download Rate Limit girişi (KB/s).
 
 ### P6-T8: Gelişmiş İndirme Ayarları (Katlanır Panel)
-- [ ] Cookies Mode: None / Browser / File dropdown.
-- [ ] Cookies Browser: chrome / firefox / edge / safari / brave / chromium / opera dropdown.
-- [ ] Browser Profile girişi.
-- [ ] Cookies File girişi + Browse butonu.
-- [ ] Concurrent Fragments girişi.
-- [ ] Fragment Retries girişi.
-- [ ] Socket Timeout girişi (saniye).
+- [x] Cookies Mode: None / Browser / File dropdown.
+- [x] Cookies Browser: chrome / firefox / edge / safari / brave / chromium / opera dropdown.
+- [x] Browser Profile girişi.
+- [x] Cookies File girişi + Browse butonu.
+- [x] Concurrent Fragments girişi.
+- [x] Fragment Retries girişi.
+- [x] Socket Timeout girişi (saniye).
 
 ### P6-T9: Torrent & Dönüştürme Ayarları
-- [ ] aria2c Path girişi.
-- [ ] Seed Time girişi (dakika).
-- [ ] Max Connections girişi.
-- [ ] FFmpeg Path girişi.
-- [ ] Auto Cleanup checkbox.
+- [x] aria2c Path girişi.
+- [x] Seed Time girişi (dakika).
+- [x] Max Connections girişi.
+- [x] FFmpeg Path girişi.
+- [x] Auto Cleanup checkbox.
 
 ### P6-T10: Ayar Eylemleri
-- [ ] Save Settings butonu (mevcut).
-- [ ] Reset Settings butonu (varsayılana döndür).
-- [ ] Export Settings (JSON) butonu.
-- [ ] Import Settings (JSON) butonu (Tauri `dialog.open`).
+- [x] Save Settings butonu (mevcut).
+- [x] Reset Settings butonu (varsayılana döndür).
+- [x] Export Settings (JSON) butonu.
+- [x] Import Settings (JSON) butonu (Tauri `dialog.open`).
 
 **P6 Doğrulama Kapısı:**
-- [ ] Araç kartlarında gerçek sürüm numarası görünüyor.
-- [ ] Tema değişince tüm sayfa anında renk değiştiriyor.
-- [ ] Export Settings butonu JSON dosyası indiriyor.
-- [ ] Tüm ayarlar `PATCH /api/v1/settings/` ile kaydediliyor.
+- [x] Araç kartlarında gerçek sürüm numarası görünüyor.
+- [x] Tema değişince tüm sayfa anında renk değiştiriyor.
+- [x] Export Settings butonu JSON dosyası indiriyor.
+- [x] Tüm ayarlar `PATCH /api/v1/settings/` ile kaydediliyor.
 
 ---
 

@@ -224,6 +224,44 @@ def test_library_endpoints(tmp_path):
     assert res_del_col.status_code == 200
 
 
+def test_settings_extended_endpoints(tmp_path):
+    # 1. Get settings
+    res = client.get("/api/v1/settings/")
+    assert res.status_code == 200
+    assert "theme" in res.json()
+
+    # 2. Patch settings
+    patch_res = client.patch("/api/v1/settings/", json={"data": {"default_format": "MKV", "history_limit": 500}})
+    assert patch_res.status_code == 200
+    assert patch_res.json()["default_format"] == "MKV"
+
+    # 3. Export settings
+    export_file = tmp_path / "settings_export.json"
+    exp_res = client.post("/api/v1/settings/export", json={"output_file": str(export_file)})
+    assert exp_res.status_code == 200
+    assert export_file.exists()
+
+    # 4. Import settings
+    imp_res = client.post("/api/v1/settings/import", json={"file_path": str(export_file)})
+    assert imp_res.status_code == 200
+    assert imp_res.json()["config"]["default_format"] == "MKV"
+
+    # 5. Direct data import
+    data_imp = client.post("/api/v1/settings/import", json={"data": {"theme": "light"}})
+    assert data_imp.status_code == 200
+    assert data_imp.json()["config"]["theme"] == "light"
+
+    # 6. Check updates endpoint
+    update_res = client.get("/api/v1/settings/updates/check")
+    assert update_res.status_code == 200
+    assert "current_version" in update_res.json()
+
+    # 7. Reset settings
+    reset_res = client.post("/api/v1/settings/reset")
+    assert reset_res.status_code == 200
+
+
+
 
 
 

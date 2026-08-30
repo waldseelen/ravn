@@ -1,6 +1,6 @@
 # Release Status
 
-Verified on 2026-08-30 (`875 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
+Verified on 2026-08-30 (`876 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
 
 RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
 
@@ -87,11 +87,33 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 - Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors**.
 - Full test suite: **875 passed, 1 skipped** (17 API tests passing).
 
+### Phase 6: Settings Workspace Matching ✅ COMPLETE
+- Rebuilt `frontend/src/components/Settings.vue` matching the full CustomTkinter `SettingsTab`:
+  - **Tool Health Diagnostics**: Live dependency checker card (`GET /api/v1/health`) for `ffmpeg`, `ffprobe`, `yt-dlp`, and `aria2c` with real versions, paths, operational status, and affected features; background `Install Missing Tools` auto-installer.
+  - **General Settings**: Theme switcher (`Nordic Dark` / `Nordic Light` live `data-theme` updates), Language dropdown (`TR`/`EN`), Close Behavior (`Close to System Tray` vs `Close Application Fully`), and notification/update/crash toggles.
+  - **Update Manager**: GitHub Releases integration (`GET /api/v1/settings/updates/check`) with live status badge and manual update check.
+  - **Download & Storage**: Output directory picker (Tauri `dialog.open`), Default format (MP4/MP3/MKV), Default quality (Best/1080p/720p/480p), Concurrent downloads slider (1-5), and History limit.
+  - **Subtitle Preferences**: Preferred language, Fallback language, Auto-generated inclusion, Auto-download, and Auto-embed toggles.
+  - **Metadata & Naming**: Embed metadata/ID3, Auto-sort by channel, Naming presets (`Standard`, `Clean`, `Playlist`), and custom filename template.
+  - **Post-Process & Reliability**: Extract audio (format/bitrate), Convert video, Archive download registry, Duplicate detection, Resume partial, Fallback format, and Rate limit (KB/s).
+  - **Advanced Network & Cookies (Collapsible)**: Cookies mode (`None`, `Browser`, `File`), browser profiles, cookie file picker, concurrent fragments, fragment retries, and socket timeouts.
+  - **Engine & Torrent**: aria2c path, seed time, max connections, ffmpeg path, and auto-cleanup.
+  - **Actions & Persistence**: Save settings (`PATCH /api/v1/settings/`), Reset to defaults modal (`POST /api/v1/settings/reset`), JSON Export (`POST /api/v1/settings/export`), and JSON Import (`POST /api/v1/settings/import`).
+- Extended FastAPI Settings router (`ravn_app/api/routers/settings.py`):
+  - `GET /api/v1/settings/updates/check` (GitHub release check via UpdateManager)
+  - `POST /api/v1/settings/tools/install` (Winget / package manager auto-installer)
+  - `POST /api/v1/settings/export` (JSON config file exporter)
+  - `POST /api/v1/settings/import` (JSON config file / payload importer)
+- Zero `alert()` calls, zero forbidden color classes, full Nordic Brass design tokens.
+- Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors** (1.80s).
+- Full test suite: **876 passed, 1 skipped** (18 API tests passing).
 
-### Phase 6: Settings Workspace Matching — NEXT
-- Tool Health status & auto-fix / re-check.
-- Video, audio, subtitle, torrent, and network engine configurations.
-- Theme policy, backup/restore database, cache purger, crash logs.
+
+### Phase 7: Queue Panel Workspace Matching — NEXT
+- QueueItemWidget redraw with status color indicator line.
+- Progress bar, speed/ETA/size metrics, active item actions.
+- Animated state icons (running spinner, success check, failed cross).
+
 
 ---
 

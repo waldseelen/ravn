@@ -106,6 +106,51 @@ export const apiClient = {
     return res.json()
   },
 
+  async resetSettings() {
+    const res = await fetch(`${API_BASE}/settings/reset`, {
+      method: 'POST'
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async checkUpdates() {
+    const res = await fetch(`${API_BASE}/settings/updates/check`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async installTools(tools?: string[]) {
+    const res = await fetch(`${API_BASE}/settings/tools/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tools })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async exportSettings(output_file?: string) {
+    const res = await fetch(`${API_BASE}/settings/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ output_file })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async importSettings(payload: { file_path?: string; data?: Record<string, any> }) {
+    const res = await fetch(`${API_BASE}/settings/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+
   // Studio Workspace APIs
   async startConversion(payload: {
     input_file: string

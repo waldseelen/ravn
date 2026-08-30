@@ -5,9 +5,13 @@ export interface DownloadTask {
   id: string
   type: string
   name: string
-  status: 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  status: 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused'
   progress: number
   progress_message: string
+  started_at?: string
+  completed_at?: string
+  output_path?: string
+  error_message?: string
   result?: {
     success: boolean
     output_path?: string

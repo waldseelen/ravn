@@ -652,25 +652,25 @@ Mevcut `Library.vue`'yu ikiye böl:
 > Kaynak: `ravn_app/ui/queue_panel.py`, `ravn_app/ui/tabs/queue_tab.py`
 
 ### P7-T1: QueueItemWidget Yeniden Yapımı
-- [ ] Sol kenarda renkli durum çizgisi (running=brass, completed=green, failed=red, queued=gray).
-- [ ] Durum ikonu animasyonları:
+- [x] Sol kenarda renkli durum çizgisi (running=brass, completed=green, failed=red, queued=gray).
+- [x] Durum ikonu animasyonları:
   - Running: dönen spinner `⟳`.
   - Failed: titreşen hata ikonu `✕`.
   - Success: beliren onay işareti `✓`.
-- [ ] Task adı + durum metni (yüzde, hız, süre veya hata mesajı).
-- [ ] Progress bar (running görevler için).
-- [ ] Aksiyon butonu: Cancel (running için), Open Folder (completed için).
+- [x] Task adı + durum metni (yüzde, hız, süre veya hata mesajı).
+- [x] Progress bar (running görevler için).
+- [x] Aksiyon butonu: Cancel (running için), Open Folder (completed için).
 
 ### P7-T2: Kuyruk Yönetimi
-- [ ] Pause Queue / Resume Queue butonları (mevcut — korunu).
-- [ ] Clear Completed butonu.
-- [ ] Boş durum widget'ı (kuyruk boşken illüstrasyon).
-- [ ] Header stats: `Active: N • Queued: N • Completed: N`.
+- [x] Pause Queue / Resume Queue butonları (mevcut — korunu).
+- [x] Clear Completed butonu.
+- [x] Boş durum widget'ı (kuyruk boşken illüstrasyon).
+- [x] Header stats: `Active: N • Queued: N • Completed: N`.
 
 **P7 Doğrulama Kapısı:**
-- [ ] Aktif indirme sırasında spinner dönüyor.
-- [ ] Tamamlanan görevde Open Folder tıklanıyor.
-- [ ] Clear Completed tüm bitmiş görevleri temizliyor.
+- [x] Aktif indirme sırasında spinner dönüyor.
+- [x] Tamamlanan görevde Open Folder tıklanıyor.
+- [x] Clear Completed tüm bitmiş görevleri temizliyor.
 
 ---
 

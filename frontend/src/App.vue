@@ -419,21 +419,53 @@ onUnmounted(() => {
           <div
             v-for="task in downloadStore.tasks"
             :key="task.id"
-            class="p-3 rounded-xl border flex flex-col gap-2 transition"
+            class="p-3 rounded-xl border flex flex-col gap-2 transition relative overflow-hidden"
             style="background-color: var(--bg-card); border-color: var(--border-subtle);"
           >
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2 min-w-0">
+            <!-- Left Accent Bar -->
+            <div
+              class="absolute left-0 top-0 bottom-0 w-1"
+              :style="{ backgroundColor: getStatusColor(task.status) }"
+            ></div>
+
+            <div class="flex items-center justify-between gap-2 pl-1.5">
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <!-- State Icon -->
                 <span
-                  class="w-2 h-2 rounded-full shrink-0"
-                  :style="{ backgroundColor: getStatusColor(task.status) }"
-                ></span>
+                  v-if="task.status === 'running'"
+                  class="animate-spin text-xs font-bold shrink-0"
+                  style="color: var(--status-running);"
+                >
+                  ⟳
+                </span>
+                <span
+                  v-else-if="task.status === 'completed'"
+                  class="text-xs font-bold shrink-0"
+                  style="color: var(--status-done);"
+                >
+                  ✓
+                </span>
+                <span
+                  v-else-if="task.status === 'failed'"
+                  class="text-xs font-bold shrink-0 animate-pulse"
+                  style="color: var(--status-error);"
+                >
+                  ✕
+                </span>
+                <span
+                  v-else
+                  class="text-xs shrink-0"
+                  style="color: var(--status-queued);"
+                >
+                  ⏳
+                </span>
+
                 <span class="text-xs font-bold truncate" style="color: var(--text-primary);">
                   {{ task.name }}
                 </span>
               </div>
 
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex items-center gap-1.5 shrink-0">
                 <span
                   class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded border"
                   :style="{ color: getStatusColor(task.status), borderColor: getStatusColor(task.status) }"
@@ -441,10 +473,11 @@ onUnmounted(() => {
                   {{ task.status }}
                 </span>
                 <button
-                  v-if="task.status === 'running'"
+                  v-if="task.status === 'running' || task.status === 'queued'"
                   @click="cancelTask(task.id)"
-                  class="text-[10px] px-1.5 py-0.5 rounded"
+                  class="text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition hover:opacity-80"
                   style="background-color: var(--error-bg); color: var(--status-error);"
+                  title="Cancel Task"
                 >
                   ✕
                 </button>
@@ -454,7 +487,7 @@ onUnmounted(() => {
             <!-- Running Progress Bar -->
             <div
               v-if="task.status === 'running'"
-              class="w-full h-1 rounded-full overflow-hidden"
+              class="w-full h-1 rounded-full overflow-hidden ml-1.5"
               style="background-color: var(--bg-input);"
             >
               <div
@@ -463,8 +496,8 @@ onUnmounted(() => {
               ></div>
             </div>
 
-            <div class="flex items-center justify-between text-[10px] font-mono" style="color: var(--text-muted);">
-              <span class="truncate max-w-[220px]">{{ task.progress_message || 'Processing...' }}</span>
+            <div class="flex items-center justify-between text-[10px] font-mono pl-1.5" style="color: var(--text-muted);">
+              <span class="truncate max-w-[200px]">{{ task.progress_message || 'Processing...' }}</span>
               <span v-if="task.progress !== undefined">{{ task.progress }}%</span>
             </div>
           </div>

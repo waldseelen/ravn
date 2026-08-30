@@ -109,10 +109,22 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 - Full test suite: **876 passed, 1 skipped** (18 API tests passing).
 
 
-### Phase 7: Queue Panel Workspace Matching — NEXT
-- QueueItemWidget redraw with status color indicator line.
-- Progress bar, speed/ETA/size metrics, active item actions.
-- Animated state icons (running spinner, success check, failed cross).
+### Phase 7: Queue Panel Workspace Matching ✅ COMPLETE
+- Rebuilt `frontend/src/components/QueuePanel.vue` and `frontend/src/App.vue` Task Queue Drawer matching CustomTkinter `QueueItemWidget`:
+  - **Status Accent Bars**: Vertical indicator line on the left border showing semantic status color (`running`=brass, `completed`=green, `failed`=red, `queued`=gray, `paused`=amber).
+  - **Animated Status Icons**: Rotating spinner `⟳` for running tasks, pulsing cross `✕` for failed tasks, checkmark `✓` for completed tasks, pause `⏸`, and hourglass `⏳` for queued tasks.
+  - **Progress Details**: Real-time progress bar with `--accent-brass` fill, progress message, percentage, and execution duration (e.g. `• 2.4s`).
+  - **Action Controls**: `Cancel` button for active/queued tasks, `Open Folder` button for completed tasks.
+  - **Queue Management**: Header stats (`Active: N • Queued: N • Completed: N`), `Pause Queue` / `Resume Queue` toggles, `Clear Completed` button, and Empty State widget with illustration.
+- Extended `DownloadTask` interface in `frontend/src/stores/downloadStore.ts`.
+- Zero `alert()` calls, zero forbidden color classes, full Nordic Brass design tokens.
+- Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors** (1.49s).
+- Full test suite: **876 passed, 1 skipped** (18 API tests passing).
+
+
+### Phase 8: Backend API Expansion & Polish — NEXT
+- Extended CLI/API parity testing and endpoint validation.
+- Comprehensive end-to-end flow checks across all workspaces.
 
 
 ---

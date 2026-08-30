@@ -1,6 +1,7 @@
 # Release Status
 
-Verified on 2026-08-30 (`876 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
+Verified on 2026-08-30 (`877 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
+
 
 RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
 
@@ -122,9 +123,21 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 - Full test suite: **876 passed, 1 skipped** (18 API tests passing).
 
 
-### Phase 8: Backend API Expansion & Polish — NEXT
-- Extended CLI/API parity testing and endpoint validation.
-- Comprehensive end-to-end flow checks across all workspaces.
+### Phase 8: Backend API Expansion & Polish ✅ COMPLETE
+- Extended and verified all FastAPI endpoints across all 7 workspace routers:
+  - **P8-T1 (Converter API)**: `POST /api/v1/convert/start` (queue task), `POST /api/v1/convert/cancel` (cancel task), WebSocket live progress broadcast.
+  - **P8-T2 (Subtitle API)**: `POST /api/v1/subtitle/download` (yt-dlp subtitle extraction), `POST /api/v1/subtitle/process` (format convert, time shift, mux, hard burn).
+  - **P8-T3 (Filters API)**: `POST /api/v1/filters/apply` (FFmpeg complex video/audio filter chains).
+  - **P8-T4 (Mixer API)**: `POST /api/v1/mixer/run` (Audio/Video concatenation, PIP, overlays, watermarks, audio replacement).
+  - **P8-T5 (Utilities API)**: `POST /api/v1/utilities/run` (23 operational utilities).
+  - **P8-T6 (Library API)**: `GET /api/v1/library/` (search & filter), `POST /api/v1/library/` & `/add`, `GET /api/v1/library/stats`, `POST /api/v1/library/export` (JSON/CSV), `POST /api/v1/library/collections/` & items CRUD.
+  - **P8-T7 (History API)**: `DELETE /api/v1/history/clear`, `DELETE /api/v1/history/downloads/{id}`, `GET /api/v1/history/stats`, `GET /api/v1/history/recent`, `GET /api/v1/history/operations`.
+  - **P8-T8 (Torrent API)**: `POST /api/v1/downloads/torrent/start`, `POST /api/v1/downloads/torrent/cancel`, WebSocket progress broadcast.
+  - **P8-T9 (Health API)**: `GET /api/v1/health` with live version, binary path, and affected feature tags for `ffmpeg`, `ffprobe`, `yt-dlp`, and `aria2c`.
+- Full test suite: **877 passed, 1 skipped** (19/19 API tests passing).
+- Zero `alert()` calls, zero forbidden color classes, full Nordic Brass design tokens.
+- Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors** (1.63s).
+
 
 
 ---

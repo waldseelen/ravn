@@ -157,3 +157,12 @@ def clear_download_history(db: DbDep) -> Dict[str, Any]:
     db.clear_history("downloads")
     return {"cleared": True}
 
+
+@router.delete("/clear", summary="Clear all history entries across all tables")
+def clear_all_history(db: DbDep) -> Dict[str, Any]:
+    """Clear downloads, conversions, and operation logs."""
+    db.clear_history("downloads")
+    db.clear_history("conversions")
+    return {"cleared": True, "message": "All history records cleared."}
+
+

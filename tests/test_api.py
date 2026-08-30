@@ -261,6 +261,24 @@ def test_settings_extended_endpoints(tmp_path):
     assert reset_res.status_code == 200
 
 
+def test_phase8_cancellations_and_history_clear():
+    # 1. Convert Cancel
+    conv_res = client.post("/api/v1/convert/cancel", json={"task_id": "nonexistent-task"})
+    assert conv_res.status_code == 200
+    assert conv_res.json()["cancelled"] is False
+
+    # 2. Torrent Cancel
+    tor_res = client.post("/api/v1/downloads/torrent/cancel", json={"task_id": "nonexistent-torrent"})
+    assert tor_res.status_code == 200
+    assert tor_res.json()["cancelled"] is False
+
+    # 3. Clear all history
+    clear_res = client.delete("/api/v1/history/clear")
+    assert clear_res.status_code == 200
+    assert clear_res.json()["cleared"] is True
+
+
+
 
 
 

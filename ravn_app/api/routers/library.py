@@ -80,6 +80,7 @@ def search_media(
     return [asdict(r) for r in records]
 
 
+@router.post("/", summary="Import a media file into the library", status_code=201)
 @router.post("/add", summary="Import a media file into the library", status_code=201)
 def add_media(
     body: AddMediaRequest,

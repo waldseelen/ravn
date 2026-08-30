@@ -152,6 +152,18 @@ def start_conversion(
     }
 
 
+class ConvertCancelRequest(BaseModel):
+    task_id: str = Field(..., description="Task ID to cancel")
+
+
+@router.post("/convert/cancel", summary="Cancel an active or queued conversion task")
+def cancel_conversion(body: ConvertCancelRequest, queue: QueueDep) -> Dict[str, Any]:
+    """Cancel a conversion task by its task_id."""
+    success = queue.cancel_task(body.task_id)
+    return {"task_id": body.task_id, "cancelled": success}
+
+
+
 @router.post("/subtitle/download", summary="Download subtitles for video URL", status_code=202)
 def download_subtitles(
     body: SubtitleDownloadRequest,

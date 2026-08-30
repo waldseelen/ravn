@@ -679,46 +679,46 @@ Mevcut `Library.vue`'yu ikiye böl:
 > Frontend'in ihtiyaç duyduğu ama mevcut olmayan API endpoint'leri.
 
 ### P8-T1: Converter API
-- [ ] `POST /api/v1/convert/start` — FFmpeg dönüştürme başlat.
-- [ ] `POST /api/v1/convert/cancel` — İptal.
-- [ ] WebSocket event: `convert.progress`, `convert.complete`, `convert.error`.
+- [x] `POST /api/v1/convert/start` — FFmpeg dönüştürme başlat.
+- [x] `POST /api/v1/convert/cancel` — İptal.
+- [x] WebSocket event: `convert.progress`, `convert.complete`, `convert.error`.
 
 ### P8-T2: Subtitle API
-- [ ] `POST /api/v1/subtitle/download` — yt-dlp ile altyazı indir.
-- [ ] `POST /api/v1/subtitle/process` — Format dönüştür, zamanlama ayarla, embed et.
+- [x] `POST /api/v1/subtitle/download` — yt-dlp ile altyazı indir.
+- [x] `POST /api/v1/subtitle/process` — Format dönüştür, zamanlama ayarla, embed et.
 
 ### P8-T3: Filters API
-- [ ] `POST /api/v1/filters/apply` — FFmpeg filtreleri uygula.
+- [x] `POST /api/v1/filters/apply` — FFmpeg filtreleri uygula.
 
 ### P8-T4: Mixer API
-- [ ] `POST /api/v1/mixer/run` — Ses/video karıştırma işlemi başlat.
+- [x] `POST /api/v1/mixer/run` — Ses/video karıştırma işlemi başlat.
 
 ### P8-T5: Utilities API
-- [ ] `POST /api/v1/utilities/run` — 23 utility işleminden herhangi birini çalıştır.
+- [x] `POST /api/v1/utilities/run` — 23 utility işleminden herhangi birini çalıştır.
 
 ### P8-T6: Library API
-- [ ] `GET /api/v1/library/` — Kütüphane listesi.
-- [ ] `POST /api/v1/library/` — Kütüphaneye ekleme.
-- [ ] `GET /api/v1/library/stats` — İstatistikler.
-- [ ] `POST /api/v1/library/export` — JSON/CSV dışa aktarma.
-- [ ] `POST /api/v1/library/collections/` — Koleksiyon CRUD.
+- [x] `GET /api/v1/library/` — Kütüphane listesi.
+- [x] `POST /api/v1/library/` — Kütüphaneye ekleme.
+- [x] `GET /api/v1/library/stats` — İstatistikler.
+- [x] `POST /api/v1/library/export` — JSON/CSV dışa aktarma.
+- [x] `POST /api/v1/library/collections/` — Koleksiyon CRUD.
 
 ### P8-T7: History API Genişletme
-- [ ] `DELETE /api/v1/history/clear` — Geçmişi temizle.
-- [ ] `GET /api/v1/history/stats` — Detaylı istatistikler.
+- [x] `DELETE /api/v1/history/clear` — Geçmişi temizle.
+- [x] `GET /api/v1/history/stats` — Detaylı istatistikler.
 
 ### P8-T8: Torrent API
-- [ ] `POST /api/v1/downloads/torrent/start` — Torrent başlat.
-- [ ] `POST /api/v1/downloads/torrent/cancel` — İptal.
-- [ ] WebSocket event: `torrent.progress`, `torrent.complete`.
+- [x] `POST /api/v1/downloads/torrent/start` — Torrent başlat.
+- [x] `POST /api/v1/downloads/torrent/cancel` — İptal.
+- [x] WebSocket event: `torrent.progress`, `torrent.complete`.
 
 ### P8-T9: Health API Genişletme
-- [ ] `GET /api/v1/health` zaten var — `version`, `path`, `affected_features` alanlarını ekle.
+- [x] `GET /api/v1/health` zaten var — `version`, `path`, `affected_features` alanlarını ekle.
 
 **P8 Doğrulama Kapısı:**
-- [ ] Her endpoint `pytest` ile test edilmiş.
-- [ ] WebSocket event'leri frontend'de doğru handle ediliyor.
-- [ ] `GET /api/v1/health` gerçek araç bilgisi dönüyor.
+- [x] Her endpoint `pytest` ile test edilmiş.
+- [x] WebSocket event'leri frontend'de doğru handle ediliyor.
+- [x] `GET /api/v1/health` gerçek araç bilgisi dönüyor.
 
 ---
 

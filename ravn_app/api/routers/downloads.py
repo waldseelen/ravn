@@ -247,3 +247,15 @@ def start_torrent_download(
 
     return {"task_id": task_id, "mode": selected_mode.value, "status": "queued"}
 
+
+class TorrentCancelRequest(BaseModel):
+    task_id: str = Field(..., description="Task ID of the torrent download to cancel")
+
+
+@router.post("/torrent/cancel", summary="Cancel a running or queued torrent task")
+def cancel_torrent(body: TorrentCancelRequest, queue: QueueDep) -> Dict[str, Any]:
+    """Cancel an active torrent task."""
+    success = queue.cancel_task(body.task_id)
+    return {"task_id": body.task_id, "cancelled": success}
+
+

@@ -65,6 +65,27 @@ def candidate_runtime_roots() -> List[Path]:
 
     roots.append(project_root())
 
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        winget_links = Path(local_appdata) / "Microsoft" / "WinGet" / "Links"
+        if winget_links.exists():
+            roots.append(winget_links)
+        winget_pkgs = Path(local_appdata) / "Microsoft" / "WinGet" / "Packages"
+        if winget_pkgs.exists():
+            roots.append(winget_pkgs)
+            for pkg in winget_pkgs.iterdir():
+                if pkg.is_dir():
+                    roots.append(pkg)
+                    bin_dir = pkg / "bin"
+                    if bin_dir.is_dir():
+                        roots.append(bin_dir)
+                    for sub in pkg.iterdir():
+                        if sub.is_dir():
+                            roots.append(sub)
+                            sub_bin = sub / "bin"
+                            if sub_bin.is_dir():
+                                roots.append(sub_bin)
+
     unique_roots: list[Path] = []
     seen: set[str] = set()
     for root in roots:
@@ -108,6 +129,10 @@ def find_bundled_binary(tool_name: str, asset_subdir: str) -> Optional[str]:
     filename = binary_name(tool_name)
     for directory in iter_bundled_dirs(asset_subdir):
         candidate = directory / filename
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+    for root in candidate_runtime_roots():
+        candidate = root / filename
         if candidate.exists() and candidate.is_file():
             return str(candidate)
     return None

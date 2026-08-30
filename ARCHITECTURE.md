@@ -65,10 +65,14 @@ Primary files:
 - `frontend/src/components/CommandPalette.vue`
 - `frontend/src/components/ToastManager.vue`
 - `frontend/src/components/ErrorPanel.vue`
-- `frontend/src/components/HomeWorkspace.vue`
+- `frontend/src/components/PlaylistSortDialog.vue`
+- `frontend/src/components/Home.vue`
 - `frontend/src/components/DownloadTab.vue`
-- `frontend/src/components/StudioWorkspace.vue` (Converter, Subtitles, Filters, Mixer, Utilities)
-- `frontend/src/components/LibraryWorkspace.vue`
+- `frontend/src/components/StudioWorkspace.vue` (ConverterTab, SubtitleTab, FiltersTab, MixerTab, UtilitiesTab)
+- `frontend/src/components/Library.vue` (Tabbed workspace: LibraryTab, HistoryTab)
+- `frontend/src/components/LibraryTab.vue`
+- `frontend/src/components/HistoryTab.vue`
+- `frontend/src/components/Settings.vue`
 
 Responsibilities:
 
@@ -85,6 +89,7 @@ Primary files:
 - `ravn_app/api/main.py`
 - `ravn_app/api/routers/downloads.py`
 - `ravn_app/api/routers/history.py`
+- `ravn_app/api/routers/library.py`
 - `ravn_app/api/routers/queue.py`
 - `ravn_app/api/routers/settings.py`
 - `ravn_app/api/routers/studio.py`
@@ -95,7 +100,7 @@ Responsibilities:
 - lightweight async HTTP endpoints for commands and queries
 - unified task queue dispatching to core service runners
 - WebSocket event broadcaster (`/ws/events`) for background task updates
-- dependency injection for database, downloader, and task manager instances
+- dependency injection for database, downloader, library, and task manager instances
 
 ### 3.3 Core service layer
 
@@ -107,6 +112,7 @@ Primary files:
 - `ravn_app/core/torrent_downloader.py`
 - `ravn_app/core/media_helpers.py`
 - `ravn_app/core/database.py`
+- `ravn_app/core/persistence/media_library.py`
 - `ravn_app/core/task_manager.py`
 
 Responsibilities:

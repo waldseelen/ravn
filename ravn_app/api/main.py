@@ -47,6 +47,13 @@ DEFAULT_PORT = 7842
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background services on startup; tear them down on shutdown."""
+    from ravn_app.core.config_paths import ensure_directories_exist, migrate_all_legacy_files
+    from ravn_app.utils.bundled_tools import configure_bundled_tools_path
+
+    ensure_directories_exist()
+    migrate_all_legacy_files()
+    configure_bundled_tools_path()
+
     # Import here to avoid circular imports at module level
     from ravn_app.api.deps import _task_queue  # type: ignore[import]
 
@@ -55,6 +62,7 @@ async def lifespan(app: FastAPI):
     logger.info("RAVN API server starting up (port=%s)", port)
 
     yield  # Application runs here
+
 
     logger.info("RAVN API server shutting down")
     tq.stop(wait=False)

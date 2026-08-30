@@ -208,7 +208,78 @@ def prefer_bundled(requested_path: str, tool_name: str) -> str:
     return find_tool(tool_name) or normalized
 
 
-def configure_bundled_tools_path() -> List[str]:
+def refresh_system_environment_path() -> List[str]:
+    """
+    On Windows, reload PATH from User and Machine registry and common tool dirs.
+    Prevents missing-tool errors on startup when tools were installed outside the current shell.
+    """
+    added_paths: List[str] = []
+    if os.name != "nt":
+        return added_paths
+
+    current_paths = [p for p in os.environ.get("PATH", "").split(os.pathsep) if p]
+    seen = set(os.path.normcase(os.path.normpath(p)) for p in current_paths)
+
+    candidates: List[str] = []
+
+    # 1. Read Windows Registry PATHs
+    try:
+        import winreg
+        for root_key, sub_key in (
+            (winreg.HKEY_CURRENT_USER, r"Environment"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+        ):
+            try:
+                with winreg.OpenKey(root_key, sub_key) as key:
+                    val, _ = winreg.QueryValueEx(key, "PATH")
+                    if val:
+                        for entry in str(val).split(os.pathsep):
+                            entry_clean = entry.strip()
+                            if entry_clean:
+                                candidates.append(entry_clean)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 2. Common tool installation paths (Winget, Scoop, Chocolatey, LocalAppData)
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        candidates.append(str(Path(local_appdata) / "Microsoft" / "WinGet" / "Links"))
+        winget_pkgs = Path(local_appdata) / "Microsoft" / "WinGet" / "Packages"
+        if winget_pkgs.exists():
+            for pkg in winget_pkgs.iterdir():
+                if pkg.is_dir():
+                    candidates.append(str(pkg))
+                    candidates.append(str(pkg / "bin"))
+                    for sub in pkg.iterdir():
+                        if sub.is_dir():
+                            candidates.append(str(sub))
+                            candidates.append(str(sub / "bin"))
+
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile:
+        candidates.append(str(Path(user_profile) / "scoop" / "shims"))
+        candidates.append(str(Path(user_profile) / "AppData" / "Local" / "Programs" / "Python" / "Python314" / "Scripts"))
+        candidates.append(str(Path(user_profile) / "AppData" / "Local" / "Programs" / "Python" / "Python313" / "Scripts"))
+
+    program_data = os.environ.get("ProgramData")
+    if program_data:
+        candidates.append(str(Path(program_data) / "chocolatey" / "bin"))
+
+    for c in candidates:
+        if os.path.exists(c):
+            norm = os.path.normcase(os.path.normpath(c))
+            if norm not in seen:
+                seen.add(norm)
+                current_paths.append(c)
+                added_paths.append(c)
+
+    os.environ["PATH"] = os.pathsep.join(current_paths)
+    return added_paths
+
+
+def configure_bundled_tools_path(refresh_system_path: bool = False) -> List[str]:
     """
     Put every bundled tool directory on PATH, and report which ones were added.
 
@@ -217,12 +288,15 @@ def configure_bundled_tools_path() -> List[str]:
     streams -- and those child processes only see PATH. Without this a packaged build
     would download a video and then fail to merge it.
     """
+    if refresh_system_path:
+        refresh_system_environment_path()
     configured: List[str] = []
     for tool_name, asset_subdir in TOOL_ASSET_SUBDIRS.items():
         bundled_dir = prepend_bundled_dir_to_path(tool_name, asset_subdir)
         if bundled_dir and bundled_dir not in configured:
             configured.append(bundled_dir)
     return configured
+
 
 
 def prepend_bundled_dir_to_path(tool_name: str, asset_subdir: str) -> Optional[str]:
@@ -242,3 +316,4 @@ def prepend_bundled_dir_to_path(tool_name: str, asset_subdir: str) -> Optional[s
     if bundled_dir not in path_parts:
         os.environ["PATH"] = bundled_dir if not current_path else bundled_dir + os.pathsep + current_path
     return bundled_dir
+

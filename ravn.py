@@ -72,8 +72,11 @@ def main():
     # Make every bundled tool (ffmpeg/ffprobe, yt-dlp, aria2c) visible before any
     # runtime/tool checks, so a freshly unzipped build finds what it shipped with
     # and child processes (yt-dlp muxing via ffmpeg) resolve them too.
+    from ravn_app.utils.bundled_tools import refresh_system_environment_path
+    refresh_system_environment_path()
     configure_bundled_tools_path()
     configure_ffmpeg_runtime()
+
 
     # Check tool dependencies at startup
     check_tool_dependencies()

@@ -197,9 +197,10 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 Latest automated verification run:
 
 - `pytest -q`
-- `858 passed, 1 skipped`
+- `877 passed, 1 skipped`
+- `npm run build` — 0 errors (Vue 3 + TypeScript production bundle: 350 kB)
 
-Observed on 2026-08-05 (Windows, Python 3.13.14).
+Observed on 2026-08-30 (Windows 11, Python 3.14).
 
 ---
 

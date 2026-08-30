@@ -95,47 +95,55 @@ class Task:
 
 
 class TaskQueue:
-    """Thread-safe task queue with priority support."""
+    """Thread-safe task queue with FIFO ordering and execution history."""
 
     def __init__(self, max_concurrent: int = 2, completed_history_limit: int = 200):
         self.max_concurrent = max_concurrent
-        self.completed_history_limit = max(int(completed_history_limit or 0), 0)
+        self.completed_history_limit = completed_history_limit
         self._queue: queue.Queue = queue.Queue()
         self._tasks: Dict[str, Task] = {}
-        self._lock = threading.Lock()
+        self._active_count = 0
+        self._lock = threading.RLock()
         self._workers: List[threading.Thread] = []
         self._running = False
         self._paused = False
-        self._active_count = 0
-
-        # Thread-safe callbacks (called from main thread or via queue)
         self._callback_queue: queue.Queue = queue.Queue()
+        self._callback_thread: Optional[threading.Thread] = None
 
-        logger.info(
-            "TaskQueue initialized with max_concurrent=%s, completed_history_limit=%s",
-            max_concurrent,
-            self.completed_history_limit,
-        )
+        # Global default callbacks (e.g. WebSocket event broadcasting)
+        self.default_on_progress: Optional[Callable[[int, str], None]] = None
+        self.default_on_complete: Optional[Callable[[Task], None]] = None
+        self.default_on_error: Optional[Callable[[Task, str], None]] = None
+        self.default_on_cancel: Optional[Callable[[Task], None]] = None
+
+    def set_default_callbacks(
+        self,
+        on_progress: Optional[Callable[[int, str], None]] = None,
+        on_complete: Optional[Callable[[Task], None]] = None,
+        on_error: Optional[Callable[[Task, str], None]] = None,
+        on_cancel: Optional[Callable[[Task], None]] = None,
+    ) -> None:
+        """Configure default callbacks for all tasks submitted without custom callbacks."""
+        self.default_on_progress = on_progress
+        self.default_on_complete = on_complete
+        self.default_on_error = on_error
+        self.default_on_cancel = on_cancel
 
     def add_task(
         self,
         task_type: TaskType,
         name: str,
-        execute_fn: Callable,
+        execute_fn: Optional[Callable] = None,
         args: tuple = (),
         kwargs: Optional[Dict[str, Any]] = None,
+        cancel_fn: Optional[Callable[[], bool]] = None,
         on_progress: Optional[Callable[[int, str], None]] = None,
         on_complete: Optional[Callable[[Task], None]] = None,
         on_error: Optional[Callable[[Task, str], None]] = None,
-        cancel_fn: Optional[Callable[[], bool]] = None,
-        on_cancel: Optional[Callable[[Task], None]] = None,
+        on_cancel: Optional[Callable[["Task"], None]] = None,
+        priority: int = 0,
     ) -> str:
-        """
-        Add a new task to the queue.
-
-        Returns:
-            Task ID
-        """
+        """Add a task to the queue."""
         task_id = str(uuid.uuid4())[:8]
 
         task = Task(
@@ -147,10 +155,10 @@ class TaskQueue:
             args=args,
             kwargs=kwargs or {},
             cancel_fn=cancel_fn,
-            on_progress=on_progress,
-            on_complete=on_complete,
-            on_error=on_error,
-            on_cancel=on_cancel,
+            on_progress=on_progress or self.default_on_progress,
+            on_complete=on_complete or self.default_on_complete,
+            on_error=on_error or self.default_on_error,
+            on_cancel=on_cancel or self.default_on_cancel,
         )
 
         with self._lock:

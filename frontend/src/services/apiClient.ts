@@ -72,6 +72,13 @@ export const apiClient = {
     return res.json()
   },
 
+  async getQueueSnapshot() {
+    const res = await fetch(`${API_BASE}/queue/`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+
   async getHistory() {
     const res = await fetch(`${API_BASE}/history/downloads`)
     if (!res.ok) throw new Error(await res.text())

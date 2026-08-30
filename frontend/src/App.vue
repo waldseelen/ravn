@@ -133,16 +133,29 @@ onMounted(() => {
 
   window.addEventListener('keydown', handleGlobalKeydown)
 
+  // Fetch initial queue snapshot
+  downloadStore.fetchQueue()
+
   connectWebSocket((event, data) => {
     downloadStore.isConnected = true
     if (event === 'task.progress') {
       downloadStore.updateTaskProgress(data.task_id, data.progress, data.message)
     } else if (event === 'task.complete') {
       downloadStore.completeTask(data.task_id, data.output_path, data.duration_seconds)
-      toastStore.success(`Completed: ${data.output_path ? data.output_path.split(/[\\/]/).pop() : 'Task'}`)
+      const fileName = data.output_path ? data.output_path.split(/[\\/]/).pop() : 'Task'
+      toastStore.success(`Completed & Saved: ${fileName}`)
     } else if (event === 'task.error') {
       downloadStore.failTask(data.task_id, data.error_message)
       toastStore.error(`Task failed: ${data.error_message}`)
+    } else if (event === 'task.created') {
+      downloadStore.addTask({
+        id: data.task_id,
+        name: data.name || 'Task',
+        type: data.task_type || 'download',
+        status: 'queued',
+        progress: 0,
+        progress_message: 'Waiting in queue...'
+      })
     }
   })
 })

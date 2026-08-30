@@ -588,12 +588,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToastStore } from '../stores/toastStore'
+import { useDownloadStore } from '../stores/downloadStore'
 import { apiClient } from '../services/apiClient'
 import ErrorPanel from './ErrorPanel.vue'
 import PlaylistSortDialog from './PlaylistSortDialog.vue'
 
 const route = useRoute()
 const toastStore = useToastStore()
+const downloadStore = useDownloadStore()
 
 const t = {
   title: 'Media Acquisition & Downloads',
@@ -700,7 +702,6 @@ const errorInfo = ref<{ title: string; message: string; traceback?: string } | n
 const isPlaylistDialogOpen = ref(false)
 const playlistEntries = ref<any[]>([])
 
-// Source classification & URL validation
 const isUrlValid = computed(() => {
   if (!singleUrl.value.trim()) return false
   const u = singleUrl.value.trim().toLowerCase()
@@ -878,8 +879,9 @@ async function startDownloadDirect(type: 'video' | 'audio') {
   errorInfo.value = null
 
   try {
+    const rawUrl = singleUrl.value.trim()
     const payload = {
-      url: singleUrl.value.trim(),
+      url: rawUrl,
       output_dir: outputDir.value || '',
       format: type === 'video' ? videoFormat.value : audioFormat.value,
       quality: type === 'video' ? videoQuality.value : 'audio',
@@ -889,7 +891,19 @@ async function startDownloadDirect(type: 'video' | 'audio') {
     }
 
     const res = await apiClient.startDownload(payload)
-    toastStore.success(`Task enqueued (ID: ${res.task_id.substring(0, 8)})`)
+    downloadStore.addTask({
+      id: res.task_id,
+      name: mediaInfo.value?.title || rawUrl,
+      type: 'download',
+      status: 'running',
+      progress: 0,
+      progress_message: 'Starting download...',
+      started_at: new Date().toISOString()
+    })
+    downloadStore.fetchQueue()
+
+    const destFolder = outputDir.value || 'Downloads'
+    toastStore.success(`Download started! Target: ${destFolder}`)
     singleUrl.value = ''
     mediaInfo.value = null
   } catch (e: any) {
@@ -916,6 +930,7 @@ async function onPlaylistConfirmed(selectedUrls: string[]) {
       format: mediaType.value === 'video' ? videoFormat.value : audioFormat.value,
       quality: mediaType.value === 'video' ? videoQuality.value : 'audio'
     })
+    downloadStore.fetchQueue()
     toastStore.success(`Enqueued ${res.enqueued} playlist tracks`)
     singleUrl.value = ''
   } catch (e: any) {
@@ -940,6 +955,7 @@ async function startTorrentDownload() {
       output_dir: outputDir.value || '',
       mode: torrentMode.value
     })
+    downloadStore.fetchQueue()
     toastStore.success(`Torrent queued in ${res.mode} mode`)
     torrentUri.value = ''
   } catch (e: any) {
@@ -966,6 +982,7 @@ async function startBatchDownload() {
       format: selectedFormat.value,
       quality: selectedQuality.value
     })
+    downloadStore.fetchQueue()
     toastStore.success(`Enqueued ${res.enqueued} batch URLs`)
     batchUrls.value = ''
   } catch (e: any) {
@@ -1026,3 +1043,4 @@ watch(() => route.query, () => {
   checkQueryParams()
 })
 </script>
+

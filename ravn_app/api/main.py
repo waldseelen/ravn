@@ -24,6 +24,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict
 
 import uvicorn
@@ -55,9 +56,20 @@ async def lifespan(app: FastAPI):
     configure_bundled_tools_path()
 
     # Import here to avoid circular imports at module level
+    import asyncio
     from ravn_app.api.deps import _task_queue  # type: ignore[import]
+    from ravn_app.api.ws import make_task_callbacks
 
     tq = _task_queue()
+    loop = asyncio.get_running_loop()
+    callbacks = make_task_callbacks(loop)
+    tq.set_default_callbacks(
+        on_progress=callbacks["on_progress"],
+        on_complete=callbacks["on_complete"],
+        on_error=callbacks["on_error"],
+        on_cancel=callbacks["on_cancel"],
+    )
+
     port = getattr(app.state, "port", DEFAULT_PORT)
     logger.info("RAVN API server starting up (port=%s)", port)
 
@@ -125,11 +137,33 @@ def create_app() -> FastAPI:
             "tools": tool_summary,
         }
 
-    @app.get("/", tags=["meta"], include_in_schema=False)
-    async def root() -> Dict[str, str]:
-        return {"service": "RAVN API", "docs": "/docs"}
+    # Mount compiled SPA frontend if dist/ exists
+    from starlette.staticfiles import StaticFiles
+    from starlette.responses import FileResponse
+
+    dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if dist_dir.exists():
+        assets_dir = dist_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa(full_path: str):
+            # If requesting an existing static file in dist root (e.g. favicon.ico)
+            target_file = dist_dir / full_path
+            if full_path and target_file.is_file():
+                return FileResponse(target_file)
+            index_file = dist_dir / "index.html"
+            if index_file.exists():
+                return FileResponse(index_file)
+            return {"service": "RAVN API", "docs": "/docs"}
+    else:
+        @app.get("/", tags=["meta"], include_in_schema=False)
+        async def root() -> Dict[str, str]:
+            return {"service": "RAVN API", "docs": "/docs"}
 
     return app
+
 
 
 # Module-level app instance (uvicorn uses this)

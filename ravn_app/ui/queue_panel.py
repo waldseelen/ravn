@@ -7,9 +7,9 @@ from typing import Callable, Dict, Optional
 
 import customtkinter as ctk
 
-from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.i18n import t
 from ravn_app.core.task_manager import Task, TaskStatus, get_task_queue
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes
 from ravn_app.ui.ui_components import EmptyStateWidget
 

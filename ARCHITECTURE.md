@@ -26,11 +26,14 @@ Current release work is centered on final Windows packaging validation and relea
 
 ## 2. Runtime surfaces
 
-### Desktop
+### Desktop (Tauri v2 + Vue 3 Migration)
 
-- Entry point: `ravn.py`
-- Shell: `ravn_app/ui/main_window.py`
-- UI toolkit: CustomTkinter
+- Entry point: Tauri application shell / `src-tauri` & `ravn.py` (legacy CustomTkinter runtime)
+- Frontend: Vue 3 + TypeScript + Vite (`frontend/src/`)
+- Backend API Transport: FastAPI + Uvicorn (`ravn_app/api/`)
+- State Management: Pinia stores (`useDownloadStore`, `useToastStore`, `useHistoryStore`)
+- Design System: Nordic Brass theme CSS tokens (`frontend/src/style.css`)
+- Real-time Events: WebSocket at `/ws/events`
 
 Startup order:
 
@@ -38,7 +41,7 @@ Startup order:
 2. `ensure_directories_exist()`
 3. `migrate_all_legacy_files()`
 4. `check_tool_dependencies()`
-5. launch `YouTubeDownloaderApp`
+5. Launch FastAPI backend service & Tauri / desktop shell
 
 ### CLI
 
@@ -52,26 +55,49 @@ The CLI reuses shared services and shared runners instead of duplicating media l
 
 ## 3. Layer model
 
-### 3.1 Shell and UI layer
+### 3.1 Frontend & UI Layer (Vue 3 + Tauri)
 
 Primary files:
 
-- `ravn_app/ui/main_window.py`
-- `ravn_app/ui/tabs/`
-- `ravn_app/ui/components/`
+- `frontend/src/App.vue`
+- `frontend/src/components/HeaderNav.vue`
+- `frontend/src/components/QueuePanel.vue`
+- `frontend/src/components/CommandPalette.vue`
+- `frontend/src/components/ToastManager.vue`
+- `frontend/src/components/ErrorPanel.vue`
+- `frontend/src/components/HomeWorkspace.vue`
+- `frontend/src/components/DownloadTab.vue`
+- `frontend/src/components/StudioWorkspace.vue` (Converter, Subtitles, Filters, Mixer, Utilities)
+- `frontend/src/components/LibraryWorkspace.vue`
 
 Responsibilities:
 
-- build the workspace shell
-- wire shared services into UI surfaces
-- host `Home`, `Download`, `Studio`, and `Library`
-- expose queue and settings surfaces
-- route shell shortcuts and command palette actions
-- refresh visible UI for theme/language changes
+- modular workspace composition (thin shell + focused feature tabs + reusable components)
+- strict Nordic Brass design token enforcement (zero arbitrary hardcoded colors)
+- zero `alert()` or mock stubs; real OS dialog integrations (`@tauri-apps/plugin-dialog`)
+- WebSocket event subscription for real-time progress, speed, and status metrics
+- dynamic Command Palette (`Ctrl+K`) and keyboard shortcuts
 
-Canonical desktop feature imports should come from `ravn_app.ui.tabs.*`.
+### 3.2 API Transport Layer (FastAPI)
 
-### 3.2 Core service layer
+Primary files:
+
+- `ravn_app/api/main.py`
+- `ravn_app/api/routers/downloads.py`
+- `ravn_app/api/routers/history.py`
+- `ravn_app/api/routers/queue.py`
+- `ravn_app/api/routers/settings.py`
+- `ravn_app/api/routers/studio.py`
+- `ravn_app/api/ws.py`
+
+Responsibilities:
+
+- lightweight async HTTP endpoints for commands and queries
+- unified task queue dispatching to core service runners
+- WebSocket event broadcaster (`/ws/events`) for background task updates
+- dependency injection for database, downloader, and task manager instances
+
+### 3.3 Core service layer
 
 Primary files:
 
@@ -91,7 +117,7 @@ Responsibilities:
 - handle queueing, callbacks, and result shaping
 - prepare outputs for library registration
 
-### 3.3 Runner layer
+### 3.4 Runner layer
 
 Primary files:
 
@@ -130,7 +156,7 @@ unavailable the preview transparently falls back to the subprocess path. Preview
 estimates, so any version skew between the two engines is low-stakes; downloads always use the
 freshest (self-updating) binary.
 
-### 3.4 Persistence and library layer
+### 3.5 Persistence and library layer
 
 Primary files:
 
@@ -146,7 +172,7 @@ Responsibilities:
 - auto-registration of successful outputs
 - OS-aware config/data/cache directories
 
-### 3.5 Support systems
+### 3.6 Support systems
 
 Primary files:
 
@@ -166,7 +192,7 @@ Responsibilities:
 - user-readable tool/process error shaping
 - packaged/runtime FFmpeg discovery
 
-### 3.6 Platform contract
+### 3.7 Platform contract
 
 RAVN runs on **Windows, Linux, and macOS**, verified by a CI test matrix across all three
 (`.github/workflows/tests.yml`) on every push/PR:
@@ -320,8 +346,8 @@ Useful starting points:
 
 ## 7. Operational notes
 
-- **Packaging:** Windows is the signed, released artifact; Linux packaging is `workflow_dispatch`-only pending real-runner verification; macOS is a tracked follow-up (§3.6).
-- **Dependencies:** `ffmpeg`, `ffprobe`, and `yt-dlp` are core tools; `aria2c` is optional and enables torrent workflows. Packaged builds bundle them under `assets/<tool>/<platform>/` and resolve them via `utils/bundled_tools.py` before falling back to `PATH` (§3.6).
+- **Packaging:** Windows is the signed, released artifact; Linux packaging is `workflow_dispatch`-only pending real-runner verification; macOS is a tracked follow-up (§3.7).
+- **Dependencies:** `ffmpeg`, `ffprobe`, and `yt-dlp` are core tools; `aria2c` is optional and enables torrent workflows. Packaged builds bundle them under `assets/<tool>/<platform>/` and resolve them via `utils/bundled_tools.py` before falling back to `PATH` (§3.7).
 - **i18n:** user-facing UI strings should remain translation-key based in `ravn_app/translations/en.json` and `ravn_app/translations/tr.json`.
 - **Themes:** theme IDs normalize to `dark` or `light`.
 - **Plugin surface:** `ravn_app/core/plugin_system.py` is experimental and is not part of the active packaged runtime.

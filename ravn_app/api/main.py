@@ -20,7 +20,6 @@ Port selection:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import sys
@@ -31,8 +30,9 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ravn_app.api.routers import downloads, history, queue, settings
-from ravn_app.api.ws import event_bus, router as ws_router
+from ravn_app.api.routers import downloads, history, queue, settings, studio
+from ravn_app.api.ws import event_bus
+from ravn_app.api.ws import router as ws_router
 from ravn_app.core.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -96,16 +96,24 @@ def create_app() -> FastAPI:
     app.include_router(queue.router,     prefix="/api/v1")
     app.include_router(history.router,   prefix="/api/v1")
     app.include_router(settings.router,  prefix="/api/v1")
+    app.include_router(studio.router,    prefix="/api/v1")
+
 
     # --- WebSocket ---
     app.include_router(ws_router)
 
     # --- Health / meta ---
-    @app.get("/health", tags=["meta"], summary="Server liveness check")
+    @app.get("/health", tags=["meta"], summary="Server and tool health check")
+    @app.get("/api/v1/health", tags=["meta"], summary="Server and tool health check")
     async def health() -> Dict[str, Any]:
+        from ravn_app.core.tool_health import get_tool_health_checker
+
+        checker = get_tool_health_checker()
+        tool_summary = checker.get_health_summary()
         return {
             "status": "ok",
             "ws_clients": event_bus.client_count,
+            "tools": tool_summary,
         }
 
     @app.get("/", tags=["meta"], include_in_schema=False)

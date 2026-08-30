@@ -26,8 +26,38 @@ export const apiClient = {
     return res.json()
   },
 
+  async extractPlaylistInfo(url: string) {
+    const res = await fetch(`${API_BASE}/downloads/playlist/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
   async startDownload(payload: StartDownloadPayload) {
     const res = await fetch(`${API_BASE}/downloads/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async startBatchDownload(payload: { urls: string[]; output_dir: string; format?: string; quality?: string }) {
+    const res = await fetch(`${API_BASE}/downloads/batch/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async startTorrentDownload(payload: { source: string; output_dir: string; mode?: string }) {
+    const res = await fetch(`${API_BASE}/downloads/torrent/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -48,6 +78,18 @@ export const apiClient = {
     return res.json()
   },
 
+  async getStats() {
+    const res = await fetch(`${API_BASE}/history/stats`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async getRecentActivities(limit = 6) {
+    const res = await fetch(`${API_BASE}/history/recent?limit=${limit}`)
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
   async getSettings() {
     const res = await fetch(`${API_BASE}/settings/`)
     if (!res.ok) throw new Error(await res.text())
@@ -62,8 +104,120 @@ export const apiClient = {
     })
     if (!res.ok) throw new Error(await res.text())
     return res.json()
+  },
+
+  // Studio Workspace APIs
+  async startConversion(payload: {
+    input_file: string
+    output_file?: string
+    video_codec?: string
+    audio_codec?: string
+    video_quality?: string
+    audio_bitrate?: string
+    preset?: string
+    hardware_accel?: string
+  }) {
+    const res = await fetch(`${API_BASE}/convert/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async downloadSubtitles(payload: {
+    url: string
+    output_dir?: string
+    languages?: string[]
+    auto_generated?: boolean
+  }) {
+    const res = await fetch(`${API_BASE}/subtitle/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async processSubtitles(payload: {
+    action: string
+    subtitle_file: string
+    video_file?: string
+    output_file?: string
+    shift_seconds?: number
+    output_format?: string
+  }) {
+    const res = await fetch(`${API_BASE}/subtitle/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async applyFilters(payload: {
+    input_file: string
+    output_file?: string
+    brightness?: number
+    contrast?: number
+    saturation?: number
+    blur?: number
+    sharpen?: number
+    rotate?: number
+    flip_h?: boolean
+    flip_v?: boolean
+    grayscale?: boolean
+    sepia?: boolean
+    invert?: boolean
+    deinterlace?: boolean
+    denoise?: string
+    lut_file?: string
+  }) {
+    const res = await fetch(`${API_BASE}/filters/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async runMixer(payload: {
+    mode: string
+    operation: string
+    input_files: string[]
+    output_file?: string
+    options?: Record<string, any>
+  }) {
+    const res = await fetch(`${API_BASE}/mixer/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  },
+
+  async runUtility(payload: {
+    category: string
+    operation: string
+    input_file: string
+    output_file?: string
+    options?: Record<string, any>
+  }) {
+    const res = await fetch(`${API_BASE}/utilities/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
   }
 }
+
 
 export function connectWebSocket(onEvent: (event: string, data: any) => void) {
   const ws = new WebSocket(WS_URL)

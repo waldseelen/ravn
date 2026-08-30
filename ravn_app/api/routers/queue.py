@@ -8,12 +8,12 @@ translates between HTTP requests and service calls.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
 
 from ravn_app.api.deps import QueueDep
-from ravn_app.core.task_manager import Task, TaskStatus
+from ravn_app.core.task_manager import Task
 
 logger = logging.getLogger(__name__)
 

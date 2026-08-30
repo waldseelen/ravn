@@ -1,129 +1,355 @@
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between bg-slate-900/80 backdrop-blur p-4 rounded-2xl border border-slate-800 shadow-xl">
-      <div class="flex items-center gap-3">
-        <div class="p-3 bg-purple-600/20 text-purple-400 rounded-xl border border-purple-500/30">
-          <span class="text-2xl">🎬</span>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-slate-100">Media Converter</h1>
-          <p class="text-xs text-slate-400">High-performance FFmpeg video & audio transcode engine</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Converter Form -->
-    <div class="bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800 space-y-6">
+  <div class="space-y-6">
+    <!-- Converter Settings Card -->
+    <div
+      class="p-6 rounded-2xl border space-y-6 shadow-sm"
+      style="background-color: var(--bg-surface); border-color: var(--border-subtle);"
+    >
+      <!-- Input File DND Zone -->
       <div class="space-y-2">
-        <label class="block text-sm font-semibold text-slate-200">Input File Path</label>
-        <div class="flex gap-3">
-          <input
-            v-model="inputFilePath"
-            type="text"
-            placeholder="C:/path/to/input/video.mp4"
-            class="flex-1 px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500"
-          />
-          <button @click="browseInputFile" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700">
-            Browse...
+        <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted);">
+          📥 {{ t.inputFileLabel }}
+        </label>
+        <div
+          class="p-5 rounded-2xl border-2 border-dashed transition-all flex flex-col sm:flex-row items-center justify-between gap-4"
+          :class="{ 'ring-2': isDragging }"
+          :style="{
+            backgroundColor: 'var(--bg-input)',
+            borderColor: isDragging ? 'var(--accent-brass)' : 'var(--border-subtle)'
+          }"
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          @drop.prevent="handleDrop"
+        >
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <span class="text-2xl" style="color: var(--accent-brass);">📁</span>
+            <div class="min-w-0 flex-1">
+              <input
+                v-model="inputFile"
+                type="text"
+                :placeholder="t.inputPlaceholder"
+                class="w-full text-xs font-mono bg-transparent border-none outline-none truncate"
+                style="color: var(--text-primary);"
+              />
+              <p class="text-[11px]" style="color: var(--text-muted);">
+                {{ inputFile ? inputFile : t.dndHint }}
+              </p>
+            </div>
+          </div>
+
+          <button
+            @click="browseInputFile"
+            class="px-4 py-2.5 rounded-xl border text-xs font-semibold hover:opacity-90 cursor-pointer shrink-0"
+            style="background-color: var(--bg-card); color: var(--text-primary); border-color: var(--border-subtle);"
+          >
+            📂 {{ t.browse }}
           </button>
         </div>
       </div>
 
-      <!-- Settings Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-        <!-- Target Format -->
-        <div class="space-y-2">
-          <label class="block text-xs font-semibold text-slate-400">Target Container / Format</label>
-          <select v-model="targetFormat" class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-sm">
-            <optgroup label="Video Formats">
-              <option value="mp4">MP4 (H.264 / AAC)</option>
-              <option value="mkv">MKV (Matroska)</option>
-              <option value="webm">WebM (VP9 / Opus)</option>
-              <option value="avi">AVI</option>
-              <option value="mov">MOV (ProRes/H.264)</option>
-            </optgroup>
-            <optgroup label="Audio Formats">
-              <option value="mp3">MP3 (Audio)</option>
-              <option value="m4a">M4A (AAC Audio)</option>
-              <option value="flac">FLAC (Lossless)</option>
-              <option value="wav">WAV (PCM Uncompressed)</option>
-              <option value="ogg">OGG (Vorbis)</option>
-            </optgroup>
+      <!-- Codecs and Parameters Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+        <!-- Video Codec -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            🎬 {{ t.videoCodec }}
+          </label>
+          <select
+            v-model="videoCodec"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="h264">H.264 / AVC (libx264)</option>
+            <option value="hevc">HEVC / H.265 (libx265)</option>
+            <option value="vp9">VP9 (libvpx-vp9)</option>
+            <option value="av1">AV1 (libaom-av1)</option>
+            <option value="copy">Copy (Direct Stream Copy)</option>
           </select>
         </div>
 
-        <!-- Video Codec / Quality -->
-        <div class="space-y-2">
-          <label class="block text-xs font-semibold text-slate-400">Encoder / Quality Preset</label>
-          <select v-model="qualityPreset" class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-sm">
-            <option value="ultrafast">Ultrafast (Fastest, Larger File)</option>
-            <option value="medium">Medium (Balanced - Recommended)</option>
-            <option value="veryslow">Very Slow (Best Compression)</option>
-            <option value="copy">Stream Copy (Passthrough - No Re-encode)</option>
+        <!-- Audio Codec -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            🎵 {{ t.audioCodec }}
+          </label>
+          <select
+            v-model="audioCodec"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="aac">AAC (Standard Audio)</option>
+            <option value="mp3">MP3 (libmp3lame)</option>
+            <option value="opus">OPUS (High Quality Compact)</option>
+            <option value="flac">FLAC (Lossless)</option>
+            <option value="copy">Copy (Direct Audio Copy)</option>
           </select>
         </div>
 
-        <!-- Resolution Scale -->
-        <div class="space-y-2">
-          <label class="block text-xs font-semibold text-slate-400">Resolution Scaling</label>
-          <select v-model="resolutionScale" class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 text-sm">
-            <option value="original">Same as Source</option>
-            <option value="1080">Scale to 1080p (Full HD)</option>
-            <option value="720">Scale to 720p (HD)</option>
-            <option value="480">Scale to 480p (SD)</option>
+        <!-- Quality / CRF -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            ✦ {{ t.videoQuality }}
+          </label>
+          <select
+            v-model="videoQuality"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="LOSSLESS">Kayıpsız / Lossless (CRF 0)</option>
+            <option value="VERYHIGH">Çok Yüksek / Studio (CRF 18)</option>
+            <option value="HIGH">Yüksek / High Quality (CRF 23)</option>
+            <option value="MEDIUM">Orta / Balanced (CRF 28)</option>
+            <option value="LOW">Düşük / Compact (CRF 33)</option>
+            <option value="VERYLOW">Çok Düşük / Tiny (CRF 51)</option>
+          </select>
+        </div>
+
+        <!-- Speed Preset -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            ⚡ {{ t.speedPreset }}
+          </label>
+          <select
+            v-model="speedPreset"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="ultrafast">ultrafast (Fastest render)</option>
+            <option value="superfast">superfast</option>
+            <option value="veryfast">veryfast</option>
+            <option value="faster">faster</option>
+            <option value="fast">fast (Recommended)</option>
+            <option value="medium">medium</option>
+            <option value="slow">slow (Better compression)</option>
+            <option value="slower">slower</option>
+            <option value="veryslow">veryslow</option>
+          </select>
+        </div>
+
+        <!-- Hardware Acceleration -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            🚀 {{ t.hardwareAccel }}
+          </label>
+          <select
+            v-model="hardwareAccel"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="">Yok (Software / CPU)</option>
+            <option value="nvenc">NVENC (NVIDIA GPU)</option>
+            <option value="quicksync">Quick Sync (Intel QSV)</option>
+            <option value="amf">AMF (AMD GPU)</option>
+          </select>
+        </div>
+
+        <!-- Audio Bitrate -->
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color: var(--text-secondary);">
+            🎧 {{ t.audioBitrate }}
+          </label>
+          <select
+            v-model="audioBitrate"
+            class="w-full rounded-xl px-3 py-2 text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          >
+            <option value="320k">320 kbps (High Fidelity)</option>
+            <option value="256k">256 kbps</option>
+            <option value="192k">192 kbps (Standard High)</option>
+            <option value="128k">128 kbps (Balanced)</option>
+            <option value="96k">96 kbps (Voice / Small)</option>
           </select>
         </div>
       </div>
 
-      <!-- Advanced Options Switches -->
-      <div class="flex flex-wrap gap-6 pt-2 text-xs text-slate-300 border-t border-slate-800/60">
-        <label class="flex items-center gap-2">
-          <input v-model="normalizeAudio" type="checkbox" class="rounded bg-slate-950 border-slate-800 text-purple-600" />
-          Normalize Audio (EBU R128 Loudness)
+      <!-- Output Destination -->
+      <div class="space-y-2 pt-2 border-t" style="border-color: var(--border-subtle);">
+        <label class="block text-xs font-bold uppercase tracking-wider" style="color: var(--text-muted);">
+          📤 {{ t.outputFileLabel }}
         </label>
-        <label class="flex items-center gap-2">
-          <input v-model="stripAudio" type="checkbox" class="rounded bg-slate-950 border-slate-800 text-purple-600" />
-          Mute / Remove Audio Track
-        </label>
+        <div class="flex gap-3">
+          <input
+            v-model="outputFile"
+            type="text"
+            :placeholder="t.outputPlaceholder"
+            class="flex-1 px-4 py-2.5 rounded-xl text-xs border outline-none font-mono"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
+          />
+          <button
+            @click="browseOutputFile"
+            class="px-4 py-2.5 rounded-xl border text-xs font-semibold hover:opacity-90 cursor-pointer shrink-0"
+            style="background-color: var(--bg-card); color: var(--text-primary); border-color: var(--border-subtle);"
+          >
+            📁 {{ t.browse }}
+          </button>
+        </div>
       </div>
 
-      <!-- Action Button -->
-      <div class="flex justify-end pt-4">
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-between gap-3 pt-2">
+        <button
+          @click="clearForm"
+          class="px-4 py-2.5 rounded-xl border text-xs font-semibold transition hover:opacity-90 cursor-pointer"
+          style="background-color: var(--bg-card); color: var(--text-secondary); border-color: var(--border-subtle);"
+        >
+          {{ t.clear }}
+        </button>
+
         <button
           @click="startConversion"
-          :disabled="!inputFilePath || converting"
-          class="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-600/30 transition disabled:opacity-50"
+          :disabled="!inputFile || isProcessing"
+          class="px-8 py-2.5 text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          style="background-color: var(--accent-brass); color: var(--bg-primary);"
         >
-          {{ converting ? 'Converting FFmpeg Stream...' : 'Start Conversion' }}
+          <span>⇄</span>
+          <span>{{ isProcessing ? t.converting : t.startConvert }}</span>
         </button>
       </div>
+
+      <!-- Live Log Area -->
+      <div v-if="logLines.length > 0" class="space-y-2 pt-2 border-t" style="border-color: var(--border-subtle);">
+        <label class="block text-[11px] font-bold uppercase tracking-wider" style="color: var(--text-muted);">
+          {{ t.processLog }}
+        </label>
+        <div
+          class="p-4 rounded-xl font-mono text-[11px] max-h-36 overflow-y-auto space-y-1"
+          style="background-color: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--text-secondary);"
+        >
+          <div v-for="(line, idx) in logLines" :key="idx" class="truncate">
+            {{ line }}
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Error Panel Integration -->
+    <ErrorPanel
+      v-if="errorInfo"
+      :title="errorInfo.title"
+      :message="errorInfo.message"
+      :traceback="errorInfo.traceback"
+      @retry="startConversion"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useToastStore } from '../stores/toastStore'
+import { apiClient } from '../services/apiClient'
+import ErrorPanel from './ErrorPanel.vue'
 
-const inputFilePath = ref('')
-const targetFormat = ref('mp4')
-const qualityPreset = ref('medium')
-const resolutionScale = ref('original')
-const normalizeAudio = ref(false)
-const stripAudio = ref(false)
-const converting = ref(false)
+const toastStore = useToastStore()
 
-function browseInputFile() {
-  const sample = 'C:/Downloads/sample_video.mkv'
-  inputFilePath.value = sample
+const t = {
+  inputFileLabel: 'Source Media File',
+  inputPlaceholder: 'Select or drag & drop media file here...',
+  dndHint: 'Drag and drop any audio or video file here',
+  browse: 'Browse File',
+  videoCodec: 'Video Codec',
+  audioCodec: 'Audio Codec',
+  videoQuality: 'Video Quality (CRF)',
+  speedPreset: 'Encoder Speed Preset',
+  hardwareAccel: 'Hardware Acceleration',
+  audioBitrate: 'Audio Bitrate',
+  outputFileLabel: 'Output Destination File',
+  outputPlaceholder: 'Auto-generated or custom output path',
+  clear: 'Clear Form',
+  startConvert: 'Start Conversion',
+  converting: 'Transcoding Media...',
+  processLog: 'Execution Log'
 }
 
-function startConversion() {
-  if (!inputFilePath.value) return
-  converting.value = true
-  setTimeout(() => {
-    converting.value = false
-    alert('Conversion finished successfully!')
-  }, 2000)
+const inputFile = ref('')
+const outputFile = ref('')
+const videoCodec = ref('h264')
+const audioCodec = ref('aac')
+const videoQuality = ref('HIGH')
+const speedPreset = ref('fast')
+const hardwareAccel = ref('')
+const audioBitrate = ref('192k')
+
+const isDragging = ref(false)
+const isProcessing = ref(false)
+const logLines = ref<string[]>([])
+const errorInfo = ref<{ title: string; message: string; traceback?: string } | null>(null)
+
+function handleDrop(e: DragEvent) {
+  isDragging.value = false
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+    const f = e.dataTransfer.files[0]
+    inputFile.value = (f as any).path || f.name
+    toastStore.info(`Loaded source file: ${f.name}`)
+  }
+}
+
+async function browseInputFile() {
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'Media Files', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'mp3', 'wav', 'flac', 'm4a', 'opus'] }]
+    })
+    if (selected && typeof selected === 'string') {
+      inputFile.value = selected
+      toastStore.success(`Selected file: ${selected}`)
+    }
+  } catch {
+    toastStore.info('Enter local file path directly.')
+  }
+}
+
+async function browseOutputFile() {
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const selected = await save({
+      filters: [{ name: 'Media Output', extensions: ['mp4', 'mkv', 'webm', 'mp3', 'flac'] }]
+    })
+    if (selected && typeof selected === 'string') {
+      outputFile.value = selected
+    }
+  } catch {
+    toastStore.info('Enter destination path directly.')
+  }
+}
+
+function clearForm() {
+  inputFile.value = ''
+  outputFile.value = ''
+  logLines.value = []
+  errorInfo.value = null
+}
+
+async function startConversion() {
+  if (!inputFile.value.trim()) return
+  isProcessing.value = true
+  errorInfo.value = null
+  logLines.value.push(`[${new Date().toLocaleTimeString()}] Queuing transcode task: ${inputFile.value}`)
+
+  try {
+    const res = await apiClient.startConversion({
+      input_file: inputFile.value.trim(),
+      output_file: outputFile.value.trim() || undefined,
+      video_codec: videoCodec.value,
+      audio_codec: audioCodec.value,
+      video_quality: videoQuality.value,
+      audio_bitrate: audioBitrate.value,
+      preset: speedPreset.value,
+      hardware_accel: hardwareAccel.value || undefined
+    })
+
+    logLines.value.push(`[${new Date().toLocaleTimeString()}] Task enqueued: ID ${res.task_id}`)
+    logLines.value.push(`[${new Date().toLocaleTimeString()}] Target Output: ${res.output_file}`)
+    toastStore.success(`Conversion task queued (ID: ${res.task_id.substring(0, 8)})`)
+  } catch (e: any) {
+    errorInfo.value = {
+      title: 'Transcoding Failed to Start',
+      message: e.message || 'Could not queue FFmpeg conversion task.',
+      traceback: String(e)
+    }
+    toastStore.error('Conversion failed')
+  } finally {
+    isProcessing.value = false
+  }
 }
 </script>

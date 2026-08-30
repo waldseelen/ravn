@@ -10,7 +10,6 @@ from typing import Callable, Optional
 
 import customtkinter as ctk
 
-from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.converter import (
     AudioBitrate,
     CodecManager,
@@ -19,6 +18,7 @@ from ravn_app.core.converter import (
     VideoQuality,
 )
 from ravn_app.core.i18n import t
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.ui.components.error_panel import ErrorPanel
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 from ravn_app.ui.ui_components import Tooltip, bind_focus_ring, set_button_loading_state, style_combo, style_entry

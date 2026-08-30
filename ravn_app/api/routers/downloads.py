@@ -14,15 +14,11 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ravn_app.api.deps import ConfigDep, DbDep, DownloaderDep, QueueDep
+from ravn_app.api.deps import DownloaderDep, QueueDep
 from ravn_app.core.downloader import (
-    DownloadAdvancedProfile,
     DownloadFormat,
-    DownloadPostProcessProfile,
     DownloadQuality,
     DownloadRequest,
-    DownloadRobustnessProfile,
-    YouTubeDownloader,
 )
 from ravn_app.core.task_manager import TaskType
 
@@ -51,6 +47,26 @@ class DownloadStartRequest(BaseModel):
 
 class VideoInfoRequest(BaseModel):
     url: str = Field(..., description="Media URL to inspect")
+
+
+class PlaylistInfoRequest(BaseModel):
+    url: str = Field(..., description="Playlist URL to inspect")
+
+
+class BatchDownloadRequest(BaseModel):
+    urls: list[str] = Field(..., description="List of media URLs to download")
+    output_dir: str = Field(..., description="Absolute path to the output directory")
+    format: str = Field("mp4", description="Output container format")
+    quality: str = Field("best", description="Quality preset")
+    embed_metadata: bool = True
+    embed_lyrics: bool = True
+    audio_bitrate: Optional[str] = None
+
+
+class TorrentStartRequest(BaseModel):
+    source: str = Field(..., description="Magnet link, .torrent URL, or local file path")
+    output_dir: str = Field(..., description="Absolute path to output directory")
+    mode: str = Field("FULL", description="Download mode: FULL, SEQUENTIAL, or STREAM")
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +123,17 @@ def get_video_info(body: VideoInfoRequest, downloader: DownloaderDep) -> Dict[st
     return info
 
 
+@router.post("/playlist/info", summary="Extract playlist entries and metadata")
+def get_playlist_info(body: PlaylistInfoRequest, downloader: DownloaderDep) -> Dict[str, Any]:
+    """Return playlist title and individual entries with thumbnails and durations."""
+    entries = downloader.extract_playlist_entries(body.url)
+    return {
+        "url": body.url,
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
 @router.post("/start", summary="Enqueue a new download", status_code=202)
 def start_download(
     body: DownloadStartRequest,
@@ -144,3 +171,79 @@ def start_download(
 
     logger.info("Download enqueued: task=%s url=%s", task_id, body.url)
     return {"task_id": task_id, "status": "queued"}
+
+
+@router.post("/batch/start", summary="Enqueue multiple download tasks", status_code=202)
+def start_batch_download(
+    body: BatchDownloadRequest,
+    downloader: DownloaderDep,
+    queue: QueueDep,
+) -> Dict[str, Any]:
+    """Enqueue a batch of download tasks."""
+    dl_format = _resolve_format(body.format)
+    dl_quality = _resolve_quality(body.quality)
+
+    task_ids: list[str] = []
+    for url in body.urls:
+        url_clean = url.strip()
+        if not url_clean:
+            continue
+        req = DownloadRequest(
+            url=url_clean,
+            output_dir=body.output_dir,
+            format=dl_format,
+            quality=dl_quality,
+            embed_metadata=body.embed_metadata,
+            embed_lyrics=body.embed_lyrics,
+            audio_bitrate=body.audio_bitrate,
+        )
+        tid = queue.add_task(
+            task_type=TaskType.DOWNLOAD,
+            name=url_clean,
+            execute_fn=downloader.download,
+            args=(req,),
+        )
+        task_ids.append(tid)
+
+    return {"enqueued": len(task_ids), "task_ids": task_ids, "status": "queued"}
+
+
+@router.post("/torrent/start", summary="Start or enqueue a torrent / magnet download", status_code=202)
+def start_torrent_download(
+    body: TorrentStartRequest,
+    queue: QueueDep,
+) -> Dict[str, Any]:
+    """Start an aria2c torrent download task."""
+    from pathlib import Path
+
+    from ravn_app.core.torrent_downloader import TorrentDownloader, TorrentDownloadMode
+
+    mode_map = {
+        "FULL": TorrentDownloadMode.FULL,
+        "SEQUENTIAL": TorrentDownloadMode.SEQUENTIAL,
+        "STREAM": TorrentDownloadMode.STREAM,
+    }
+    selected_mode = mode_map.get(body.mode.upper(), TorrentDownloadMode.FULL)
+    out_dir = body.output_dir if body.output_dir else str(Path.home() / "Downloads" / "RAVN")
+
+
+
+    td = TorrentDownloader()
+
+    def run_torrent(progress_cb=None, status_cb=None, is_cancelled=None):
+        return td.download(
+            body.source,
+            out_dir,
+            mode=selected_mode,
+            progress_callback=progress_cb,
+            status_callback=status_cb,
+        )
+
+    task_id = queue.add_task(
+        task_type=TaskType.DOWNLOAD,
+        name=f"Torrent: {body.source[:40]}",
+        execute_fn=run_torrent,
+    )
+
+    return {"task_id": task_id, "mode": selected_mode.value, "status": "queued"}
+

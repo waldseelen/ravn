@@ -7,7 +7,7 @@ Thin wrappers over DatabaseManager.  No business logic here.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -67,6 +67,80 @@ def list_conversion_history(
     ]
 
 
+@router.get("/stats", summary="Get overall database and task statistics")
+def get_database_statistics(db: DbDep) -> Dict[str, Any]:
+    """Return total downloads, conversions, operations, and file size metrics."""
+    return db.get_statistics()
+
+
+@router.get("/recent", summary="Get combined recent activity records")
+def get_recent_activity(
+    db: DbDep,
+    limit: int = Query(6, ge=1, le=50),
+) -> List[Dict[str, Any]]:
+    """Return unified recent operations and downloads for dashboard display."""
+    activities: List[Dict[str, Any]] = []
+
+    # Get recent operations
+    ops = db.get_operations(limit=limit)
+    for op in ops:
+        activities.append({
+            "id": f"op-{op.id}",
+            "type": "operation",
+            "category": op.task_type or "operation",
+            "title": op.title or f"{op.task_type}: {op.operation}",
+            "detail": op.output_path or ", ".join(op.input_paths),
+            "status": op.status,
+            "timestamp": op.completed_at or op.started_at,
+            "duration": op.duration,
+        })
+
+    # Get recent downloads
+    downloads = db.get_downloads(limit=limit)
+    for d in downloads:
+        activities.append({
+            "id": f"dl-{d.id}",
+            "type": "download",
+            "category": "download",
+            "title": d.title or d.url,
+            "detail": d.file_path or d.format,
+            "status": d.status,
+            "timestamp": str(d.download_date),
+            "duration": d.duration or 0.0,
+        })
+
+    # Sort descending by timestamp/id and return top N
+    activities.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
+    return activities[:limit]
+
+
+@router.get("/operations", summary="List Phase 7/8 operation history")
+def list_operations_history(
+    db: DbDep,
+    limit: int = Query(100, ge=1, le=1000),
+    task_type: str | None = Query(None),
+) -> List[Dict[str, Any]]:
+    """Return recent operation records."""
+    records = db.get_operations(limit=limit, task_type=task_type)
+    return [
+        {
+            "id": r.id,
+            "task_type": r.task_type,
+            "operation": r.operation,
+            "title": r.title,
+            "input_paths": r.input_paths,
+            "output_path": r.output_path,
+            "format": r.format,
+            "started_at": r.started_at,
+            "completed_at": r.completed_at,
+            "duration": r.duration,
+            "status": r.status,
+            "error_message": r.error_message,
+        }
+        for r in records
+    ]
+
+
 @router.delete("/downloads/{record_id}", summary="Delete a download history record")
 def delete_download_record(record_id: int, db: DbDep) -> Dict[str, Any]:
     conn = db._require_conn()
@@ -82,3 +156,4 @@ def delete_download_record(record_id: int, db: DbDep) -> Dict[str, Any]:
 def clear_download_history(db: DbDep) -> Dict[str, Any]:
     db.clear_history("downloads")
     return {"cleared": True}
+

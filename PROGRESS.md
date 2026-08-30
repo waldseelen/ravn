@@ -1,88 +1,67 @@
 # Release Status
 
-Verified on 2026-08-05 (`858 passed, 1 skipped`, Windows — Python 3.13.14).
+Verified on 2026-08-30 (`874 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
 
 RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
 
-> **Active work:** RAVN is currently undergoing a major GUI migration — replacing the existing CustomTkinter desktop UI with a modern **Tauri v2 + Vue 3** frontend. The Python core (downloader, converter, library, CLI) is the single source of truth and will not be rewritten. See the migration plan in `RAVN PROJECT TO DO.txt`.
+> **Active work:** RAVN is currently undergoing a major GUI migration — replacing the existing CustomTkinter desktop UI with a modern **Tauri v2 + Vue 3** frontend. The Python core (downloader, converter, library, CLI) is the single source of truth and will not be rewritten. See the migration plan in `TASKS.md` and `CLAUDE.md`.
 
 ---
 
-## Tauri Migration — Phase Status (2026-08-05)
+## Tauri Migration — Phase Status (2026-08-30)
 
-### Phase 1: Backend Isolation ✅ COMPLETE
+### Phase 0: Cleanup & Design System Tokens ✅ COMPLETE
+- Extended `frontend/src/style.css` with full CustomTkinter Nordic Brass tokens (`--bg-*`, `--text-*`, `--accent-*`, `--border-*`, `--status-*`, `--*-bg`, light theme `:root[data-theme="light"]`).
+- Converted all legacy prototype and wrong-palette components to canonical Nordic Brass tokens: `ConverterTab.vue`, `SubtitleTab.vue`, `FiltersTab.vue`, `MixerTab.vue`, `UtilitiesTab.vue`, `QueuePanel.vue`.
+- Removed dead prototype `Dashboard.vue`.
+- Zero forbidden color utility classes (`slate`, `purple`, `rose`, `cyan`, `teal`, `indigo`, `amber`) across all frontend files.
+- Removed all `alert()` and mock `setTimeout` stubs.
 
-**Goal:** Ensure the Python core (`ravn_app/core/`) is completely UI-agnostic.
+### Phase 1: App Shell Architecture ✅ COMPLETE
+- Rebuilt top header navigation with Brand Logo, `◐` Dark/Light theme toggle, `TR`/`EN` language switcher, and `🔍 Ctrl+K` command palette trigger.
+- Added Quick Action Bar (`Paste URL`, `Add Torrent`, `Convert File`, `Open Library`).
+- Implemented 380px right-side slide-out Task Queue Drawer with live counters, badges, progress bar, cancel, and clear completed actions.
+- Created `frontend/src/components/CommandPalette.vue` with keyboard navigation (`↑`/`↓`/`↵`/`ESC`), fuzzy live search, and categorized action items.
+- Built global `ToastManager.vue` and `useToastStore` (`success`, `warning`, `error`, `info`).
+- Built expandable `ErrorPanel.vue` with technical details accordion and retry callback.
+- Registered global hotkeys (`Ctrl+K`, `Escape`, `Ctrl+,` / `Ctrl+P`).
 
-- `animation_manager.py` relocated from `ravn_app/core/` → `ravn_app/ui/` — this module is a presentation concern (CustomTkinter animations) and does not belong in the shared core.
-- `ravn_app/core/animation_manager.py` converted to a **backward-compatibility shim** that re-exports from the new location. Existing code continues to work unchanged during the incremental migration. Marked `TODO(tauri-migration)` for removal in Phase 5.
-- All 4 direct `ravn_app.core.animation_manager` imports in `ravn_app/ui/` updated to the canonical `ravn_app.ui.animation_manager` path (`converter_tab.py`, `main_window.py`, `queue_panel.py`, `subtitle_tab.py`).
-- `ravn_app/core/app_builder.py` — `customtkinter` removed from `check_requirements()` and `build_executable()` hidden imports. Marked with `NOTE(tauri-migration)` comments.
-- `tests/test_animation_manager.py` — import path and all `@patch` targets updated to the canonical `ravn_app.ui.animation_manager` module.
-- **Test result: 858 passed, 1 skipped (no regressions).**
+### Phase 2: Home Workspace Matching ✅ COMPLETE
+- Integrated `ToolHealthChecker` banner (`GET /api/v1/health` & `GET /health`): displays degraded/critical warnings, lists missing tools and affected features, and includes "Fix in Settings" action. Banner hides automatically when tools are healthy.
+- Replaced 2 static links with 6 interactive Quick Action cards (`Paste URL & Download`, `Playlist Downloader`, `Torrent / Magnet`, `Convert Format`, `Apply Filters & EQ`, `Media Library`).
+- Built 4 live summary overview cards (`Downloads`, `Conversions`, `Operations`, `Task Queue`) wired directly to `GET /api/v1/history/stats` and Pinia download store.
+- Added Recent Activity list powered by `GET /api/v1/history/recent` displaying the last 6 operations with formatted timestamps and status badges.
+- Added backend endpoints: `GET /api/v1/health`, `GET /api/v1/history/stats`, `GET /api/v1/history/recent`, `GET /api/v1/history/operations`.
+- Test suite updated: **867 passed, 1 skipped**.
 
-### Phase 2: API Transport Layer ✅ COMPLETE
+### Phase 3: Download Workspace Matching ✅ COMPLETE
+- Built Source Classifier Card with live URL/Magnet/Torrent auto-detection, platform badges, and drag-and-drop (`@dragover`, `@drop`, visual glow).
+- Integrated `Video` / `Audio` segmented media mode switcher.
+- Added Platform Profile selector (YouTube, Twitter, Instagram, TikTok, Vimeo, Twitch, SoundCloud) and preset configurations (Music, Podcast, Archive, Social Clip) with auto-fill.
+- Added live URL validation (`✓` / `⚠`) and dynamic size estimator (`~MB`).
+- Implemented 2-Column layout: Video acquisition column (Quality, Format, Subtitles) & Audio extraction column (Format, Bitrate, ID3/Cover tags).
+- Created `PlaylistSortDialog.vue` (P3-T7) with 7-column sortable table, Title/Duration/Popularity filtering, select-all/invert controls, and batch download confirmation.
+- Full Torrent & Magnet acquisition workflow (P3-T9) with FULL/SEQUENTIAL/STREAM modes and aria2c health status.
+- Batch URL processing panel (P3-T10) for multi-line link queuing.
+- Integrated `ErrorPanel.vue` (P3-T11) with retry handling.
+- Added backend endpoints: `POST /api/v1/downloads/playlist/info`, `POST /api/v1/downloads/batch/start`, `POST /api/v1/downloads/torrent/start`.
+- Test suite updated: **869 passed, 1 skipped**.
 
-**Goal:** Create a lightweight FastAPI server that exposes the Python core to the Tauri frontend over HTTP and WebSocket. The backend must remain completely UI-agnostic — this layer only translates requests and serializes responses.
+### Phase 4: Studio Workspace Matching ✅ COMPLETE
+- Built 5-Card Launcher Grid (`StudioWorkspace.vue`) with subtab switcher and `‹ Back to Launcher` button.
+- Rebuilt `ConverterTab.vue` matching CustomTkinter: DND input, video codecs (h264/hevc/vp9/av1/copy), audio codecs (aac/mp3/opus/flac/copy), CRF qualities (Lossless to Very Low), speed presets (ultrafast to veryslow), HW Accel (NVENC/QSV/AMF), bitrate, real file dialogs, progress bar, live log console, and `ErrorPanel`.
+- Rebuilt `SubtitleTab.vue`: Dual-panel layout (Left: Video URL downloader with tr/en/de/fr/es + auto-subs; Right: format converter SRT/VTT/ASS/SSA, ±10s precision time shifter, Soft Mux / Hard Burn-in embedding, console log, and `ErrorPanel`). Zero `alert()` calls.
+- Rebuilt `FiltersTab.vue`: Brightness, Contrast, Saturation, Blur, Sharpen, Rotate (0/90/180/270), 6 Effect toggles (Flip H/V, Grayscale, Sepia, Invert, Deinterlace), 5-level Denoise, 3D LUT loader, dynamic filter parameter summary, progress bar, and `ErrorPanel`.
+- Rebuilt `MixerTab.vue`: Audio / Video mode switcher, 6 audio operations (`concat`, `mix`, `crossfade`, `normalize`, `trim`, `fade`), 7 video operations (`concat`, `overlay`, `pip`, `side-by-side`, `watermark`, `transition`, `replace-audio`), multi-input DND list, dynamic parameter panel, and `ErrorPanel`.
+- Rebuilt `UtilitiesTab.vue`: 4-section Accordion panel with 23 operational helpers (6 Quick, 6 Audio, 8 Video, 3 Smart), asynchronous loading states, and live output log.
+- Added backend studio router (`ravn_app/api/routers/studio.py`) with 6 FastAPI endpoints (`/convert/start`, `/subtitle/download`, `/subtitle/process`, `/filters/apply`, `/mixer/run`, `/utilities/run`).
+- Zero forbidden Tailwind color classes, zero `alert()` calls, full Nordic Brass design tokens.
+- Frontend build: `vue-tsc --noEmit && vite build` -> **0 errors**.
+- Test suite updated: **874 passed, 1 skipped** (16 API tests passing).
 
-**New package: `ravn_app/api/`**
-
-| File | Responsibility |
-|---|---|
-| `ravn_app/api/__init__.py` | Package declaration and architectural docstring |
-| `ravn_app/api/deps.py` | FastAPI dependency providers (singleton service factories via `lru_cache`) |
-| `ravn_app/api/main.py` | FastAPI application factory, uvicorn entry point, Tauri sidecar `serve()` |
-| `ravn_app/api/ws.py` | `EventBus` singleton, `/ws/events` WebSocket endpoint, `make_task_callbacks()` bridge |
-| `ravn_app/api/routers/downloads.py` | `POST /api/v1/downloads/info` and `POST /api/v1/downloads/start` |
-| `ravn_app/api/routers/queue.py` | Full queue inspection and control (list/active/pending/completed/cancel/pause/resume/clear) |
-| `ravn_app/api/routers/history.py` | Paginated download and conversion history with delete/clear |
-| `ravn_app/api/routers/settings.py` | Settings read (`GET`), partial update (`PATCH`), reset to defaults (`POST /reset`) |
-
-**Architecture decisions implemented:**
-- **HTTP for commands/queries**, **WebSocket exclusively for event streaming** (progress, logs, ETA, queue state changes, notifications).
-- `EventBus.broadcast()` pushes structured JSON events `{ "event": "...", "data": {...}, "ts": "..." }` to all connected clients.
-- `make_task_callbacks()` bridges synchronous `TaskQueue` callbacks to the async FastAPI event loop via `asyncio.run_coroutine_threadsafe()`.
-- Port `7842` by default; overridable via `RAVN_API_PORT` env var. Port announced on stdout (`RAVN_API_PORT=...`) so the Tauri process can discover it at runtime.
-- `fastapi>=0.100.0` and `uvicorn[standard]>=0.23.0` added to `requirements.in`.
-
-**Registered endpoints (confirmed via OpenAPI schema):**
-
-```
-POST     /api/v1/downloads/info
-POST     /api/v1/downloads/start
-GET      /api/v1/queue/
-GET      /api/v1/queue/active
-GET      /api/v1/queue/pending
-GET      /api/v1/queue/completed
-DELETE   /api/v1/queue/completed
-GET      /api/v1/queue/{task_id}
-POST     /api/v1/queue/{task_id}/cancel
-POST     /api/v1/queue/pause
-POST     /api/v1/queue/resume
-GET      /api/v1/history/downloads
-DELETE   /api/v1/history/downloads
-GET      /api/v1/history/conversions
-DELETE   /api/v1/history/downloads/{record_id}
-GET      /api/v1/settings/
-PATCH    /api/v1/settings/
-POST     /api/v1/settings/reset
-GET      /health
-WS       /ws/events
-```
-
-- **Test result: 858 passed, 1 skipped (no regressions).**
-
-### Phase 3: Tauri Shell + Vue 3 Frontend — NEXT
-
-Scaffold the `frontend/` workspace with Tauri v2, Vue 3, TypeScript, Vite, Pinia, Vue Router, TanStack Table, and shadcn-vue or PrimeVue. Wire the Tauri sidecar to spawn the Python API on startup.
-
-### Phase 4: Page Migration — PENDING
-
-Rebuild UI screens (Dashboard, Queue, Library, Studio, Settings, Logs) in Vue, consuming the Phase 2 API.
-
-### Phase 5: Tkinter Retirement — PENDING
-
-Delete `ravn_app/ui/`, remove the `core/animation_manager.py` shim, strip `customtkinter`/`tkinterdnd2`/`pystray` from dependencies, update packaging pipeline.
+### Phase 5: Library Workspace Matching — NEXT
+- Split `LibraryTab.vue` and `HistoryTab.vue` workflows.
+- Media library collections, tag filtering, search, and batch actions.
 
 ---
 

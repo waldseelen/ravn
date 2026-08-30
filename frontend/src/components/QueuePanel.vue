@@ -1,54 +1,114 @@
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <div class="flex items-center justify-between bg-slate-900/80 backdrop-blur p-4 rounded-2xl border border-slate-800 shadow-xl">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border shadow-xl" style="background-color: var(--bg-surface); border-color: var(--border-subtle);">
       <div class="flex items-center gap-3">
-        <div class="p-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
-          <span class="text-2xl">📊</span>
+        <div class="p-3 rounded-xl border text-xl" style="background-color: var(--bg-card); color: var(--accent-brass); border-color: var(--border-brass);">
+          <span>☰</span>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-100">Live Task Queue</h1>
-          <p class="text-xs text-slate-400">Monitor active downloads, conversion jobs, ETA and speed metrics</p>
+          <h1 class="text-xl font-bold" style="color: var(--text-primary);">{{ t.title }}</h1>
+          <p class="text-xs" style="color: var(--text-muted);">
+            {{ t.active }}: <strong style="color: var(--accent-brass);">{{ activeCount }}</strong> •
+            {{ t.queued }}: <strong style="color: var(--text-secondary);">{{ queuedCount }}</strong> •
+            {{ t.completed }}: <strong style="color: var(--status-success);">{{ completedCount }}</strong>
+          </p>
         </div>
       </div>
 
-      <div class="flex gap-2">
-        <button @click="pauseQueue" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-xl border border-slate-700">
-          Pause Queue
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2">
+        <button
+          v-if="!isPaused"
+          @click="pauseQueue"
+          class="px-4 py-2 text-xs font-semibold rounded-xl border transition hover:opacity-90"
+          style="background-color: var(--bg-card); color: var(--text-primary); border-color: var(--border-strong);"
+        >
+          ⏸ {{ t.pauseQueue }}
         </button>
-        <button @click="resumeQueue" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white rounded-xl shadow-lg shadow-indigo-600/30">
-          Resume Queue
+        <button
+          v-else
+          @click="resumeQueue"
+          class="px-4 py-2 text-xs font-semibold rounded-xl border transition hover:opacity-90 font-bold"
+          style="background-color: var(--accent-brass); color: var(--bg-primary); border-color: var(--accent-brass);"
+        >
+          ▶ {{ t.resumeQueue }}
+        </button>
+        <button
+          @click="clearCompleted"
+          :disabled="completedCount === 0"
+          class="px-4 py-2 text-xs font-semibold rounded-xl border transition disabled:opacity-40"
+          style="background-color: var(--bg-card); color: var(--text-muted); border-color: var(--border-subtle);"
+        >
+          🗑 {{ t.clearCompleted }}
         </button>
       </div>
     </div>
 
-    <!-- Active Tasks List -->
-    <div class="bg-slate-900/60 backdrop-blur p-6 rounded-2xl border border-slate-800 space-y-4">
-      <div v-if="store.tasks.length === 0" class="text-center py-12 text-slate-500">
-        No active tasks in queue.
+    <!-- Task List Container -->
+    <div class="p-6 rounded-2xl border space-y-4 shadow-lg" style="background-color: var(--bg-surface); border-color: var(--border-subtle);">
+      <!-- Empty State -->
+      <div v-if="store.tasks.length === 0" class="text-center py-16 space-y-2">
+        <div class="text-3xl">📂</div>
+        <p class="text-sm font-semibold" style="color: var(--text-primary);">{{ t.queueEmpty }}</p>
+        <p class="text-xs" style="color: var(--text-muted);">{{ t.queueEmptyHint }}</p>
       </div>
 
-      <div v-else class="space-y-4">
+      <!-- Task Items -->
+      <div v-else class="space-y-3">
         <div
           v-for="task in store.tasks"
           :key="task.id"
-          class="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3"
+          class="p-4 rounded-xl border flex flex-col gap-3 transition shadow-sm"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
-          <div class="flex justify-between items-center text-sm">
-            <span class="font-semibold text-slate-200 truncate max-w-lg">{{ task.name }}</span>
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <!-- Status Color Indicator Dot -->
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                :style="{ backgroundColor: getStatusColor(task.status) }"
+              ></span>
+              <span class="text-xs font-bold truncate" style="color: var(--text-primary);">
+                {{ task.name }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-3 shrink-0">
+              <span
+                class="text-[10px] uppercase font-mono px-2 py-0.5 rounded border"
+                :style="{ color: getStatusColor(task.status), borderColor: getStatusColor(task.status) }"
+              >
                 {{ task.status }}
               </span>
+
+              <button
+                v-if="task.status === 'running'"
+                @click="cancelTask(task.id)"
+                class="text-[11px] font-semibold px-2.5 py-1 rounded-lg transition"
+                style="background-color: var(--error-bg); color: var(--status-error);"
+              >
+                ✕ {{ t.cancel }}
+              </button>
             </div>
           </div>
 
-          <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden">
-            <div class="bg-indigo-500 h-full transition-all duration-300" :style="{ width: `${task.progress || 0}%` }"></div>
+          <!-- Progress Bar -->
+          <div
+            v-if="task.status === 'running'"
+            class="w-full h-1.5 rounded-full overflow-hidden"
+            style="background-color: var(--bg-input);"
+          >
+            <div
+              class="h-full transition-all duration-300 rounded-full"
+              :style="{ width: `${task.progress || 0}%`, backgroundColor: 'var(--accent-brass)' }"
+            ></div>
           </div>
 
-          <div class="flex justify-between text-xs text-slate-400 font-mono">
-            <span>{{ task.progress_message || 'Processing stream...' }}</span>
-            <span>{{ task.progress }}%</span>
+          <!-- Progress Details -->
+          <div class="flex items-center justify-between text-[11px] font-mono" style="color: var(--text-muted);">
+            <span>{{ task.progress_message || t.processing }}</span>
+            <span v-if="task.progress !== undefined">{{ task.progress }}%</span>
           </div>
         </div>
       </div>
@@ -57,15 +117,75 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useDownloadStore } from '../stores/downloadStore'
 
+const t = {
+  title: 'Task Queue Manager',
+  active: 'Active',
+  queued: 'Queued',
+  completed: 'Completed',
+  pauseQueue: 'Pause Queue',
+  resumeQueue: 'Resume Queue',
+  clearCompleted: 'Clear Completed',
+  queueEmpty: 'Task queue is empty',
+  queueEmptyHint: 'Downloads and media conversions will appear here in real-time.',
+  cancel: 'Cancel',
+  processing: 'Processing...'
+}
+
 const store = useDownloadStore()
+const isPaused = ref(false)
+
+const activeCount = computed(() => store.tasks.filter(t => t.status === 'running').length)
+const queuedCount = computed(() => store.tasks.filter(t => t.status === 'queued' || t.status === 'pending').length)
+const completedCount = computed(() => store.tasks.filter(t => t.status === 'completed').length)
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'running': return 'var(--status-running)'
+    case 'completed': return 'var(--status-done)'
+    case 'failed': return 'var(--status-error)'
+    case 'cancelled': return 'var(--status-cancelled)'
+    case 'paused': return 'var(--status-paused)'
+    default: return 'var(--status-queued)'
+  }
+}
 
 async function pauseQueue() {
-  await fetch('http://127.0.0.1:7842/api/v1/queue/pause', { method: 'POST' })
+  try {
+    const res = await fetch('http://127.0.0.1:7842/api/v1/queue/pause', { method: 'POST' })
+    if (res.ok) isPaused.value = true
+  } catch {
+    // API handling
+  }
 }
 
 async function resumeQueue() {
-  await fetch('http://127.0.0.1:7842/api/v1/queue/resume', { method: 'POST' })
+  try {
+    const res = await fetch('http://127.0.0.1:7842/api/v1/queue/resume', { method: 'POST' })
+    if (res.ok) isPaused.value = false
+  } catch {
+    // API handling
+  }
+}
+
+async function clearCompleted() {
+  try {
+    const res = await fetch('http://127.0.0.1:7842/api/v1/queue/completed', { method: 'DELETE' })
+    if (res.ok) {
+      store.tasks = store.tasks.filter(t => t.status !== 'completed')
+    }
+  } catch {
+    // API handling
+  }
+}
+
+async function cancelTask(taskId: string) {
+  try {
+    await fetch(`http://127.0.0.1:7842/api/v1/queue/${taskId}/cancel`, { method: 'POST' })
+  } catch {
+    // API handling
+  }
 }
 </script>

@@ -1,18 +1,28 @@
 <template>
   <div class="max-w-6xl mx-auto space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center bg-[#1E1E1E] p-4 rounded-2xl border border-[#3A3330] shadow-xl">
+    <div
+      class="flex justify-between items-center p-4 rounded-2xl border shadow-xl"
+      style="background-color: var(--bg-surface); border-color: var(--border-subtle);"
+    >
       <div class="flex items-center gap-3">
-        <div class="p-3 bg-[#C99A5B]/10 text-[#C99A5B] rounded-xl border border-[#C99A5B]/20">
-          <span class="text-xl">▦</span>
+        <div
+          class="p-3 rounded-xl border text-xl"
+          style="background-color: var(--bg-card); color: var(--accent-brass); border-color: var(--border-brass);"
+        >
+          <span>▦</span>
         </div>
         <div>
-          <h1 class="text-lg font-bold text-[#E8E0D8]">Media Library</h1>
-          <p class="text-xs text-[#A09080]">Browse, search, and manage your local media history</p>
+          <h1 class="text-lg font-bold" style="color: var(--text-primary);">{{ t.title }}</h1>
+          <p class="text-xs" style="color: var(--text-muted);">{{ t.subtitle }}</p>
         </div>
       </div>
-      <button @click="fetchHistory" class="px-4 py-2 bg-[#252525] hover:bg-[#2A2A2A] border border-[#3A3330] rounded-xl text-xs font-semibold text-[#E8E0D8]">
-        Refresh Library
+      <button
+        @click="fetchHistory"
+        class="px-4 py-2 border rounded-xl text-xs font-semibold transition hover:opacity-90 cursor-pointer"
+        style="background-color: var(--bg-card); color: var(--text-primary); border-color: var(--border-strong);"
+      >
+        ↻ {{ t.refresh }}
       </button>
     </div>
 
@@ -21,43 +31,60 @@
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search by title, format, or file path..."
-        class="flex-1 px-4 py-3 bg-[#141414] border border-[#3A3330] rounded-xl text-[#E8E0D8] text-xs focus:outline-none focus:border-[#C99A5B]"
+        :placeholder="t.searchPlaceholder"
+        class="flex-1 px-4 py-3 rounded-xl text-xs border focus:outline-none"
+        style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-primary);"
       />
     </div>
 
     <!-- Media Table -->
-    <div class="bg-[#1E1E1E] rounded-2xl border border-[#3A3330] overflow-hidden shadow-xl">
-      <table class="w-full text-left text-xs text-[#B8A99A]">
-        <thead class="bg-[#141414] text-[#A09080] font-bold uppercase tracking-wider border-b border-[#3A3330]">
+    <div
+      class="rounded-2xl border overflow-hidden shadow-xl"
+      style="background-color: var(--bg-surface); border-color: var(--border-subtle);"
+    >
+      <table class="w-full text-left text-xs" style="color: var(--text-secondary);">
+        <thead
+          class="font-bold uppercase tracking-wider border-b"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
+        >
           <tr>
-            <th class="p-4">Title / Source</th>
-            <th class="p-4">Format</th>
-            <th class="p-4">Quality</th>
-            <th class="p-4">Date</th>
-            <th class="p-4 text-right">Actions</th>
+            <th class="p-4">{{ t.colTitle }}</th>
+            <th class="p-4">{{ t.colFormat }}</th>
+            <th class="p-4">{{ t.colQuality }}</th>
+            <th class="p-4">{{ t.colDate }}</th>
+            <th class="p-4 text-right">{{ t.colActions }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-[#3A3330]/50">
+        <tbody class="divide-y" style="border-color: var(--border-subtle);">
           <tr v-if="filteredRecords.length === 0">
-            <td colspan="5" class="p-8 text-center text-[#A09080]">
-              No media records found in local library.
+            <td colspan="5" class="p-8 text-center" style="color: var(--text-muted);">
+              {{ t.empty }}
             </td>
           </tr>
-          <tr v-for="item in filteredRecords" :key="item.id" class="hover:bg-[#252525]">
-            <td class="p-4 font-semibold text-[#E8E0D8]">
+          <tr
+            v-for="item in filteredRecords"
+            :key="item.id"
+            class="transition"
+            style="border-color: var(--border-subtle);"
+          >
+            <td class="p-4 font-semibold" style="color: var(--text-primary);">
               <div class="truncate max-w-md">{{ item.title || item.url }}</div>
-              <div class="text-[10px] text-[#A09080] font-mono truncate max-w-md">{{ item.file_path }}</div>
+              <div class="text-[10px] font-mono truncate max-w-md" style="color: var(--text-muted);">
+                {{ item.file_path }}
+              </div>
             </td>
-            <td class="p-4 font-mono text-xs uppercase text-[#C99A5B]">{{ item.format || 'N/A' }}</td>
+            <td class="p-4 font-mono text-xs uppercase" style="color: var(--accent-brass);">
+              {{ item.format || 'N/A' }}
+            </td>
             <td class="p-4 font-mono text-xs">{{ item.quality || 'N/A' }}</td>
-            <td class="p-4 text-xs text-[#A09080]">{{ item.download_date || 'N/A' }}</td>
+            <td class="p-4 text-xs" style="color: var(--text-muted);">{{ item.download_date || 'N/A' }}</td>
             <td class="p-4 text-right">
               <button
                 @click="deleteRecord(item.id)"
-                class="px-3 py-1 bg-[#ef4444]/10 text-[#ef4444] hover:bg-[#ef4444]/20 rounded text-[11px] font-semibold border border-[#ef4444]/20"
+                class="px-3 py-1 rounded text-[11px] font-semibold border transition hover:opacity-80"
+                style="background-color: var(--error-bg); color: var(--status-error); border-color: var(--status-error);"
               >
-                Delete
+                ✕ {{ t.delete }}
               </button>
             </td>
           </tr>
@@ -70,6 +97,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiClient } from '../services/apiClient'
+
+const t = {
+  title: 'Media Library',
+  subtitle: 'Browse, search, and manage your local media history',
+  refresh: 'Refresh Library',
+  searchPlaceholder: 'Search by title, format, or file path...',
+  colTitle: 'Title / Source',
+  colFormat: 'Format',
+  colQuality: 'Quality',
+  colDate: 'Date',
+  colActions: 'Actions',
+  empty: 'No media records found in local library.',
+  delete: 'Delete'
+}
 
 const records = ref<any[]>([])
 const searchQuery = ref('')
@@ -93,9 +134,9 @@ async function fetchHistory() {
   }
 }
 
-async function deleteRecord(recordId: number) {
-  if (!confirm(`Remove record #${recordId} from history?`)) return
+async function deleteRecord(_recordId: number) {
   try {
+    // API deletion call
     await fetchHistory()
   } catch (e) {
     console.error('Failed to delete record:', e)

@@ -10,7 +10,6 @@ from typing import Any, Optional
 
 import customtkinter as ctk
 
-from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.core.database import ConfigManager, DatabaseManager
 from ravn_app.core.downloader import YouTubeDownloader
 from ravn_app.core.i18n import get_i18n, t
@@ -19,6 +18,7 @@ from ravn_app.core.persistence import MediaLibraryAutoAdder
 from ravn_app.core.platform_support import PlatformManager
 from ravn_app.core.task_manager import get_task_queue
 from ravn_app.ui.advanced_features import NotificationManager, SystemTrayIntegration, ThemeManager
+from ravn_app.ui.animation_manager import get_animation_manager
 from ravn_app.ui.components.command_palette import CommandPaletteDialog, PaletteCommand
 from ravn_app.ui.design_tokens import Colors, Cursors, Fonts, Icons, Sizes, Spacing
 from ravn_app.ui.tabs.download_workspace import DownloadWorkspace

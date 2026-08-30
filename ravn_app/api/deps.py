@@ -18,7 +18,6 @@ from ravn_app.core.downloader import YouTubeDownloader
 from ravn_app.core.task_manager import TaskQueue, get_task_queue
 from ravn_app.utils.bundled_tools import find_tool
 
-
 # ---------------------------------------------------------------------------
 # Tool-path resolution (reuses the same lookup chain as the desktop runtime)
 # ---------------------------------------------------------------------------

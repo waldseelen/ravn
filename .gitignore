@@ -22,6 +22,7 @@ nosetests.xml
 # Build / packaging
 build/
 dist/
+dist_release/
 site/
 .eggs/
 *.egg
@@ -30,6 +31,7 @@ pip-wheel-metadata/
 PyInstaller/
 *.manifest
 *.exe
+*.msi
 
 # Virtual environments / local Python config
 .env

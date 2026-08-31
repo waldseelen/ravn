@@ -19,14 +19,15 @@
 </p>
 
 <p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white">
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows&logoColor=white">
-  <img alt="UI" src="https://img.shields.io/badge/UI-Tauri%20v2%20%7C%20Vue%203-4FC08D?logo=vuedotjs&logoColor=white">
+  <img alt="Desktop" src="https://img.shields.io/badge/Desktop-Tauri%20v2%20%7C%20Rust-FFC131?logo=tauri&logoColor=white">
+  <img alt="Frontend" src="https://img.shields.io/badge/UI-Vue%203%20%7C%20Tailwind-4FC08D?logo=vuedotjs&logoColor=white">
+  <img alt="Backend" src="https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.9%2B-009688?logo=fastapi&logoColor=white">
   <img alt="CLI" src="https://img.shields.io/badge/CLI-Click-6C47FF">
 </p>
 
 <p align="center">
-  <a href="https://github.com/waldseelen/ravn/releases">Download the latest Windows build</a>
+  <a href="https://github.com/waldseelen/ravn/releases">Download the latest Windows build (.exe / .msi)</a>
 </p>
 
 ---
@@ -90,20 +91,32 @@
 
 ## Quick Start
 
-### Windows release
+### Windows Desktop (Packaged)
 
-1. Download the latest `RAVN-windows-x64.zip` from [GitHub Releases](https://github.com/waldseelen/ravn/releases).
-2. Extract the archive.
-3. Run `RAVN.exe`.
-4. If the app reports missing tools, install the required dependencies from [DEPENDENCIES.md](DEPENDENCIES.md).
-5. Paste a URL, playlist, magnet link, or local file into the relevant workspace and start working.
+1. Download `RAVN_Installer.exe` (or `RAVN_Installer.msi` / portable `RAVN.exe`) from [GitHub Releases](https://github.com/waldseelen/ravn/releases).
+2. Run the installer or executable.
+3. Paste a URL, playlist, magnet link, or local file into the relevant workspace and start working.
 
-### Run from source
+### Run Desktop from Source
+
+```powershell
+# 1. Install Python & Node dependencies
+pip install -r requirements.txt
+cd frontend && npm install && cd ..
+
+# 2. Launch both Backend & Native Desktop Window
+.\start_desktop.bat
+
+# Or run Tauri development mode directly:
+cd frontend
+npm run tauri dev
+```
+
+### Run CLI from Source
 
 ```bash
 pip install -r requirements.txt
 pip install -e .
-python ravn.py
 ravn --help
 ```
 

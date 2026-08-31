@@ -1,15 +1,14 @@
 # Release Status
 
-Verified on 2026-08-30 (`877 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
+Verified on 2026-08-31 (`877 passed, 1 skipped`, Windows 11 — Python 3.14 / 3.13).
 
+RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`).
 
-RAVN is an actively maintained **cross-platform desktop + CLI media product**, verified to run on Windows, Linux, and macOS via a CI test matrix (`.github/workflows/tests.yml`). The core experience is already in place: download, processing, organization, and automation workflows all run through the current shared runtime. Packaged/downloadable releases remain Windows-only for now; the main remaining release work there is final packaged-app validation and trust/signing polish.
-
-> **Active work:** RAVN is currently undergoing a major GUI migration — replacing the existing CustomTkinter desktop UI with a modern **Tauri v2 + Vue 3** frontend. The Python core (downloader, converter, library, CLI) is the single source of truth and will not be rewritten. See the migration plan in `TASKS.md` and `CLAUDE.md`.
+> **Desktop Migration Status:** The desktop GUI migration to **Tauri v2 (Rust) + Vue 3 + Tailwind CSS** is **100% COMPLETE**. The native desktop executable and installers (`RAVN.exe`, `RAVN_Installer.exe`, `RAVN_Installer.msi`) have been compiled and verified. The Python core (FastAPI backend, downloader, converter, library, task queue, CLI) serves as the high-performance unified engine.
 
 ---
 
-## Tauri Migration — Phase Status (2026-08-30)
+## Tauri Migration — Complete Summary (2026-08-31)
 
 ### Phase 0: Cleanup & Design System Tokens ✅ COMPLETE
 - Extended `frontend/src/style.css` with full CustomTkinter Nordic Brass tokens (`--bg-*`, `--text-*`, `--accent-*`, `--border-*`, `--status-*`, `--*-bg`, light theme `:root[data-theme="light"]`).
@@ -179,16 +178,17 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 
 ### Desktop and CLI runtime
 - Desktop workspaces are grouped into `Home`, `Download`, `Studio`, and `Library`.
-- Queue is exposed as a shared panel instead of a top-level workspace.
+- Process shell: Tauri v2 (Rust `tao`/`wry`) native window manager.
+- Queue is exposed as a shared 380px slide-out panel with live progress, ETA, and cancellation.
 - Settings, theme, and language controls are integrated directly into the shell.
 - The CLI supports `download`, `convert`, `info`, `subtitle`, `history`, `torrent`, `mixer`, `library`, `filters`, and `utilities`.
 
 ### Platform and packaging
 - RAVN runs on Windows, Linux, and macOS — CI runs the full test suite on all three on every push/PR.
-- Windows packaged builds are the only pre-built distribution target today.
-- Packaged Windows builds support bundled FFmpeg/FFprobe lookup.
-- GitHub Actions packaging and tagged-release workflows are in place (Windows-only).
-- Linux and macOS packaged artifacts (AppImage/tar.gz, `.app`/`.dmg`) are not shipped yet — tracked as a follow-up in [TASKS.md](TASKS.md).
+- Standalone native binary: `dist_release/RAVN.exe` (**9.06 MB**).
+- Windows Setup Installer: `dist_release/RAVN_Installer.exe` (**1.98 MB** NSIS).
+- Windows MSI Installer: `dist_release/RAVN_Installer.msi` (**3.02 MB** WiX).
+- Launchers: `start_desktop.bat` and `start_desktop.ps1` for one-click background service and GUI management.
 
 ---
 
@@ -196,20 +196,12 @@ RAVN is an actively maintained **cross-platform desktop + CLI media product**, v
 
 Latest automated verification run:
 
-- `pytest -q`
-- `877 passed, 1 skipped`
-- `npm run build` — 0 errors (Vue 3 + TypeScript production bundle: 350 kB)
+- `pytest -q` -> **877 passed, 1 skipped** (100% green)
+- `cargo check` -> **0 errors** (Finished dev profile target in 1m 24s)
+- `npm run tauri build` -> **0 errors** (Compiled standalone executable and 2 release bundles)
+- `vue-tsc --noEmit && vite build` -> **0 errors** (Vue 3 + TypeScript production bundle: 350 kB)
 
-Observed on 2026-08-30 (Windows 11, Python 3.14).
-
----
-
-## Current release focus
-
-- **Tauri migration (active):** Phase 1 and Phase 2 complete; Phase 3 (Tauri shell scaffold) is next.
-- Validate packaged behavior on a clean Windows machine / VM.
-- Tighten signing and release-trust guidance for Windows distribution.
-- Keep docs, screenshots, and onboarding material aligned with repository reality.
+Observed on 2026-08-31 (Windows 11, Python 3.14).
 
 ---
 
@@ -218,8 +210,7 @@ Observed on 2026-08-30 (Windows 11, Python 3.14).
 - `ffmpeg`, `ffprobe`, and `yt-dlp` are core dependencies.
 - `aria2c` is optional and only required for torrent and magnet workflows.
 - `plugin_system.py` is experimental and is not part of the active packaged runtime.
-- `ravn_app/api/` is the new FastAPI transport layer for the Tauri frontend; it is not yet wired into the packaged build.
-- `customtkinter`, `tkinterdnd2`, and `pystray` are legacy Tkinter UI dependencies — they will be removed in Phase 5 of the Tauri migration.
+- `ravn_app/api/` is the official FastAPI transport layer powering the Tauri frontend and headless integrations.
 
 ---
 

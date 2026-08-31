@@ -26,14 +26,15 @@ Current release work is centered on final Windows packaging validation and relea
 
 ## 2. Runtime surfaces
 
-### Desktop (Tauri v2 + Vue 3 Migration)
+### Desktop (Tauri v2 + Vue 3 Native Desktop Shell)
 
-- Entry point: Tauri application shell / `src-tauri` & `ravn.py` (legacy CustomTkinter runtime)
-- Frontend: Vue 3 + TypeScript + Vite (`frontend/src/`)
+- Process Shell: Tauri v2 (Rust) (`frontend/src-tauri/`)
+- Frontend UI: Vue 3 + TypeScript + Vite + Tailwind CSS (`frontend/src/`)
 - Backend API Transport: FastAPI + Uvicorn (`ravn_app/api/`)
 - State Management: Pinia stores (`useDownloadStore`, `useToastStore`, `useHistoryStore`)
 - Design System: Nordic Brass theme CSS tokens (`frontend/src/style.css`)
 - Real-time Events: WebSocket at `/ws/events`
+- Launchers: `start_desktop.bat`, `start_desktop.ps1`, `dist_release/RAVN.exe`
 
 Startup order:
 
@@ -41,7 +42,8 @@ Startup order:
 2. `ensure_directories_exist()`
 3. `migrate_all_legacy_files()`
 4. `check_tool_dependencies()`
-5. Launch FastAPI backend service & Tauri / desktop shell
+5. Launch FastAPI backend service on `127.0.0.1:7842`
+6. Launch Tauri v2 native desktop window shell
 
 ### CLI
 
@@ -321,28 +323,43 @@ call would hang. macOS (`brew`) is a tracked follow-up.
 ## 6. Repository map
 
 ```text
+start_desktop.bat
+start_desktop.ps1
 ravn.py
-build.ps1
-ravn.spec
+frontend/
+  src/
+    components/
+    stores/
+    services/
+    style.css
+  src-tauri/
+    src/
+    Cargo.toml
+    tauri.conf.json
 ravn_app/
+  api/
+    routers/
+    main.py
+    ws.py
+    deps.py
   cli.py
   core/
     runners/
     persistence/
-  ui/
-    components/
-    tabs/
   translations/
   utils/
-docs/
+dist_release/
 tests/
-tools/
+docs/
 ```
 
 Useful starting points:
 
-- desktop entry: `ravn.py`
-- desktop shell: `ravn_app/ui/main_window.py`
+- desktop native launcher: `start_desktop.bat` / `start_desktop.ps1`
+- desktop process binary: `dist_release/RAVN.exe`
+- tauri core: `frontend/src-tauri/src/lib.rs`
+- frontend root: `frontend/src/App.vue`
+- backend API: `ravn_app/api/main.py`
 - download logic: `ravn_app/core/downloader.py`
 - queue: `ravn_app/core/task_manager.py`
 - history/config DB: `ravn_app/core/database.py`

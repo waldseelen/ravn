@@ -6,12 +6,15 @@
 #
 altgraph==0.17.5
     # via pyinstaller
+annotated-doc==0.0.5
+    # via fastapi
 annotated-types==0.8.0
     # via pydantic
 anyio==4.14.2
     # via
     #   httpx
     #   starlette
+    #   watchfiles
 certifi==2026.6.17
     # via
     #   httpcore
@@ -19,13 +22,9 @@ certifi==2026.6.17
     #   requests
 charset-normalizer==3.4.9
     # via requests
-click==8.4.2
+click==8.5.0
     # via
     #   -r requirements.in
-    #   uvicorn
-colorama==0.4.6
-    # via
-    #   click
     #   uvicorn
 customtkinter==6.0.0
     # via -r requirements.in
@@ -55,8 +54,6 @@ packaging==26.2
     #   customtkinter
     #   pyinstaller
     #   pyinstaller-hooks-contrib
-pefile==2024.8.26
-    # via pyinstaller
 pillow==12.3.0
     # via
     #   -r requirements.in
@@ -75,14 +72,16 @@ pystray==0.19.5
     # via -r requirements.in
 python-dotenv==1.2.3
     # via uvicorn
-pywin32-ctypes==0.2.3
-    # via pyinstaller
-PyYAML==6.0.3
+python-xlib==0.33
+    # via pystray
+pyyaml==6.0.3
     # via uvicorn
 requests==2.34.2
     # via -r requirements.in
 six==1.17.0
-    # via pystray
+    # via
+    #   pystray
+    #   python-xlib
 starlette==1.6.0
     # via
     #   -r requirements.in
@@ -96,11 +95,17 @@ typing-extensions==4.16.0
     #   pydantic
     #   pydantic-core
     #   starlette
-    #   uvicorn
+    #   typing-inspection
+typing-inspection==0.4.4
+    # via
+    #   fastapi
+    #   pydantic
 urllib3==2.7.0
     # via requests
 uvicorn==0.52.4
     # via -r requirements.in
+uvloop==0.22.1
+    # via uvicorn
 watchfiles==1.2.0
     # via uvicorn
 websockets==17.1
@@ -109,4 +114,3 @@ websockets==17.1
     #   uvicorn
 yt-dlp==2026.7.4
     # via -r requirements.in
-

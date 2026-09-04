@@ -10,7 +10,7 @@ customtkinter>=5.2.0      # desktop UI toolkit (legacy Tkinter UI)
 Pillow>=10.0.0            # image handling (icons, thumbnails)
 yt-dlp>=2024.1.1          # media download engine
 requests>=2.32.0          # HTTP (update checks, thumbnail fetch)
-click>=8.1.0             # CLI framework
+click>=8.5.0             # CLI framework
 mutagen>=1.47.0          # audio metadata tagging
 
 # --- API transport (Tauri frontend IPC) ---
